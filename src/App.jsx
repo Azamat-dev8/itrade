@@ -28,6 +28,11 @@ function App() {
   const [contactPhone, setContactPhone] = useState('')
   const [contactNote, setContactNote] = useState('')
 
+  const [editingContact, setEditingContact] = useState(null)
+  const [editContactName, setEditContactName] = useState('')
+  const [editContactPhone, setEditContactPhone] = useState('')
+  const [editContactNote, setEditContactNote] = useState('')
+
   const [genExpAmount, setGenExpAmount] = useState('')
   const [genExpCategory, setGenExpCategory] = useState('Реклама/Авито')
   const [genExpNote, setGenExpNote] = useState('')
@@ -67,6 +72,7 @@ function App() {
     const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name), buyer:buyer_id(name)').order('created_at', { ascending: false })
     if (dealsData) setDeals(dealsData)
 
+    // contactsData теперь включает created_at (так как используем *)
     const { data: contactsData } = await supabase.from('contacts').select('*').order('name')
     if (contactsData) setContacts(contactsData)
 
@@ -110,6 +116,44 @@ function App() {
     fetchData()
   }
 
+  const addContact = async (e) => {
+    e.preventDefault()
+    if (!contactName) return alert('Введите имя')
+    const { error } = await supabase.from('contacts').insert([{ name: contactName, phone: contactPhone, note: contactNote }])
+    if (!error) { setContactName(''); setContactPhone(''); setContactNote(''); fetchData(); haptic('medium'); }
+  }
+
+  const openEditContactModal = (contact) => {
+    haptic();
+    setEditingContact(contact)
+    setEditContactName(contact.name)
+    setEditContactPhone(contact.phone || '')
+    setEditContactNote(contact.note || '')
+  }
+
+  const saveEditContact = async () => {
+    if (!editContactName) return alert('Введите имя')
+    const { error } = await supabase.from('contacts').update({
+      name: editContactName,
+      phone: editContactPhone || null,
+      note: editContactNote || null
+    }).eq('id', editingContact.id)
+    
+    if (!error) { 
+      setEditingContact(null); 
+      fetchData(); 
+      haptic('medium'); 
+    } else {
+      alert('Ошибка при сохранении: ' + error.message)
+    }
+  }
+
+  const deleteContact = async (id) => {
+    if (!window.confirm('Удалить этот контакт? (В сделках он останется, но имя исчезнет)')) return
+    const { error } = await supabase.from('contacts').delete().eq('id', id)
+    if (!error) { fetchData(); haptic('heavy'); }
+  }
+
   const openEditModal = (deal) => {
     haptic();
     setEditingDeal(deal)
@@ -137,13 +181,6 @@ function App() {
     if (!window.confirm('Удалить это устройство?')) return
     const { error } = await supabase.from('deals').delete().eq('id', id)
     if (!error) { fetchData(); haptic('heavy'); }
-  }
-
-  const addContact = async (e) => {
-    e.preventDefault()
-    if (!contactName) return alert('Введите имя')
-    const { error } = await supabase.from('contacts').insert([{ name: contactName, phone: contactPhone, note: contactNote }])
-    if (!error) { setContactName(''); setContactPhone(''); setContactNote(''); fetchData(); haptic('medium'); }
   }
 
   const openSellModal = (deal) => { haptic(); setSellingDeal(deal); setSellPrice(''); setBuyerId('') }
@@ -192,7 +229,6 @@ function App() {
   const totalProfit = totalRevenue - totalBuy - totalDealExp - totalGenExp
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + e.amount, 0);
 
-  // Данные для графика
   const monthlyProfits = soldDeals.reduce((acc, deal) => {
     const date = new Date(deal.sold_at || deal.created_at);
     const monthYear = date.toLocaleString('ru-RU', { month: 'short', year: '2-digit' });
@@ -203,10 +239,7 @@ function App() {
     return acc;
   }, {});
   
-  // Превращаем объект в массив для Recharts и разворачиваем (старые слева, новые справа)
-  const chartData = Object.entries(monthlyProfits)
-    .map(([name, profit]) => ({ name, profit }))
-    .reverse();
+  const chartData = Object.entries(monthlyProfits).map(([name, profit]) => ({ name, profit })).reverse();
 
   const filterDealsByQuery = (list) => {
     if (!searchQuery) return list;
@@ -273,7 +306,6 @@ function App() {
         </button>
       </div>
 
-      {/* КРАСИВЫЙ ГРАФИК ПРИБЫЛИ */}
       {chartData.length > 0 && (
         <div className="card">
           <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Прибыль по месяцам</h3>
@@ -403,15 +435,36 @@ function App() {
   const renderContacts = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Контакты</h2>
+      
       <div className="card">
+        <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить контакт</h3>
         <form onSubmit={addContact}>
           <input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/>
           <input className="input-field" type="text" placeholder="Телефон" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}/>
+          <input className="input-field" type="text" placeholder="Комментарий (скуп, продавец 15 про...)" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/>
           <button className="btn-primary" type="submit">Сохранить</button>
         </form>
       </div>
+
+      {contacts.length === 0 ? <p style={{textAlign: 'center', color: '#888', marginTop: 20}}>Список контактов пуст</p> : null}
+
       {contacts.map((c) => (
-        <div key={c.id} className="card" style={{ padding: 16 }}><div style={{ fontWeight: 600, fontSize: 16 }}>{c.name}</div>{c.phone && <div style={{ color: 'var(--accent)', marginTop: 4 }}>📞 {c.phone}</div>}</div>
+        <div key={c.id} className="card" style={{ padding: 16 }}>
+          <div className="card-header" style={{ marginBottom: 8 }}>
+            <div style={{ fontWeight: 600, fontSize: 16 }}>{c.name}</div>
+            <div>
+              <button className="icon-btn" onClick={() => openEditContactModal(c)}>✏️</button>
+              <button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button>
+            </div>
+          </div>
+          {c.phone && <div style={{ color: 'var(--accent)', marginTop: 4, fontSize: 14 }}>📞 {c.phone}</div>}
+          {c.note && <div style={{ color: '#888', fontSize: 13, marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}
+          
+          {/* ВЫВОД ДАТЫ ДОБАВЛЕНИЯ */}
+          <div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
+            Добавлен: {new Date(c.created_at).toLocaleDateString('ru-RU')}
+          </div>
+        </div>
       ))}
     </div>
   )
@@ -424,7 +477,6 @@ function App() {
       {activeTab === 'finance' && renderFinance()}
       {activeTab === 'contacts' && renderContacts()}
 
-      {/* МОДАЛКИ */}
       {sellingDeal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Продажа: {sellingDeal.model}</h3>
@@ -452,7 +504,7 @@ function App() {
 
       {editingDeal && (
         <div className="modal-overlay"><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-          <h3>Редактировать</h3>
+          <h3>Редактировать устройство</h3>
           <label style={{fontSize: 12, color: '#888'}}>Модель</label><input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/>
           <label style={{fontSize: 12, color: '#888'}}>Цена закупа (₽)</label><input className="input-field" type="number" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value)}/>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -466,6 +518,23 @@ function App() {
             </>
           )}
           <div className="modal-actions" style={{ marginTop: 20 }}><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" style={{ flex: 1, backgroundColor: 'var(--accent)' }} onClick={saveEdit}>Сохранить</button></div>
+        </div></div>
+      )}
+
+      {editingContact && (
+        <div className="modal-overlay"><div className="modal-content">
+          <h3>Редактировать контакт</h3>
+          <label style={{fontSize: 12, color: '#888'}}>Имя</label>
+          <input className="input-field" type="text" value={editContactName} onChange={(e) => setEditContactName(e.target.value)} />
+          <label style={{fontSize: 12, color: '#888'}}>Телефон</label>
+          <input className="input-field" type="text" value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)} />
+          <label style={{fontSize: 12, color: '#888'}}>Комментарий</label>
+          <input className="input-field" type="text" value={editContactNote} onChange={(e) => setEditContactNote(e.target.value)} />
+          
+          <div className="modal-actions" style={{ marginTop: 20 }}>
+            <button className="btn-cancel" onClick={() => setEditingContact(null)}>Отмена</button>
+            <button className="btn-confirm" style={{ flex: 1, backgroundColor: 'var(--accent)' }} onClick={saveEditContact}>Сохранить</button>
+          </div>
         </div></div>
       )}
 
@@ -488,7 +557,6 @@ function App() {
         <Scanner onScan={(text) => setImei(text)} onClose={() => setShowScanner(false)} />
       )}
 
-      {/* НИЖНЕЕ МЕНЮ */}
       <div className="tab-bar">
         <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon">📊</span> Главная</button>
         <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => { setActiveTab('stock'); haptic(); }}><span className="tab-icon">📦</span> Склад</button>

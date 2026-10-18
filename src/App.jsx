@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import Scanner from './Scanner'
 import './App.css'
-import Scanner from './Scanner';
 
 function App() {
   const [user, setUser] = useState(null)
@@ -12,12 +13,10 @@ function App() {
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Стейты для экспорта в Excel
   const [showExportModal, setShowExportModal] = useState(false)
-  const [showScanner, setShowScanner] = useState(false);
   const [csvData, setCsvData] = useState('')
+  const [showScanner, setShowScanner] = useState(false)
 
-  // Поля для новой сделки
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [storage, setStorage] = useState('')
@@ -25,17 +24,14 @@ function App() {
   const [imei, setImei] = useState('')
   const [sellerId, setSellerId] = useState('')
   
-  // Поля для нового контакта
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactNote, setContactNote] = useState('')
 
-  // Поля для ОБЩЕГО расхода
   const [genExpAmount, setGenExpAmount] = useState('')
   const [genExpCategory, setGenExpCategory] = useState('Реклама/Авито')
   const [genExpNote, setGenExpNote] = useState('')
 
-  // Окна (модалки)
   const [sellingDeal, setSellingDeal] = useState(null)
   const [sellPrice, setSellPrice] = useState('')
   const [buyerId, setBuyerId] = useState('')
@@ -56,10 +52,7 @@ function App() {
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
-    if (tg) {
-      tg.ready(); tg.expand();
-      setUser(tg.initDataUnsafe?.user || null)
-    }
+    if (tg) { tg.ready(); tg.expand(); setUser(tg.initDataUnsafe?.user || null) }
     fetchData()
   }, [])
 
@@ -170,11 +163,9 @@ function App() {
     if (!error) { setExpenseDeal(null); fetchData(); haptic('medium'); }
   }
 
-  // --- ГЕНЕРАЦИЯ CSV И ОТКРЫТИЕ ОКНА ---
   const exportToCSV = () => {
     haptic();
     if (deals.length === 0) return alert('Нет данных для экспорта')
-    
     const headers = ['Модель', 'Память', 'АКБ', 'IMEI', 'Закупка', 'Расходы', 'Продажа', 'Прибыль', 'Дата закупа', 'Дата продажи', 'Продавец', 'Покупатель'];
     const rows = deals.map(d => {
       const exp = getDealExpensesSum(d);
@@ -187,34 +178,35 @@ function App() {
         d.seller ? `"${d.seller.name}"` : '', d.buyer ? `"${d.buyer.name}"` : ''
       ].join(';'); 
     });
-    
     const csvString = [headers.join(';'), ...rows].join('\n');
     setCsvData(csvString);
     setShowExportModal(true);
   }
 
-  // --- СТАТИСТИКА ---
   const soldDeals = deals.filter(d => d.status === 'sold')
   const inStockDeals = deals.filter(d => d.status === 'in_stock')
-  
   const totalBuy = deals.reduce((sum, deal) => sum + deal.buy_price, 0)
   const totalDealExp = deals.reduce((sum, deal) => sum + (deal.expenses || []).reduce((s, e) => s + e.amount, 0), 0)
   const totalGenExp = generalExpenses.reduce((sum, exp) => sum + exp.amount, 0)
   const totalRevenue = soldDeals.reduce((sum, deal) => sum + deal.sell_price, 0)
   const totalProfit = totalRevenue - totalBuy - totalDealExp - totalGenExp
-  
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + e.amount, 0);
 
+  // Данные для графика
   const monthlyProfits = soldDeals.reduce((acc, deal) => {
     const date = new Date(deal.sold_at || deal.created_at);
-    const monthYear = date.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
-    const formatted = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
+    const monthYear = date.toLocaleString('ru-RU', { month: 'short', year: '2-digit' });
     const expSum = getDealExpensesSum(deal);
     const profit = deal.sell_price - deal.buy_price - expSum;
-    if (!acc[formatted]) acc[formatted] = 0;
-    acc[formatted] += profit;
+    if (!acc[monthYear]) acc[monthYear] = 0;
+    acc[monthYear] += profit;
     return acc;
   }, {});
+  
+  // Превращаем объект в массив для Recharts и разворачиваем (старые слева, новые справа)
+  const chartData = Object.entries(monthlyProfits)
+    .map(([name, profit]) => ({ name, profit }))
+    .reverse();
 
   const filterDealsByQuery = (list) => {
     if (!searchQuery) return list;
@@ -232,66 +224,68 @@ function App() {
   }
 
   const renderDaysBadge = (days, status) => {
-    let bg = '#e5e5ea'; let color = '#333';
+    let badgeClass = 'badge-gray';
     if (status === 'in_stock') {
-      if (days >= 30) { bg = '#ffe4e1'; color = '#ff3b30'; }
-      else if (days >= 15) { bg = '#fff3cd'; color = '#856404'; }
-      else { bg = '#d1f9d1'; color = '#28a745'; }
-    } else { bg = '#f0f0f0'; color = '#666'; }
-    return <span style={{ background: bg, color: color, padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 'bold' }}>⏱ {days} дн.</span>
+      if (days >= 30) badgeClass = 'badge-red';
+      else if (days >= 15) badgeClass = 'badge-yellow';
+      else badgeClass = 'badge-green';
+    }
+    return <span className={`badge ${badgeClass}`}>⏱ {days} дн.</span>
   }
 
   const renderSpecs = (deal) => (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, marginBottom: 10 }}>
       {renderDaysBadge(getDaysOnStock(deal), deal.status)}
-      {deal.storage_gb && <span style={{ background: '#e5e5ea', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>{deal.storage_gb} GB</span>}
-      {deal.battery_health && <span style={{ background: deal.battery_health >= 85 ? '#d1f9d1' : '#ffe4e1', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>🔋 {deal.battery_health}%</span>}
-      {deal.imei && <span style={{ background: '#e5e5ea', padding: '2px 8px', borderRadius: 4, fontSize: 12, color: '#666' }}>IMEI: ...{deal.imei.slice(-4)}</span>}
+      {deal.storage_gb && <span className="badge badge-gray">{deal.storage_gb} GB</span>}
+      {deal.battery_health && <span className="badge badge-gray">🔋 {deal.battery_health}%</span>}
+      {deal.imei && <span className="badge badge-gray">IMEI: ...{deal.imei.slice(-4)}</span>}
     </div>
   )
 
   const renderSearchBar = () => (
-    <div style={{ position: 'relative', marginBottom: 15 }}>
-      <input className="input-field" type="text" placeholder="Поиск по модели или IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
-      <span style={{ position: 'absolute', left: 12, top: 12, fontSize: 16, color: '#888' }}>🔍</span>
+    <div style={{ position: 'relative', marginBottom: 16 }}>
+      <input className="input-field" type="text" placeholder="Поиск по модели или IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 40 }}/>
+      <span style={{ position: 'absolute', left: 14, top: 15, fontSize: 16, color: '#888' }}>🔍</span>
     </div>
   )
 
-  // --- ЭКРАНЫ ---
   const renderHome = () => (
     <div>
-      <h2>Дашборд</h2>
-      <div className="card" style={{ background: 'linear-gradient(135deg, #2481cc, #1a5c94)', color: 'white' }}>
-        <h3 style={{ color: 'white', marginTop: 0, opacity: 0.8 }}>Чистая прибыль</h3>
-        <div style={{ fontSize: 32, fontWeight: 'bold' }}>{totalProfit} ₽</div>
-        <div style={{ marginTop: 15, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: 10, fontSize: 13 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}><span>Выручка:</span> <span>{totalRevenue} ₽</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}><span>Закупки:</span> <span>{totalBuy} ₽</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}><span>Расходы по сделкам:</span> <span>{totalDealExp} ₽</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ffb3b3' }}><span>Общие расходы:</span> <span>{totalGenExp} ₽</span></div>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Дашборд</h2>
+      
+      <div className="main-profit-card">
+        <h3>Чистая прибыль</h3>
+        <div className="main-profit-value">{totalProfit} ₽</div>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>
+          <div className="stat-row"><span>Выручка:</span> <span>{totalRevenue} ₽</span></div>
+          <div className="stat-row"><span>Закупки:</span> <span>{totalBuy} ₽</span></div>
+          <div className="stat-row" style={{ marginBottom: 0 }}><span>Всего расходов:</span> <span>{totalDealExp + totalGenExp} ₽</span></div>
         </div>
       </div>
 
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h3 style={{ margin: 0 }}>На складе</h3>
-          <div style={{ fontSize: 20, fontWeight: 'bold' }}>{inStockDeals.length} шт.</div>
+          <h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3>
+          <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.length} шт.</div>
         </div>
-        <button className="btn-primary" onClick={exportToCSV} style={{ width: 'auto', padding: '10px 15px', backgroundColor: '#34c759' }}>
-          📥 Скачать Excel
+        <button className="btn-success" onClick={exportToCSV} style={{ padding: '12px 16px' }}>
+          📥 Экспорт
         </button>
       </div>
 
-      {soldDeals.length > 0 && (
+      {/* КРАСИВЫЙ ГРАФИК ПРИБЫЛИ */}
+      {chartData.length > 0 && (
         <div className="card">
-          <h3>Прибыль по месяцам</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
-            {Object.entries(monthlyProfits).map(([month, profit]) => (
-              <div key={month} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: 5 }}>
-                <span style={{ color: '#555' }}>{month}</span>
-                <span style={{ fontWeight: 'bold', color: profit >= 0 ? '#34c759' : '#ff3b30' }}>{profit} ₽</span>
-              </div>
-            ))}
+          <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Прибыль по месяцам</h3>
+          <div style={{ width: '100%', height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
+                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                <Bar dataKey="profit" fill="#34c759" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
@@ -300,32 +294,32 @@ function App() {
 
   const renderFinance = () => (
     <div>
-      <h2>Финансы</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Финансы</h2>
       <div className="card">
-        <h3>Быстрые расходы</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0 }}>Быстрые расходы</h3>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <button className="btn-cancel" style={{ flex: '1 0 30%', padding: 8 }} onClick={() => addQuickGeneralExpense(1000, 'Реклама/Авито')}>Авито 1000₽</button>
-          <button className="btn-cancel" style={{ flex: '1 0 30%', padding: 8 }} onClick={() => addQuickGeneralExpense(500, 'Бензин')}>Бензин 500₽</button>
-          <button className="btn-cancel" style={{ flex: '1 0 30%', padding: 8 }} onClick={() => addQuickGeneralExpense(300, 'Прочее')}>Такси 300₽</button>
+          <button className="btn-cancel" style={{ flex: '1 0 30%', padding: '10px 8px', fontSize: 14 }} onClick={() => addQuickGeneralExpense(1000, 'Реклама/Авито')}>Авито 1000₽</button>
+          <button className="btn-cancel" style={{ flex: '1 0 30%', padding: '10px 8px', fontSize: 14 }} onClick={() => addQuickGeneralExpense(500, 'Бензин')}>Бензин 500₽</button>
+          <button className="btn-cancel" style={{ flex: '1 0 30%', padding: '10px 8px', fontSize: 14 }} onClick={() => addQuickGeneralExpense(300, 'Прочее')}>Такси 300₽</button>
         </div>
       </div>
 
       <div className="card">
-        <h3>Добавить свой расход</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0 }}>Свой расход</h3>
         <form onSubmit={addGeneralExpense}>
           <input className="input-field" type="number" placeholder="Сумма (₽)" value={genExpAmount} onChange={(e) => setGenExpAmount(e.target.value)}/>
           <select className="input-field" value={genExpCategory} onChange={(e) => setGenExpCategory(e.target.value)}>
-            <option value="Реклама/Авито">Реклама/Авито</option><option value="Аренда">Аренда</option><option value="Бензин">Бензин</option><option value="Инструменты">Инструменты</option><option value="Подписки">Подписки</option><option value="Прочее">Прочее</option>
+            <option value="Реклама/Авито">Реклама/Авито</option><option value="Аренда">Аренда</option><option value="Бензин">Бензин</option><option value="Прочее">Прочее</option>
           </select>
-          <input className="input-field" type="text" placeholder="Комментарий" value={genExpNote} onChange={(e) => setGenExpNote(e.target.value)}/>
-          <button className="btn-primary" type="submit" style={{backgroundColor: '#ff3b30'}}>Добавить расход</button>
+          <button className="btn-primary" type="submit" style={{backgroundColor: 'var(--danger)'}}>Добавить</button>
         </form>
       </div>
-      <h3>История общих расходов</h3>
+
+      <h3 style={{ fontSize: 18, marginTop: 24 }}>История</h3>
       {generalExpenses.map(exp => (
-        <div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px' }}>
-          <div><div style={{ fontWeight: 'bold' }}>{exp.category}</div>{exp.note && <div style={{ fontSize: 12, color: '#888' }}>{exp.note}</div>}</div>
-          <div style={{ fontWeight: 'bold', color: '#ff3b30' }}>-{exp.amount} ₽</div>
+        <div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8 }}>
+          <div><div style={{ fontWeight: 600 }}>{exp.category}</div>{exp.note && <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>{exp.note}</div>}</div>
+          <div style={{ fontWeight: 700, color: 'var(--danger)' }}>-{exp.amount} ₽</div>
         </div>
       ))}
     </div>
@@ -333,54 +327,46 @@ function App() {
 
   const renderStock = () => (
     <div>
-      <h2>Склад</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Склад</h2>
       <div className="card">
-        <h3>Добавить устройство</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить</h3>
         <form onSubmit={addDeal}>
-          <input className="input-field" type="text" placeholder="Модель" value={model} onChange={(e) => setModel(e.target.value)}/>
+          <input className="input-field" type="text" placeholder="Модель (iPhone 13 Pro)" value={model} onChange={(e) => setModel(e.target.value)}/>
           <input className="input-field" type="number" placeholder="Цена закупа (₽)" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)}/>
           <div style={{ display: 'flex', gap: 10 }}>
             <input className="input-field" type="number" placeholder="Память (ГБ)" value={storage} onChange={(e) => setStorage(e.target.value)}/>
             <input className="input-field" type="number" placeholder="АКБ (%)" value={battery} onChange={(e) => setBattery(e.target.value)}/>
           </div>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <input 
-              className="input-field" 
-              type="text" 
-              placeholder="IMEI" 
-              value={imei} 
-              onChange={(e) => setImei(e.target.value)}
-              style={{ flex: 1, marginBottom: 10 }}
-            />
-            <button 
-              type="button" 
-              onClick={() => setShowScanner(true)}
-              style={{ marginBottom: 10, padding: '12px 15px', backgroundColor: '#ff9500', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold' }}
-            >
-              📷
-            </button>
+          
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <input className="input-field" type="text" placeholder="IMEI" value={imei} onChange={(e) => setImei(e.target.value)} style={{ flex: 1, marginBottom: 10 }}/>
+            <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px 16px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12 }}>📷</button>
           </div>
+
           <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
             <option value="">Кто продал? (Необязательно)</option>
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <button className="btn-primary" type="submit" disabled={loading}>Добавить</button>
+          <button className="btn-primary" type="submit" disabled={loading}>Сохранить на склад</button>
         </form>
       </div>
+
       {inStockDeals.length > 0 && renderSearchBar()}
       {filteredStock.map((deal) => {
         const expSum = getDealExpensesSum(deal);
         return (
-          <div key={deal.id} className="card" style={{ borderLeft: '4px solid #ff9500' }}>
+          <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
             <div className="card-header">
-              <div style={{ fontWeight: 'bold', fontSize: 16 }}>{deal.model}</div>
-              <div className="action-buttons"><button className="icon-btn" onClick={() => openEditModal(deal)}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div>
+              <div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div>
+              <div><button className="icon-btn" onClick={() => openEditModal(deal)}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div>
             </div>
             {renderSpecs(deal)}
-            <div style={{ fontSize: 14, color: '#666', marginTop: 5 }}>Закуп: {deal.buy_price} ₽ {expSum > 0 && <span style={{color: '#ff3b30'}}>+ Расходы: {expSum} ₽</span>}</div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-              <button className="btn-success" style={{ margin: 0, flex: 1, backgroundColor: '#ff9500' }} onClick={() => openExpenseModal(deal)}>+ Расход</button>
-              <button className="btn-success" style={{ margin: 0, flex: 1 }} onClick={() => openSellModal(deal)}>Продать</button>
+            <div style={{ fontSize: 15, color: '#333', fontWeight: 500 }}>
+              Закуп: {deal.buy_price} ₽ {expSum > 0 && <span style={{color: 'var(--danger)'}}>+ Расходы: {expSum} ₽</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+              <button className="btn-cancel" style={{ padding: '12px', backgroundColor: '#fff3cd', color: '#b28900' }} onClick={() => openExpenseModal(deal)}>+ Расход</button>
+              <button className="btn-success" style={{ flex: 1, padding: '12px' }} onClick={() => openSellModal(deal)}>Продать</button>
             </div>
           </div>
         )
@@ -390,20 +376,24 @@ function App() {
 
   const renderDeals = () => (
     <div>
-      <h2>История сделок</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Сделки</h2>
       {soldDeals.length > 0 && renderSearchBar()}
       {filteredSold.map((deal) => {
         const expSum = getDealExpensesSum(deal);
         const margin = deal.sell_price - deal.buy_price - expSum; 
         return (
-          <div key={deal.id} className="card" style={{ borderLeft: '4px solid #34c759' }}>
+          <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--success)' }}>
             <div className="card-header">
-              <div style={{ fontWeight: 'bold', fontSize: 16 }}>{deal.model}</div>
-              <div className="action-buttons"><button className="icon-btn" onClick={() => openEditModal(deal)}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div>
+              <div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div>
+              <div><button className="icon-btn" onClick={() => openEditModal(deal)}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div>
             </div>
             {renderSpecs(deal)}
-            <div style={{ fontSize: 14, color: '#666', marginTop: 5 }}>Закуп: {deal.buy_price} ₽ | Расходы: {expSum} ₽ | Продажа: {deal.sell_price} ₽</div>
-            <div style={{ fontWeight: 'bold', color: margin >= 0 ? '#34c759' : '#ff3b30', marginTop: 5 }}>Прибыль: {margin} ₽</div>
+            <div style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>
+              Закуп: {deal.buy_price} ₽ | Расходы: {expSum} ₽ | Продажа: {deal.sell_price} ₽
+            </div>
+            <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16 }}>
+              Прибыль: {margin} ₽
+            </div>
           </div>
         )
       })}
@@ -412,7 +402,7 @@ function App() {
 
   const renderContacts = () => (
     <div>
-      <h2>Контакты</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Контакты</h2>
       <div className="card">
         <form onSubmit={addContact}>
           <input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/>
@@ -421,7 +411,7 @@ function App() {
         </form>
       </div>
       {contacts.map((c) => (
-        <div key={c.id} className="card"><div style={{ fontWeight: 'bold' }}>{c.name}</div>{c.phone && <div>📞 {c.phone}</div>}</div>
+        <div key={c.id} className="card" style={{ padding: 16 }}><div style={{ fontWeight: 600, fontSize: 16 }}>{c.name}</div>{c.phone && <div style={{ color: 'var(--accent)', marginTop: 4 }}>📞 {c.phone}</div>}</div>
       ))}
     </div>
   )
@@ -434,107 +424,70 @@ function App() {
       {activeTab === 'finance' && renderFinance()}
       {activeTab === 'contacts' && renderContacts()}
 
-      {/* ОКНО ПРОДАЖИ */}
+      {/* МОДАЛКИ */}
       {sellingDeal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Продажа: {sellingDeal.model}</h3>
           <input className="input-field" type="number" placeholder="Цена продажи (₽)" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} autoFocus/>
           <select className="input-field" value={buyerId} onChange={(e) => setBuyerId(e.target.value)}><option value="">Кто купил?</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-          <div className="modal-actions"><button className="btn-cancel" onClick={() => setSellingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmSell}>Продать</button></div>
+          <div className="modal-actions"><button className="btn-cancel" onClick={() => setSellingDeal(null)}>Отмена</button><button className="btn-confirm" style={{ flex: 1, backgroundColor: 'var(--success)' }} onClick={confirmSell}>Продать</button></div>
         </div></div>
       )}
 
-      {/* ОКНО РАСХОДА ПО СДЕЛКЕ */}
       {expenseDeal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Расход: {expenseDeal.model}</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 15 }}>
-            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 8 }} onClick={() => addQuickDealExpense(500, 'Такси/Доставка')}>Такси 500₽</button>
-            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 8 }} onClick={() => addQuickDealExpense(1000, 'Запчасти')}>Запчасти 1000₽</button>
-            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 8 }} onClick={() => addQuickDealExpense(5000, 'Ремонт')}>Ремонт 5000₽</button>
-            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 8 }} onClick={() => addQuickDealExpense(1500, 'Комиссия')}>Комиссия 1500₽</button>
+            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 12 }} onClick={() => addQuickDealExpense(500, 'Такси/Доставка')}>Такси 500₽</button>
+            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 12 }} onClick={() => addQuickDealExpense(1000, 'Запчасти')}>Запчасти 1000₽</button>
+            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 12 }} onClick={() => addQuickDealExpense(5000, 'Ремонт')}>Ремонт 5000₽</button>
+            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 12 }} onClick={() => addQuickDealExpense(1500, 'Комиссия')}>Комиссия 1500₽</button>
           </div>
-          <p style={{textAlign:'center', color:'#888', fontSize: 12, margin: '10px 0'}}>Или введите свой:</p>
+          <p style={{textAlign:'center', color: '#888', fontSize: 13}}>Или введите свой:</p>
           <input className="input-field" type="number" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} autoFocus/>
           <select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option></select>
-          <div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" style={{backgroundColor: '#ff9500'}} onClick={confirmExpense}>Добавить</button></div>
+          <div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" style={{ flex: 1, backgroundColor: 'var(--warning)' }} onClick={confirmExpense}>Добавить</button></div>
         </div></div>
       )}
 
-      {/* ОКНО РЕДАКТИРОВАНИЯ */}
       {editingDeal && (
         <div className="modal-overlay"><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-          <h3>Редактировать: {editingDeal.model}</h3>
-          <label style={{fontSize: 12, color: '#888'}}>Модель</label>
-          <input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/>
-          <label style={{fontSize: 12, color: '#888'}}>Цена закупа (₽)</label>
-          <input className="input-field" type="number" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value)}/>
+          <h3>Редактировать</h3>
+          <label style={{fontSize: 12, color: '#888'}}>Модель</label><input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/>
+          <label style={{fontSize: 12, color: '#888'}}>Цена закупа (₽)</label><input className="input-field" type="number" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value)}/>
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}><label style={{fontSize: 12, color: '#888'}}>Память</label><input className="input-field" type="number" value={editStorage} onChange={(e) => setEditStorage(e.target.value)}/></div>
             <div style={{ flex: 1 }}><label style={{fontSize: 12, color: '#888'}}>АКБ</label><input className="input-field" type="number" value={editBattery} onChange={(e) => setEditBattery(e.target.value)}/></div>
           </div>
-          <label style={{fontSize: 12, color: '#888'}}>IMEI</label>
-          <input className="input-field" type="text" value={editImei} onChange={(e) => setEditImei(e.target.value)}/>
-          <label style={{fontSize: 12, color: '#888'}}>Продавец</label>
-          <select className="input-field" value={editSellerId} onChange={(e) => setEditSellerId(e.target.value)}>
-            <option value="">Не указан</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <label style={{fontSize: 12, color: '#888'}}>IMEI</label><input className="input-field" type="text" value={editImei} onChange={(e) => setEditImei(e.target.value)}/>
           {editingDeal.status === 'sold' && (
             <>
-              <label style={{fontSize: 12, color: '#888', marginTop: 10, display: 'block'}}>Цена продажи (₽)</label>
-              <input className="input-field" type="number" value={editSellPrice} onChange={(e) => setEditSellPrice(e.target.value)}/>
-              <label style={{fontSize: 12, color: '#888'}}>Покупатель</label>
-              <select className="input-field" value={editBuyerId} onChange={(e) => setEditBuyerId(e.target.value)}>
-                <option value="">Не указан</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <label style={{fontSize: 12, color: '#888', marginTop: 10, display: 'block'}}>Цена продажи (₽)</label><input className="input-field" type="number" value={editSellPrice} onChange={(e) => setEditSellPrice(e.target.value)}/>
             </>
           )}
-          <div className="modal-actions" style={{ marginTop: 20 }}><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" style={{ backgroundColor: '#2481cc' }} onClick={saveEdit}>Сохранить</button></div>
+          <div className="modal-actions" style={{ marginTop: 20 }}><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" style={{ flex: 1, backgroundColor: 'var(--accent)' }} onClick={saveEdit}>Сохранить</button></div>
         </div></div>
       )}
 
-      {/* ОКНО ЭКСПОРТА В EXCEL (РАБОТАЕТ ЧЕРЕЗ КОПИРОВАНИЕ) */}
       {showExportModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <h3>Экспорт данных</h3>
-            <p style={{ fontSize: 13, color: '#666' }}>
-              1. Нажмите «Копировать»<br/>
-              2. Вставьте в Excel или Google Таблицы
-            </p>
-            <textarea 
-              value={csvData} 
-              readOnly 
-              onClick={(e) => e.target.select()}
-              style={{ flex: 1, minHeight: '150px', padding: 10, borderRadius: 8, border: '1px solid #ccc', fontSize: 12, fontFamily: 'monospace', marginBottom: 15 }}
-            />
+        <div className="modal-overlay"><div className="modal-content" style={{ display: 'flex', flexDirection: 'column' }}>
+            <h3>Экспорт</h3>
+            <textarea value={csvData} readOnly onClick={(e) => e.target.select()} style={{ flex: 1, minHeight: '150px', padding: 10, borderRadius: 12, border: '1px solid #ccc', fontSize: 12, marginBottom: 15 }} />
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowExportModal(false)}>Закрыть</button>
-              <button className="btn-confirm" style={{ backgroundColor: '#34c759' }} onClick={() => {
-                const textArea = document.createElement("textarea");
-                textArea.value = csvData;
-                document.body.appendChild(textArea);
-                textArea.select();
-                try {
-                  document.execCommand('copy');
-                  haptic('heavy');
-                  alert('✅ Скопировано! Вставьте в Excel.');
-                  setShowExportModal(false);
-                } catch (err) {
-                  alert('Выделите текст вручную и скопируйте его');
-                }
+              <button className="btn-confirm" style={{ flex: 1, backgroundColor: 'var(--success)' }} onClick={() => {
+                const textArea = document.createElement("textarea"); textArea.value = csvData; document.body.appendChild(textArea); textArea.select();
+                try { document.execCommand('copy'); alert('✅ Скопировано!'); setShowExportModal(false); } catch (err) { alert('Скопируйте вручную'); }
                 document.body.removeChild(textArea);
               }}>Копировать</button>
             </div>
-          </div>
-        </div>
+        </div></div>
       )}
-{showScanner && (
-  <Scanner 
-    onScan={(text) => setImei(text)} // Автоматически подставляем IMEI
-    onClose={() => setShowScanner(false)} 
-  />
-)}
+
+      {showScanner && (
+        <Scanner onScan={(text) => setImei(text)} onClose={() => setShowScanner(false)} />
+      )}
+
       {/* НИЖНЕЕ МЕНЮ */}
       <div className="tab-bar">
         <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon">📊</span> Главная</button>

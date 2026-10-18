@@ -1,72 +1,169 @@
-/* Сброс стандартных отступов */
+/* --- ОБЩИЕ НАСТРОЙКИ --- */
+:root {
+  --bg-color: #f2f2f7;
+  --card-bg: #ffffff;
+  --text-main: #1c1c1e;
+  --text-muted: #8e8e93;
+  --accent: #007aff;
+  --success: #34c759;
+  --danger: #ff3b30;
+  --warning: #ff9500;
+  --border: #e5e5ea;
+}
+
 body, html {
   margin: 0;
   padding: 0;
-  background-color: #f0f2f5;
+  background-color: var(--bg-color);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Контейнер приложения, чтобы контент не залезал под нижнее меню */
 .app-container {
   padding: 16px;
-  padding-bottom: 80px; 
+  padding-bottom: 90px; 
   min-height: 100vh;
   box-sizing: border-box;
 }
 
-/* Карточки */
+/* --- КАРТОЧКИ --- */
 .card {
-  background-color: white;
+  background-color: var(--card-bg);
   padding: 16px;
-  border-radius: 12px;
-  margin-bottom: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border-radius: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.02);
 }
 
-/* Поля ввода */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+/* --- ГЛАВНАЯ КАРТОЧКА ПРИБЫЛИ --- */
+.main-profit-card {
+  background: linear-gradient(135deg, #2481cc, #1a5c94);
+  color: white;
+  border-radius: 20px;
+  padding: 24px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 24px rgba(36, 129, 204, 0.3);
+}
+
+.main-profit-card h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.main-profit-value {
+  font-size: 38px;
+  font-weight: 700;
+  margin: 8px 0 20px 0;
+  letter-spacing: -1px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 8px;
+  opacity: 0.9;
+}
+
+/* --- ФОРМЫ И ИНПУТЫ --- */
 .input-field {
   width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background-color: var(--bg-color);
   box-sizing: border-box;
   font-size: 16px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  transition: border-color 0.2s;
+  outline: none;
+  color: var(--text-main);
+}
+.input-field:focus {
+  border-color: var(--accent);
+  background-color: #fff;
 }
 
-/* Кнопки */
+/* --- КНОПКИ --- */
+button {
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.2s, transform 0.1s;
+}
+button:active {
+  transform: scale(0.97);
+  opacity: 0.8;
+}
+
 .btn-primary {
   width: 100%;
-  padding: 12px;
-  background-color: #2481cc;
+  padding: 16px;
+  background-color: var(--accent);
   color: white;
   border: none;
-  border-radius: 8px;
-  font-weight: bold;
+  border-radius: 12px;
+  font-weight: 600;
   font-size: 16px;
 }
 
 .btn-success {
-  padding: 8px 16px;
-  background-color: #34c759;
+  padding: 10px 16px;
+  background-color: var(--success);
   color: white;
   border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  margin-top: 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
 }
 
-/* Нижнее меню (Tab Bar) */
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  padding: 8px;
+  opacity: 0.7;
+}
+
+/* --- БЕЙДЖИ (ТЕГИ) --- */
+.badge {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.badge-gray { background: var(--bg-color); color: var(--text-muted); }
+.badge-green { background: #e8f9ee; color: var(--success); }
+.badge-yellow { background: #fff8e6; color: #b28900; }
+.badge-red { background: #ffe8e8; color: var(--danger); }
+
+/* --- НИЖНЕЕ МЕНЮ --- */
 .tab-bar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 60px;
-  background-color: white;
+  height: 70px;
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   display: flex;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border);
   z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom); /* Для iPhone с "челкой" */
 }
 
 .tab-button {
@@ -77,104 +174,76 @@ body, html {
   justify-content: center;
   border: none;
   background: none;
-  color: #8e8e93;
+  color: var(--text-muted);
   font-size: 10px;
-  cursor: pointer;
+  font-weight: 500;
+  gap: 4px;
 }
 
 .tab-button.active {
-  color: #2481cc;
-  font-weight: bold;
+  color: var(--accent);
 }
 
 .tab-icon {
-  font-size: 20px;
-  margin-bottom: 2px;
+  font-size: 22px;
 }
 
-/* Заголовки */
-h2 { margin-top: 0; font-size: 22px; }
-h3 { font-size: 16px; color: #333; margin-bottom: 10px; }
-
-/* Текст статистики на главной */
-.stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 15px; }
-.stat-value { font-weight: bold; }
-.stat-profit { color: #34c759; font-size: 18px; font-weight: bold; }
-/* Стили для модального окна продажи */
+/* --- МОДАЛЬНЫЕ ОКНА --- */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
   display: flex;
-  align-items: center;
+  align-items: flex-end; /* Выезжает снизу как на iOS */
   justify-content: center;
   z-index: 1000;
-  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
 }
 
 .modal-content {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
+  background: var(--card-bg);
+  padding: 24px 20px;
+  border-radius: 24px 24px 0 0;
   width: 100%;
-  max-width: 400px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+  animation: slideUp 0.3s ease-out;
 }
 
 .modal-content h3 {
   margin-top: 0;
-  margin-bottom: 15px;
+  font-size: 20px;
+  margin-bottom: 16px;
 }
 
 .modal-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 15px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 .btn-cancel {
   flex: 1;
-  padding: 12px;
-  background: #e5e5ea;
-  color: #333;
+  padding: 14px;
+  background: var(--bg-color);
+  color: var(--text-main);
   border: none;
-  border-radius: 8px;
-  font-weight: bold;
+  border-radius: 12px;
+  font-weight: 600;
   font-size: 16px;
 }
 
-.btn-confirm {
-  flex: 1;
-  padding: 12px;
-  background: #34c759;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: bold;
-  font-size: 16px;
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
-/* Кнопки-иконки на карточках */
-.icon-btn {
-  background: none;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 4px;
-  opacity: 0.6;
-  transition: opacity 0.2s;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.icon-btn:hover {
-  opacity: 1;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 8px;
-}
+/* --- СКРОЛЛБАР --- */
+::-webkit-scrollbar { width: 0px; background: transparent; }

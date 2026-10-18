@@ -397,7 +397,38 @@ function App() {
       ))}
     </div>
   )
-
+      {/* МОДАЛКА ЭКСПОРТА В EXCEL */}
+      {showExportModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <h3>Экспорт данных</h3>
+            <p style={{ fontSize: 13, color: '#666' }}>
+              1. Нажмите «Копировать»<br/>
+              2. Вставьте в Excel или Google Таблицы
+            </p>
+            
+            <textarea 
+              value={csvData} 
+              readOnly 
+              style={{ flex: 1, minHeight: '150px', padding: 10, borderRadius: 8, border: '1px solid #ccc', fontSize: 12, fontFamily: 'monospace', marginBottom: 15 }}
+            />
+            
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowExportModal(false)}>Закрыть</button>
+              <button className="btn-confirm" style={{ backgroundColor: '#34c759' }} onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(csvData);
+                  haptic('heavy');
+                  alert('✅ Скопировано! Теперь вставьте в Excel.');
+                  setShowExportModal(false);
+                } catch (err) {
+                  alert('Выделите текст вручную и скопируйте его');
+                }
+              }}>Копировать</button>
+            </div>
+          </div>
+        </div>
+      )}
   return (
     <div className="app-container">
       {activeTab === 'home' && renderHome()}

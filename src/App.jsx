@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import './App.css'
+import Scanner from './Scanner';
 
 function App() {
   const [user, setUser] = useState(null)
@@ -13,6 +14,7 @@ function App() {
 
   // Стейты для экспорта в Excel
   const [showExportModal, setShowExportModal] = useState(false)
+  const [showScanner, setShowScanner] = useState(false);
   const [csvData, setCsvData] = useState('')
 
   // Поля для новой сделки
@@ -341,7 +343,23 @@ function App() {
             <input className="input-field" type="number" placeholder="Память (ГБ)" value={storage} onChange={(e) => setStorage(e.target.value)}/>
             <input className="input-field" type="number" placeholder="АКБ (%)" value={battery} onChange={(e) => setBattery(e.target.value)}/>
           </div>
-          <input className="input-field" type="text" placeholder="IMEI" value={imei} onChange={(e) => setImei(e.target.value)}/>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <input 
+              className="input-field" 
+              type="text" 
+              placeholder="IMEI" 
+              value={imei} 
+              onChange={(e) => setImei(e.target.value)}
+              style={{ flex: 1, marginBottom: 10 }}
+            />
+            <button 
+              type="button" 
+              onClick={() => setShowScanner(true)}
+              style={{ marginBottom: 10, padding: '12px 15px', backgroundColor: '#ff9500', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold' }}
+            >
+              📷
+            </button>
+          </div>
           <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
             <option value="">Кто продал? (Необязательно)</option>
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -511,7 +529,12 @@ function App() {
           </div>
         </div>
       )}
-
+{showScanner && (
+  <Scanner 
+    onScan={(text) => setImei(text)} // Автоматически подставляем IMEI
+    onClose={() => setShowScanner(false)} 
+  />
+)}
       {/* НИЖНЕЕ МЕНЮ */}
       <div className="tab-bar">
         <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon">📊</span> Главная</button>

@@ -31,7 +31,7 @@ function App() {
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('Ремонт')
 
-  // НОВОЕ: Состояние для редактирования
+  // Состояние для редактирования
   const [editingDeal, setEditingDeal] = useState(null)
   const [editModel, setEditModel] = useState('')
   const [editBuyPrice, setEditBuyPrice] = useState('')
@@ -89,7 +89,6 @@ function App() {
     setLoading(false)
   }
 
-  // --- РЕДАКТИРОВАНИЕ И УДАЛЕНИЕ ---
   const openEditModal = (deal) => {
     setEditingDeal(deal)
     setEditModel(deal.model)
@@ -114,7 +113,6 @@ function App() {
       seller_id: editSellerId ? Number(editSellerId) : null,
     }
 
-    // Если товар уже продан, обновляем и данные продажи
     if (editingDeal.status === 'sold') {
       updates.sell_price = editSellPrice ? Number(editSellPrice) : null
       updates.buyer_id = editBuyerId ? Number(editBuyerId) : null
@@ -131,7 +129,6 @@ function App() {
     if (!error) fetchData()
   }
 
-  // --- ОСТАЛЬНЫЕ ФУНКЦИИ ---
   const addContact = async (e) => {
     e.preventDefault()
     if (!contactName) return alert('Введите имя')
@@ -140,9 +137,17 @@ function App() {
   }
 
   const openSellModal = (deal) => { setSellingDeal(deal); setSellPrice(''); setBuyerId('') }
+  
   const confirmSell = async () => {
     if (!sellPrice || isNaN(sellPrice) || Number(sellPrice) <= 0) return alert('Введите цену')
-    const { error } = await supabase.from('deals').update({ sell_price: Number(sellPrice), status: 'sold', buyer_id: buyerId ? Number(buyerId) : null }).eq('id', sellingDeal.id)
+    const { error } = await supabase.from('deals')
+      .update({ 
+        sell_price: Number(sellPrice), 
+        status: 'sold', 
+        buyer_id: buyerId ? Number(buyerId) : null,
+        sold_at: new Date().toISOString() // Записываем точное время продажи
+      })
+      .eq('id', sellingDeal.id)
     if (!error) { setSellingDeal(null); fetchData() }
   }
 
@@ -162,8 +167,35 @@ function App() {
   const totalProfit = totalRevenue - totalBuy - totalExp
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + e.amount, 0);
 
+  // --- РАСЧЕТ ДНЕЙ НА СКЛАДЕ ---
+  const getDaysOnStock = (deal) => {
+    const start = new Date(deal.created_at);
+    // Если товар продан и есть дата продажи - считаем до нее, иначе до сегодня
+    const end = (deal.status === 'sold' && deal.sold_at) ? new Date(deal.sold_at) : new Date();
+    const diffTime = Math.abs(end - start);
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  const renderDaysBadge = (days, status) => {
+    let bg = '#e5e5ea'; let color = '#333';
+    if (status === 'in_stock') {
+      if (days >= 30) { bg = '#ffe4e1'; color = '#ff3b30'; } // Красный (залежался)
+      else if (days >= 15) { bg = '#fff3cd'; color = '#856404'; } // Желтый (пора снижать)
+      else { bg = '#d1f9d1'; color = '#28a745'; } // Зеленый (свежий)
+    } else {
+      bg = '#f0f0f0'; color = '#666'; // Серый для проданных
+    }
+    
+    return (
+      <span style={{ background: bg, color: color, padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 'bold' }}>
+        ⏱ {days} дн.
+      </span>
+    )
+  }
+
   const renderSpecs = (deal) => (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+      {renderDaysBadge(getDaysOnStock(deal), deal.status)}
       {deal.storage_gb && <span style={{ background: '#e5e5ea', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>{deal.storage_gb} GB</span>}
       {deal.battery_health && <span style={{ background: deal.battery_health >= 85 ? '#d1f9d1' : '#ffe4e1', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>🔋 {deal.battery_health}%</span>}
       {deal.imei && <span style={{ background: '#e5e5ea', padding: '2px 8px', borderRadius: 4, fontSize: 12, color: '#666' }}>IMEI: ...{deal.imei.slice(-4)}</span>}
@@ -294,7 +326,7 @@ function App() {
       {activeTab === 'deals' && renderDeals()}
       {activeTab === 'contacts' && renderContacts()}
 
-      {/* ОКНО ПРОДАЖИ */}
+      {/* ОКНА */}
       {sellingDeal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Продажа: {sellingDeal.model}</h3>
@@ -307,7 +339,6 @@ function App() {
         </div></div>
       )}
 
-      {/* ОКНО РАСХОДА */}
       {expenseDeal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Расход: {expenseDeal.model}</h3>
@@ -319,17 +350,13 @@ function App() {
         </div></div>
       )}
 
-      {/* ОКНО РЕДАКТИРОВАНИЯ */}
       {editingDeal && (
         <div className="modal-overlay"><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
           <h3>Редактировать: {editingDeal.model}</h3>
-          
           <label style={{fontSize: 12, color: '#888'}}>Модель</label>
           <input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/>
-          
           <label style={{fontSize: 12, color: '#888'}}>Цена закупа (₽)</label>
           <input className="input-field" type="number" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value)}/>
-          
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={{fontSize: 12, color: '#888'}}>Память (ГБ)</label>
@@ -340,22 +367,17 @@ function App() {
               <input className="input-field" type="number" value={editBattery} onChange={(e) => setEditBattery(e.target.value)}/>
             </div>
           </div>
-
           <label style={{fontSize: 12, color: '#888'}}>IMEI</label>
           <input className="input-field" type="text" value={editImei} onChange={(e) => setEditImei(e.target.value)}/>
-          
           <label style={{fontSize: 12, color: '#888'}}>Продавец</label>
           <select className="input-field" value={editSellerId} onChange={(e) => setEditSellerId(e.target.value)}>
             <option value="">Не указан</option>
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-
-          {/* Поля для проданного товара */}
           {editingDeal.status === 'sold' && (
             <>
               <label style={{fontSize: 12, color: '#888', marginTop: 10, display: 'block'}}>Цена продажи (₽)</label>
               <input className="input-field" type="number" value={editSellPrice} onChange={(e) => setEditSellPrice(e.target.value)}/>
-              
               <label style={{fontSize: 12, color: '#888'}}>Покупатель</label>
               <select className="input-field" value={editBuyerId} onChange={(e) => setEditBuyerId(e.target.value)}>
                 <option value="">Не указан</option>
@@ -363,7 +385,6 @@ function App() {
               </select>
             </>
           )}
-
           <div className="modal-actions" style={{ marginTop: 20 }}>
             <button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button>
             <button className="btn-confirm" style={{ backgroundColor: '#2481cc' }} onClick={saveEdit}>Сохранить</button>

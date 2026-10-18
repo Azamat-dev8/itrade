@@ -20,6 +20,9 @@ function App() {
   const [battery, setBattery] = useState('')
   const [imei, setImei] = useState('')
   const [sellerId, setSellerId] = useState('')
+    // Для окна экспорта
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [csvData, setCsvData] = useState('')
   
   // Поля для нового контакта
   const [contactName, setContactName] = useState('')
@@ -145,7 +148,7 @@ function App() {
     if (!error) { setExpenseDeal(null); fetchData() }
   }
 
-  const exportToCSV = async () => {
+    const exportToCSV = () => {
     haptic();
     if (deals.length === 0) return alert('Нет данных для экспорта')
     
@@ -163,30 +166,13 @@ function App() {
     });
     
     const csvString = [headers.join(';'), ...rows].join('\n');
-
-    // Пытаемся использовать системное меню "Поделиться" (работает в Telegram)
-    if (navigator.share) {
-      try {
-        const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
-        const file = new File([blob], "itrade_сделки.csv", { type: 'text/csv' });
-        await navigator.share({
-          title: 'Экспорт данных iTrade',
-          files: [file]
-        });
-        return; // Если успешно поделились, выходим
-      } catch (err) {
-        console.log('Ошибка шаринга:', err);
-      }
-    }
-
-    // Запасной вариант: копируем в буфер обмена
-    try {
-      await navigator.clipboard.writeText(csvString);
-      alert('Данные скопированы! Можете вставить их в Excel, Google Таблицы или отправить себе в Избранное в Telegram.');
-    } catch (err) {
-      alert('Не удалось сохранить файл. Попробуйте открыть приложение на компьютере.');
-    }
+    
+    // Сохраняем текст и открываем модальное окно
+    setCsvData(csvString);
+    setShowExportModal(true);
   }
+
+
 
   // --- СТАТИСТИКА ---
   const soldDeals = deals.filter(d => d.status === 'sold')

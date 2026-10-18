@@ -1,4 +1,3 @@
-// v2
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import './App.css'
@@ -10,8 +9,11 @@ function App() {
   const [generalExpenses, setGeneralExpenses] = useState([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
-  
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Стейты для экспорта в Excel
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [csvData, setCsvData] = useState('')
 
   // Поля для новой сделки
   const [model, setModel] = useState('')
@@ -20,9 +22,6 @@ function App() {
   const [battery, setBattery] = useState('')
   const [imei, setImei] = useState('')
   const [sellerId, setSellerId] = useState('')
-    // Для окна экспорта
-  const [showExportModal, setShowExportModal] = useState(false)
-  const [csvData, setCsvData] = useState('')
   
   // Поля для нового контакта
   const [contactName, setContactName] = useState('')
@@ -64,6 +63,11 @@ function App() {
 
   useEffect(() => { setSearchQuery('') }, [activeTab])
 
+  const haptic = (type = 'light') => {
+    const tg = window.Telegram?.WebApp
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(type)
+  }
+
   const fetchData = async () => {
     const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name), buyer:buyer_id(name)').order('created_at', { ascending: false })
     if (dealsData) setDeals(dealsData)
@@ -84,8 +88,10 @@ function App() {
         storage_gb: storage ? Number(storage) : null, battery_health: battery ? Number(battery) : null,
         imei: imei || null, seller_id: sellerId ? Number(sellerId) : null
       }])
-    if (!error) { setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId(''); fetchData() } 
-    else { alert('Ошибка: ' + error.message) }
+    if (!error) { 
+      setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId(''); 
+      fetchData(); haptic('medium'); 
+    } else { alert('Ошибка: ' + error.message) }
     setLoading(false)
   }
 
@@ -93,10 +99,24 @@ function App() {
     e.preventDefault()
     if (!genExpAmount || isNaN(genExpAmount)) return alert('Введите сумму')
     const { error } = await supabase.from('expenses').insert([{ amount: Number(genExpAmount), category: genExpCategory, note: genExpNote || null }])
-    if (!error) { setGenExpAmount(''); setGenExpNote(''); fetchData() }
+    if (!error) { setGenExpAmount(''); setGenExpNote(''); fetchData(); haptic('medium'); }
+  }
+
+  const addQuickGeneralExpense = async (amount, category) => {
+    haptic('medium');
+    await supabase.from('expenses').insert([{ amount, category, note: 'Быстрый ввод' }])
+    fetchData()
+  }
+
+  const addQuickDealExpense = async (amount, category) => {
+    haptic('medium');
+    await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount, category }])
+    setExpenseDeal(null)
+    fetchData()
   }
 
   const openEditModal = (deal) => {
+    haptic();
     setEditingDeal(deal)
     setEditModel(deal.model); setEditBuyPrice(deal.buy_price); setEditStorage(deal.storage_gb || '')
     setEditBattery(deal.battery_health || ''); setEditImei(deal.imei || ''); setEditSellerId(deal.seller_id || '')
@@ -115,40 +135,41 @@ function App() {
       updates.buyer_id = editBuyerId ? Number(editBuyerId) : null
     }
     const { error } = await supabase.from('deals').update(updates).eq('id', editingDeal.id)
-    if (!error) { setEditingDeal(null); fetchData() } 
+    if (!error) { setEditingDeal(null); fetchData(); haptic('medium'); } 
   }
 
   const deleteDeal = async (id) => {
     if (!window.confirm('Удалить это устройство?')) return
     const { error } = await supabase.from('deals').delete().eq('id', id)
-    if (!error) fetchData()
+    if (!error) { fetchData(); haptic('heavy'); }
   }
 
   const addContact = async (e) => {
     e.preventDefault()
     if (!contactName) return alert('Введите имя')
     const { error } = await supabase.from('contacts').insert([{ name: contactName, phone: contactPhone, note: contactNote }])
-    if (!error) { setContactName(''); setContactPhone(''); setContactNote(''); fetchData() }
+    if (!error) { setContactName(''); setContactPhone(''); setContactNote(''); fetchData(); haptic('medium'); }
   }
 
-  const openSellModal = (deal) => { setSellingDeal(deal); setSellPrice(''); setBuyerId('') }
+  const openSellModal = (deal) => { haptic(); setSellingDeal(deal); setSellPrice(''); setBuyerId('') }
   const confirmSell = async () => {
     if (!sellPrice || isNaN(sellPrice) || Number(sellPrice) <= 0) return alert('Введите цену')
     const { error } = await supabase.from('deals').update({ 
         sell_price: Number(sellPrice), status: 'sold', 
         buyer_id: buyerId ? Number(buyerId) : null, sold_at: new Date().toISOString() 
       }).eq('id', sellingDeal.id)
-    if (!error) { setSellingDeal(null); fetchData() }
+    if (!error) { setSellingDeal(null); fetchData(); haptic('medium'); }
   }
 
-  const openExpenseModal = (deal) => { setExpenseDeal(deal); setExpenseAmount(''); setExpenseCategory('Ремонт') }
+  const openExpenseModal = (deal) => { haptic(); setExpenseDeal(deal); setExpenseAmount(''); setExpenseCategory('Ремонт') }
   const confirmExpense = async () => {
     if (!expenseAmount || isNaN(expenseAmount) || Number(expenseAmount) <= 0) return alert('Введите сумму')
     const { error } = await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount: Number(expenseAmount), category: expenseCategory }])
-    if (!error) { setExpenseDeal(null); fetchData() }
+    if (!error) { setExpenseDeal(null); fetchData(); haptic('medium'); }
   }
 
-    const exportToCSV = () => {
+  // --- ГЕНЕРАЦИЯ CSV И ОТКРЫТИЕ ОКНА ---
+  const exportToCSV = () => {
     haptic();
     if (deals.length === 0) return alert('Нет данных для экспорта')
     
@@ -166,13 +187,9 @@ function App() {
     });
     
     const csvString = [headers.join(';'), ...rows].join('\n');
-    
-    // Сохраняем текст и открываем модальное окно
     setCsvData(csvString);
     setShowExportModal(true);
   }
-
-
 
   // --- СТАТИСТИКА ---
   const soldDeals = deals.filter(d => d.status === 'sold')
@@ -186,28 +203,16 @@ function App() {
   
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + e.amount, 0);
 
-  // --- ГРУППИРОВКА ПРИБЫЛИ ПО МЕСЯЦАМ ---
   const monthlyProfits = soldDeals.reduce((acc, deal) => {
     const date = new Date(deal.sold_at || deal.created_at);
     const monthYear = date.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
     const formatted = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
-    
     const expSum = getDealExpensesSum(deal);
     const profit = deal.sell_price - deal.buy_price - expSum;
-    
     if (!acc[formatted]) acc[formatted] = 0;
     acc[formatted] += profit;
     return acc;
   }, {});
-
-  const sortedMonths = Object.entries(monthlyProfits).sort((a, b) => {
-    // Сортируем по дате (так как ключи в формате "Октябрь 2026")
-    return new Date(b[0]) - new Date(a[0]); // Простой хак для сортировки (может работать не идеально, но для нас сойдет)
-  });
-  
-  // Чтобы сортировка работала точно, сделаем правильный массив
-  const monthsList = Object.entries(monthlyProfits).map(([month, profit]) => ({ month, profit }));
-  // (Оставляем простой вывод без сложной сортировки, база и так отдает новые сверху)
 
   const filterDealsByQuery = (list) => {
     if (!searchQuery) return list;
@@ -275,7 +280,6 @@ function App() {
         </button>
       </div>
 
-      {/* БЛОК: ПРИБЫЛЬ ПО МЕСЯЦАМ */}
       {soldDeals.length > 0 && (
         <div className="card">
           <h3>Прибыль по месяцам</h3>
@@ -292,14 +296,20 @@ function App() {
     </div>
   )
 
-  // ... (ОСТАЛЬНЫЕ ЭКРАНЫ БЕЗ ИЗМЕНЕНИЙ, Я ИХ СОКРАТИЛ ДЛЯ УДОБСТВА, НО В ТВОЕМ ФАЙЛЕ ОНИ ДОЛЖНЫ БЫТЬ ПОЛНОСТЬЮ)
-  // Вставь сюда renderFinance, renderStock, renderDeals, renderContacts из предыдущего кода
-  
   const renderFinance = () => (
     <div>
       <h2>Финансы</h2>
       <div className="card">
-        <h3>Добавить общий расход</h3>
+        <h3>Быстрые расходы</h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <button className="btn-cancel" style={{ flex: '1 0 30%', padding: 8 }} onClick={() => addQuickGeneralExpense(1000, 'Реклама/Авито')}>Авито 1000₽</button>
+          <button className="btn-cancel" style={{ flex: '1 0 30%', padding: 8 }} onClick={() => addQuickGeneralExpense(500, 'Бензин')}>Бензин 500₽</button>
+          <button className="btn-cancel" style={{ flex: '1 0 30%', padding: 8 }} onClick={() => addQuickGeneralExpense(300, 'Прочее')}>Такси 300₽</button>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>Добавить свой расход</h3>
         <form onSubmit={addGeneralExpense}>
           <input className="input-field" type="number" placeholder="Сумма (₽)" value={genExpAmount} onChange={(e) => setGenExpAmount(e.target.value)}/>
           <select className="input-field" value={genExpCategory} onChange={(e) => setGenExpCategory(e.target.value)}>
@@ -397,38 +407,7 @@ function App() {
       ))}
     </div>
   )
-      {/* МОДАЛКА ЭКСПОРТА В EXCEL */}
-      {showExportModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <h3>Экспорт данных</h3>
-            <p style={{ fontSize: 13, color: '#666' }}>
-              1. Нажмите «Копировать»<br/>
-              2. Вставьте в Excel или Google Таблицы
-            </p>
-            
-            <textarea 
-              value={csvData} 
-              readOnly 
-              style={{ flex: 1, minHeight: '150px', padding: 10, borderRadius: 8, border: '1px solid #ccc', fontSize: 12, fontFamily: 'monospace', marginBottom: 15 }}
-            />
-            
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowExportModal(false)}>Закрыть</button>
-              <button className="btn-confirm" style={{ backgroundColor: '#34c759' }} onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(csvData);
-                  haptic('heavy');
-                  alert('✅ Скопировано! Теперь вставьте в Excel.');
-                  setShowExportModal(false);
-                } catch (err) {
-                  alert('Выделите текст вручную и скопируйте его');
-                }
-              }}>Копировать</button>
-            </div>
-          </div>
-        </div>
-      )}
+
   return (
     <div className="app-container">
       {activeTab === 'home' && renderHome()}
@@ -437,7 +416,7 @@ function App() {
       {activeTab === 'finance' && renderFinance()}
       {activeTab === 'contacts' && renderContacts()}
 
-      {/* МОДАЛКИ ОСТАЛИСЬ БЕЗ ИЗМЕНЕНИЙ */}
+      {/* ОКНО ПРОДАЖИ */}
       {sellingDeal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Продажа: {sellingDeal.model}</h3>
@@ -446,29 +425,100 @@ function App() {
           <div className="modal-actions"><button className="btn-cancel" onClick={() => setSellingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmSell}>Продать</button></div>
         </div></div>
       )}
+
+      {/* ОКНО РАСХОДА ПО СДЕЛКЕ */}
       {expenseDeal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Расход: {expenseDeal.model}</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 15 }}>
+            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 8 }} onClick={() => addQuickDealExpense(500, 'Такси/Доставка')}>Такси 500₽</button>
+            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 8 }} onClick={() => addQuickDealExpense(1000, 'Запчасти')}>Запчасти 1000₽</button>
+            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 8 }} onClick={() => addQuickDealExpense(5000, 'Ремонт')}>Ремонт 5000₽</button>
+            <button className="btn-cancel" style={{ flex: '1 0 45%', padding: 8 }} onClick={() => addQuickDealExpense(1500, 'Комиссия')}>Комиссия 1500₽</button>
+          </div>
+          <p style={{textAlign:'center', color:'#888', fontSize: 12, margin: '10px 0'}}>Или введите свой:</p>
           <input className="input-field" type="number" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} autoFocus/>
           <select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option></select>
           <div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" style={{backgroundColor: '#ff9500'}} onClick={confirmExpense}>Добавить</button></div>
         </div></div>
       )}
+
+      {/* ОКНО РЕДАКТИРОВАНИЯ */}
       {editingDeal && (
         <div className="modal-overlay"><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-          <h3>Редактировать</h3>
+          <h3>Редактировать: {editingDeal.model}</h3>
+          <label style={{fontSize: 12, color: '#888'}}>Модель</label>
           <input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/>
+          <label style={{fontSize: 12, color: '#888'}}>Цена закупа (₽)</label>
           <input className="input-field" type="number" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value)}/>
-          <div className="modal-actions" style={{ marginTop: 20 }}><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={saveEdit}>Сохранить</button></div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}><label style={{fontSize: 12, color: '#888'}}>Память</label><input className="input-field" type="number" value={editStorage} onChange={(e) => setEditStorage(e.target.value)}/></div>
+            <div style={{ flex: 1 }}><label style={{fontSize: 12, color: '#888'}}>АКБ</label><input className="input-field" type="number" value={editBattery} onChange={(e) => setEditBattery(e.target.value)}/></div>
+          </div>
+          <label style={{fontSize: 12, color: '#888'}}>IMEI</label>
+          <input className="input-field" type="text" value={editImei} onChange={(e) => setEditImei(e.target.value)}/>
+          <label style={{fontSize: 12, color: '#888'}}>Продавец</label>
+          <select className="input-field" value={editSellerId} onChange={(e) => setEditSellerId(e.target.value)}>
+            <option value="">Не указан</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {editingDeal.status === 'sold' && (
+            <>
+              <label style={{fontSize: 12, color: '#888', marginTop: 10, display: 'block'}}>Цена продажи (₽)</label>
+              <input className="input-field" type="number" value={editSellPrice} onChange={(e) => setEditSellPrice(e.target.value)}/>
+              <label style={{fontSize: 12, color: '#888'}}>Покупатель</label>
+              <select className="input-field" value={editBuyerId} onChange={(e) => setEditBuyerId(e.target.value)}>
+                <option value="">Не указан</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </>
+          )}
+          <div className="modal-actions" style={{ marginTop: 20 }}><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" style={{ backgroundColor: '#2481cc' }} onClick={saveEdit}>Сохранить</button></div>
         </div></div>
       )}
 
+      {/* ОКНО ЭКСПОРТА В EXCEL (РАБОТАЕТ ЧЕРЕЗ КОПИРОВАНИЕ) */}
+      {showExportModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <h3>Экспорт данных</h3>
+            <p style={{ fontSize: 13, color: '#666' }}>
+              1. Нажмите «Копировать»<br/>
+              2. Вставьте в Excel или Google Таблицы
+            </p>
+            <textarea 
+              value={csvData} 
+              readOnly 
+              onClick={(e) => e.target.select()}
+              style={{ flex: 1, minHeight: '150px', padding: 10, borderRadius: 8, border: '1px solid #ccc', fontSize: 12, fontFamily: 'monospace', marginBottom: 15 }}
+            />
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowExportModal(false)}>Закрыть</button>
+              <button className="btn-confirm" style={{ backgroundColor: '#34c759' }} onClick={() => {
+                const textArea = document.createElement("textarea");
+                textArea.value = csvData;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                  document.execCommand('copy');
+                  haptic('heavy');
+                  alert('✅ Скопировано! Вставьте в Excel.');
+                  setShowExportModal(false);
+                } catch (err) {
+                  alert('Выделите текст вручную и скопируйте его');
+                }
+                document.body.removeChild(textArea);
+              }}>Копировать</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* НИЖНЕЕ МЕНЮ */}
       <div className="tab-bar">
-        <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}><span className="tab-icon">📊</span> Главная</button>
-        <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}><span className="tab-icon">📦</span> Склад</button>
-        <button className={`tab-button ${activeTab === 'deals' ? 'active' : ''}`} onClick={() => setActiveTab('deals')}><span className="tab-icon">💰</span> Сделки</button>
-        <button className={`tab-button ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => setActiveTab('finance')}><span className="tab-icon">💵</span> Финансы</button>
-        <button className={`tab-button ${activeTab === 'contacts' ? 'active' : ''}`} onClick={() => setActiveTab('contacts')}><span className="tab-icon">👥</span> Контакты</button>
+        <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon">📊</span> Главная</button>
+        <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => { setActiveTab('stock'); haptic(); }}><span className="tab-icon">📦</span> Склад</button>
+        <button className={`tab-button ${activeTab === 'deals' ? 'active' : ''}`} onClick={() => { setActiveTab('deals'); haptic(); }}><span className="tab-icon">💰</span> Сделки</button>
+        <button className={`tab-button ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => { setActiveTab('finance'); haptic(); }}><span className="tab-icon">💵</span> Финансы</button>
+        <button className={`tab-button ${activeTab === 'contacts' ? 'active' : ''}`} onClick={() => { setActiveTab('contacts'); haptic(); }}><span className="tab-icon">👥</span> Контакты</button>
       </div>
     </div>
   )

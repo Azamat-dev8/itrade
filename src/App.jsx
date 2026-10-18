@@ -31,6 +31,17 @@ function App() {
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('Ремонт')
 
+  // НОВОЕ: Состояние для редактирования
+  const [editingDeal, setEditingDeal] = useState(null)
+  const [editModel, setEditModel] = useState('')
+  const [editBuyPrice, setEditBuyPrice] = useState('')
+  const [editStorage, setEditStorage] = useState('')
+  const [editBattery, setEditBattery] = useState('')
+  const [editImei, setEditImei] = useState('')
+  const [editSellerId, setEditSellerId] = useState('')
+  const [editSellPrice, setEditSellPrice] = useState('')
+  const [editBuyerId, setEditBuyerId] = useState('')
+
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (tg) {
@@ -42,18 +53,13 @@ function App() {
   }, [])
 
   const fetchData = async () => {
-    // Загружаем сделки (с расходами, продавцом и покупателем)
     const { data: dealsData } = await supabase
       .from('deals')
       .select('*, expenses(*), seller:seller_id(name), buyer:buyer_id(name)')
       .order('created_at', { ascending: false })
     if (dealsData) setDeals(dealsData)
 
-    // Загружаем контакты
-    const { data: contactsData } = await supabase
-      .from('contacts')
-      .select('*')
-      .order('name')
+    const { data: contactsData } = await supabase.from('contacts').select('*').order('name')
     if (contactsData) setContacts(contactsData)
   }
 
@@ -65,7 +71,7 @@ function App() {
     const { error } = await supabase
       .from('deals')
       .insert([{ 
-        model: model, 
+        model, 
         buy_price: Number(buyPrice), 
         status: 'in_stock',
         storage_gb: storage ? Number(storage) : null,
@@ -78,46 +84,69 @@ function App() {
       setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId('')
       fetchData() 
     } else {
-      alert('Ошибка при добавлении: ' + error.message)
+      alert('Ошибка: ' + error.message)
     }
     setLoading(false)
   }
 
+  // --- РЕДАКТИРОВАНИЕ И УДАЛЕНИЕ ---
+  const openEditModal = (deal) => {
+    setEditingDeal(deal)
+    setEditModel(deal.model)
+    setEditBuyPrice(deal.buy_price)
+    setEditStorage(deal.storage_gb || '')
+    setEditBattery(deal.battery_health || '')
+    setEditImei(deal.imei || '')
+    setEditSellerId(deal.seller_id || '')
+    setEditSellPrice(deal.sell_price || '')
+    setEditBuyerId(deal.buyer_id || '')
+  }
+
+  const saveEdit = async () => {
+    if (!editModel || !editBuyPrice) return alert('Заполните модель и цену закупа')
+    
+    const updates = {
+      model: editModel,
+      buy_price: Number(editBuyPrice),
+      storage_gb: editStorage ? Number(editStorage) : null,
+      battery_health: editBattery ? Number(editBattery) : null,
+      imei: editImei || null,
+      seller_id: editSellerId ? Number(editSellerId) : null,
+    }
+
+    // Если товар уже продан, обновляем и данные продажи
+    if (editingDeal.status === 'sold') {
+      updates.sell_price = editSellPrice ? Number(editSellPrice) : null
+      updates.buyer_id = editBuyerId ? Number(editBuyerId) : null
+    }
+
+    const { error } = await supabase.from('deals').update(updates).eq('id', editingDeal.id)
+    if (!error) { setEditingDeal(null); fetchData() } 
+    else { alert('Ошибка при сохранении: ' + error.message) }
+  }
+
+  const deleteDeal = async (id) => {
+    if (!window.confirm('Удалить это устройство? Все расходы по нему тоже удалятся.')) return
+    const { error } = await supabase.from('deals').delete().eq('id', id)
+    if (!error) fetchData()
+  }
+
+  // --- ОСТАЛЬНЫЕ ФУНКЦИИ ---
   const addContact = async (e) => {
     e.preventDefault()
     if (!contactName) return alert('Введите имя')
-    
-    const { error } = await supabase
-      .from('contacts')
-      .insert([{ name: contactName, phone: contactPhone, note: contactNote }])
-
-    if (!error) {
-      setContactName(''); setContactPhone(''); setContactNote('')
-      fetchData()
-    } else {
-      alert('Ошибка: ' + error.message)
-    }
+    const { error } = await supabase.from('contacts').insert([{ name: contactName, phone: contactPhone, note: contactNote }])
+    if (!error) { setContactName(''); setContactPhone(''); setContactNote(''); fetchData() }
   }
 
   const openSellModal = (deal) => { setSellingDeal(deal); setSellPrice(''); setBuyerId('') }
-
   const confirmSell = async () => {
     if (!sellPrice || isNaN(sellPrice) || Number(sellPrice) <= 0) return alert('Введите цену')
-    
-    const { error } = await supabase
-      .from('deals')
-      .update({ 
-        sell_price: Number(sellPrice), 
-        status: 'sold',
-        buyer_id: buyerId ? Number(buyerId) : null
-      })
-      .eq('id', sellingDeal.id)
-      
+    const { error } = await supabase.from('deals').update({ sell_price: Number(sellPrice), status: 'sold', buyer_id: buyerId ? Number(buyerId) : null }).eq('id', sellingDeal.id)
     if (!error) { setSellingDeal(null); fetchData() }
   }
 
   const openExpenseModal = (deal) => { setExpenseDeal(deal); setExpenseAmount(''); setExpenseCategory('Ремонт') }
-
   const confirmExpense = async () => {
     if (!expenseAmount || isNaN(expenseAmount) || Number(expenseAmount) <= 0) return alert('Введите сумму')
     const { error } = await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount: Number(expenseAmount), category: expenseCategory }])
@@ -141,7 +170,6 @@ function App() {
     </div>
   )
 
-  // --- ЭКРАНЫ ---
   const renderHome = () => (
     <div>
       <h2>Дашборд</h2>
@@ -171,13 +199,10 @@ function App() {
             <input className="input-field" type="number" placeholder="АКБ (%)" value={battery} onChange={(e) => setBattery(e.target.value)}/>
           </div>
           <input className="input-field" type="text" placeholder="IMEI" value={imei} onChange={(e) => setImei(e.target.value)}/>
-          
-          {/* Выбор продавца */}
           <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
             <option value="">Кто продал? (Необязательно)</option>
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
           </select>
-
           <button className="btn-primary" type="submit" disabled={loading}>Добавить</button>
         </form>
       </div>
@@ -186,7 +211,13 @@ function App() {
         const expSum = getDealExpensesSum(deal);
         return (
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid #ff9500' }}>
-            <div style={{ fontWeight: 'bold', fontSize: 16 }}>{deal.model}</div>
+            <div className="card-header">
+              <div style={{ fontWeight: 'bold', fontSize: 16 }}>{deal.model}</div>
+              <div className="action-buttons">
+                <button className="icon-btn" onClick={() => openEditModal(deal)}>✏️</button>
+                <button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button>
+              </div>
+            </div>
             {renderSpecs(deal)}
             {deal.seller && <div style={{ fontSize: 13, color: '#888', marginTop: 5 }}>Продавец: {deal.seller.name}</div>}
             <div style={{ fontSize: 14, color: '#666', marginTop: 5 }}>
@@ -210,7 +241,13 @@ function App() {
         const margin = deal.sell_price - deal.buy_price - expSum; 
         return (
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid #34c759' }}>
-            <div style={{ fontWeight: 'bold', fontSize: 16 }}>{deal.model}</div>
+            <div className="card-header">
+              <div style={{ fontWeight: 'bold', fontSize: 16 }}>{deal.model}</div>
+              <div className="action-buttons">
+                <button className="icon-btn" onClick={() => openEditModal(deal)}>✏️</button>
+                <button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button>
+              </div>
+            </div>
             {renderSpecs(deal)}
             <div style={{ fontSize: 13, color: '#888', marginTop: 5, marginBottom: 5 }}>
               {deal.seller && <div>Купил у: {deal.seller.name}</div>}
@@ -236,11 +273,10 @@ function App() {
         <form onSubmit={addContact}>
           <input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/>
           <input className="input-field" type="text" placeholder="Телефон" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}/>
-          <input className="input-field" type="text" placeholder="Заметка (надежный, торгуется...)" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/>
+          <input className="input-field" type="text" placeholder="Заметка" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/>
           <button className="btn-primary" type="submit">Сохранить</button>
         </form>
       </div>
-
       {contacts.map((c) => (
         <div key={c.id} className="card">
           <div style={{ fontWeight: 'bold', fontSize: 16 }}>{c.name}</div>
@@ -263,12 +299,10 @@ function App() {
         <div className="modal-overlay"><div className="modal-content">
           <h3>Продажа: {sellingDeal.model}</h3>
           <input className="input-field" type="number" placeholder="Цена продажи (₽)" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} autoFocus/>
-          
           <select className="input-field" value={buyerId} onChange={(e) => setBuyerId(e.target.value)}>
             <option value="">Кто купил? (Необязательно)</option>
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
           </select>
-
           <div className="modal-actions"><button className="btn-cancel" onClick={() => setSellingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmSell}>Продать</button></div>
         </div></div>
       )}
@@ -285,7 +319,59 @@ function App() {
         </div></div>
       )}
 
-      {/* НИЖНЕЕ МЕНЮ (4 кнопки) */}
+      {/* ОКНО РЕДАКТИРОВАНИЯ */}
+      {editingDeal && (
+        <div className="modal-overlay"><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+          <h3>Редактировать: {editingDeal.model}</h3>
+          
+          <label style={{fontSize: 12, color: '#888'}}>Модель</label>
+          <input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/>
+          
+          <label style={{fontSize: 12, color: '#888'}}>Цена закупа (₽)</label>
+          <input className="input-field" type="number" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value)}/>
+          
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{fontSize: 12, color: '#888'}}>Память (ГБ)</label>
+              <input className="input-field" type="number" value={editStorage} onChange={(e) => setEditStorage(e.target.value)}/>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{fontSize: 12, color: '#888'}}>АКБ (%)</label>
+              <input className="input-field" type="number" value={editBattery} onChange={(e) => setEditBattery(e.target.value)}/>
+            </div>
+          </div>
+
+          <label style={{fontSize: 12, color: '#888'}}>IMEI</label>
+          <input className="input-field" type="text" value={editImei} onChange={(e) => setEditImei(e.target.value)}/>
+          
+          <label style={{fontSize: 12, color: '#888'}}>Продавец</label>
+          <select className="input-field" value={editSellerId} onChange={(e) => setEditSellerId(e.target.value)}>
+            <option value="">Не указан</option>
+            {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+
+          {/* Поля для проданного товара */}
+          {editingDeal.status === 'sold' && (
+            <>
+              <label style={{fontSize: 12, color: '#888', marginTop: 10, display: 'block'}}>Цена продажи (₽)</label>
+              <input className="input-field" type="number" value={editSellPrice} onChange={(e) => setEditSellPrice(e.target.value)}/>
+              
+              <label style={{fontSize: 12, color: '#888'}}>Покупатель</label>
+              <select className="input-field" value={editBuyerId} onChange={(e) => setEditBuyerId(e.target.value)}>
+                <option value="">Не указан</option>
+                {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </>
+          )}
+
+          <div className="modal-actions" style={{ marginTop: 20 }}>
+            <button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button>
+            <button className="btn-confirm" style={{ backgroundColor: '#2481cc' }} onClick={saveEdit}>Сохранить</button>
+          </div>
+        </div></div>
+      )}
+
+      {/* НИЖНЕЕ МЕНЮ */}
       <div className="tab-bar">
         <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}><span className="tab-icon">📊</span> Главная</button>
         <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}><span className="tab-icon">📦</span> Склад</button>

@@ -144,39 +144,47 @@ function App() {
     if (!error) { setExpenseDeal(null); fetchData() }
   }
 
-  const exportToCSV = () => {
+  const exportToCSV = async () => {
+    haptic();
     if (deals.length === 0) return alert('Нет данных для экспорта')
     
     const headers = ['Модель', 'Память', 'АКБ', 'IMEI', 'Закупка', 'Расходы', 'Продажа', 'Прибыль', 'Дата закупа', 'Дата продажи', 'Продавец', 'Покупатель'];
-    
     const rows = deals.map(d => {
       const exp = getDealExpensesSum(d);
       const margin = d.sell_price ? d.sell_price - d.buy_price - exp : '';
-      
       return [
-        `"${d.model}"`, 
-        d.storage_gb || '', 
-        d.battery_health || '', 
-        d.imei || '',
-        d.buy_price, 
-        exp, 
-        d.sell_price || '', 
-        margin,
+        `"${d.model}"`, d.storage_gb || '', d.battery_health || '', d.imei || '',
+        d.buy_price, exp, d.sell_price || '', margin,
         new Date(d.created_at).toLocaleDateString('ru-RU'),
         d.sold_at ? new Date(d.sold_at).toLocaleDateString('ru-RU') : '',
-        d.seller ? `"${d.seller.name}"` : '', 
-        d.buyer ? `"${d.buyer.name}"` : ''
-      ].join(';'); // Точка с запятой
+        d.seller ? `"${d.seller.name}"` : '', d.buyer ? `"${d.buyer.name}"` : ''
+      ].join(';'); 
     });
+    
+    const csvString = [headers.join(';'), ...rows].join('\n');
 
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(';'), ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "itrade_сделки.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Пытаемся использовать системное меню "Поделиться" (работает в Telegram)
+    if (navigator.share) {
+      try {
+        const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
+        const file = new File([blob], "itrade_сделки.csv", { type: 'text/csv' });
+        await navigator.share({
+          title: 'Экспорт данных iTrade',
+          files: [file]
+        });
+        return; // Если успешно поделились, выходим
+      } catch (err) {
+        console.log('Ошибка шаринга:', err);
+      }
+    }
+
+    // Запасной вариант: копируем в буфер обмена
+    try {
+      await navigator.clipboard.writeText(csvString);
+      alert('Данные скопированы! Можете вставить их в Excel, Google Таблицы или отправить себе в Избранное в Telegram.');
+    } catch (err) {
+      alert('Не удалось сохранить файл. Попробуйте открыть приложение на компьютере.');
+    }
   }
 
   // --- СТАТИСТИКА ---

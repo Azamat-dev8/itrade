@@ -5,19 +5,28 @@ import './App.css'
 function App() {
   const [user, setUser] = useState(null)
   const [deals, setDeals] = useState([])
+  const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
   
   // Поля для новой сделки
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
-  const [storage, setStorage] = useState('') // Память
-  const [battery, setBattery] = useState('') // АКБ
-  const [imei, setImei] = useState('')       // IMEI
+  const [storage, setStorage] = useState('')
+  const [battery, setBattery] = useState('')
+  const [imei, setImei] = useState('')
+  const [sellerId, setSellerId] = useState('')
   
+  // Поля для нового контакта
+  const [contactName, setContactName] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
+  const [contactNote, setContactNote] = useState('')
+
   // Окна (модалки)
   const [sellingDeal, setSellingDeal] = useState(null)
   const [sellPrice, setSellPrice] = useState('')
+  const [buyerId, setBuyerId] = useState('')
+
   const [expenseDeal, setExpenseDeal] = useState(null)
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('Ремонт')
@@ -29,16 +38,23 @@ function App() {
       tg.expand()
       setUser(tg.initDataUnsafe?.user || null)
     }
-    fetchDeals()
+    fetchData()
   }, [])
 
-  const fetchDeals = async () => {
-    const { data, error } = await supabase
+  const fetchData = async () => {
+    // Загружаем сделки (с расходами, продавцом и покупателем)
+    const { data: dealsData } = await supabase
       .from('deals')
-      .select('*, expenses(*)')
+      .select('*, expenses(*), seller:seller_id(name), buyer:buyer_id(name)')
       .order('created_at', { ascending: false })
-    
-    if (!error && data) setDeals(data)
+    if (dealsData) setDeals(dealsData)
+
+    // Загружаем контакты
+    const { data: contactsData } = await supabase
+      .from('contacts')
+      .select('*')
+      .order('name')
+    if (contactsData) setContacts(contactsData)
   }
 
   const addDeal = async (e) => {
@@ -46,7 +62,6 @@ function App() {
     if (!model || !buyPrice) return alert('Заполните модель и цену')
     setLoading(true)
 
-    // Отправляем в базу все поля, включая новые
     const { error } = await supabase
       .from('deals')
       .insert([{ 
@@ -55,24 +70,50 @@ function App() {
         status: 'in_stock',
         storage_gb: storage ? Number(storage) : null,
         battery_health: battery ? Number(battery) : null,
-        imei: imei || null
+        imei: imei || null,
+        seller_id: sellerId ? Number(sellerId) : null
       }])
 
     if (!error) {
-      setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei('')
-      fetchDeals() 
+      setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId('')
+      fetchData() 
     } else {
       alert('Ошибка при добавлении: ' + error.message)
     }
     setLoading(false)
   }
 
-  const openSellModal = (deal) => { setSellingDeal(deal); setSellPrice('') }
+  const addContact = async (e) => {
+    e.preventDefault()
+    if (!contactName) return alert('Введите имя')
+    
+    const { error } = await supabase
+      .from('contacts')
+      .insert([{ name: contactName, phone: contactPhone, note: contactNote }])
+
+    if (!error) {
+      setContactName(''); setContactPhone(''); setContactNote('')
+      fetchData()
+    } else {
+      alert('Ошибка: ' + error.message)
+    }
+  }
+
+  const openSellModal = (deal) => { setSellingDeal(deal); setSellPrice(''); setBuyerId('') }
 
   const confirmSell = async () => {
     if (!sellPrice || isNaN(sellPrice) || Number(sellPrice) <= 0) return alert('Введите цену')
-    const { error } = await supabase.from('deals').update({ sell_price: Number(sellPrice), status: 'sold' }).eq('id', sellingDeal.id)
-    if (!error) { setSellingDeal(null); fetchDeals() }
+    
+    const { error } = await supabase
+      .from('deals')
+      .update({ 
+        sell_price: Number(sellPrice), 
+        status: 'sold',
+        buyer_id: buyerId ? Number(buyerId) : null
+      })
+      .eq('id', sellingDeal.id)
+      
+    if (!error) { setSellingDeal(null); fetchData() }
   }
 
   const openExpenseModal = (deal) => { setExpenseDeal(deal); setExpenseAmount(''); setExpenseCategory('Ремонт') }
@@ -80,7 +121,7 @@ function App() {
   const confirmExpense = async () => {
     if (!expenseAmount || isNaN(expenseAmount) || Number(expenseAmount) <= 0) return alert('Введите сумму')
     const { error } = await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount: Number(expenseAmount), category: expenseCategory }])
-    if (!error) { setExpenseDeal(null); fetchDeals() }
+    if (!error) { setExpenseDeal(null); fetchData() }
   }
 
   // --- СТАТИСТИКА ---
@@ -92,7 +133,6 @@ function App() {
   const totalProfit = totalRevenue - totalBuy - totalExp
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + e.amount, 0);
 
-  // Вспомогательная функция для красивых тегов устройства
   const renderSpecs = (deal) => (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
       {deal.storage_gb && <span style={{ background: '#e5e5ea', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>{deal.storage_gb} GB</span>}
@@ -126,14 +166,18 @@ function App() {
         <form onSubmit={addDeal}>
           <input className="input-field" type="text" placeholder="Модель (iPhone 13 Pro)" value={model} onChange={(e) => setModel(e.target.value)}/>
           <input className="input-field" type="number" placeholder="Цена закупа (₽)" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)}/>
-          
-          {/* Новые поля */}
           <div style={{ display: 'flex', gap: 10 }}>
             <input className="input-field" type="number" placeholder="Память (ГБ)" value={storage} onChange={(e) => setStorage(e.target.value)}/>
             <input className="input-field" type="number" placeholder="АКБ (%)" value={battery} onChange={(e) => setBattery(e.target.value)}/>
           </div>
-          <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={imei} onChange={(e) => setImei(e.target.value)}/>
+          <input className="input-field" type="text" placeholder="IMEI" value={imei} onChange={(e) => setImei(e.target.value)}/>
           
+          {/* Выбор продавца */}
+          <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
+            <option value="">Кто продал? (Необязательно)</option>
+            {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
+          </select>
+
           <button className="btn-primary" type="submit" disabled={loading}>Добавить</button>
         </form>
       </div>
@@ -144,6 +188,7 @@ function App() {
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid #ff9500' }}>
             <div style={{ fontWeight: 'bold', fontSize: 16 }}>{deal.model}</div>
             {renderSpecs(deal)}
+            {deal.seller && <div style={{ fontSize: 13, color: '#888', marginTop: 5 }}>Продавец: {deal.seller.name}</div>}
             <div style={{ fontSize: 14, color: '#666', marginTop: 5 }}>
               Закуп: {deal.buy_price} ₽ {expSum > 0 && <span style={{color: '#ff3b30'}}>+ Расходы: {expSum} ₽</span>}
             </div>
@@ -167,7 +212,11 @@ function App() {
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid #34c759' }}>
             <div style={{ fontWeight: 'bold', fontSize: 16 }}>{deal.model}</div>
             {renderSpecs(deal)}
-            <div style={{ fontSize: 14, color: '#666', marginTop: 8, marginBottom: 5 }}>
+            <div style={{ fontSize: 13, color: '#888', marginTop: 5, marginBottom: 5 }}>
+              {deal.seller && <div>Купил у: {deal.seller.name}</div>}
+              {deal.buyer && <div>Продал: {deal.buyer.name}</div>}
+            </div>
+            <div style={{ fontSize: 14, color: '#666', marginBottom: 5 }}>
               Закуп: {deal.buy_price} ₽ | Расходы: {expSum} ₽ | Продажа: {deal.sell_price} ₽
             </div>
             <div style={{ fontWeight: 'bold', color: margin >= 0 ? '#34c759' : '#ff3b30' }}>
@@ -179,20 +228,52 @@ function App() {
     </div>
   )
 
+  const renderContacts = () => (
+    <div>
+      <h2>Контакты</h2>
+      <div className="card">
+        <h3>Добавить контакт</h3>
+        <form onSubmit={addContact}>
+          <input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/>
+          <input className="input-field" type="text" placeholder="Телефон" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}/>
+          <input className="input-field" type="text" placeholder="Заметка (надежный, торгуется...)" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/>
+          <button className="btn-primary" type="submit">Сохранить</button>
+        </form>
+      </div>
+
+      {contacts.map((c) => (
+        <div key={c.id} className="card">
+          <div style={{ fontWeight: 'bold', fontSize: 16 }}>{c.name}</div>
+          {c.phone && <div style={{ fontSize: 14, color: '#2481cc', marginTop: 5 }}>📞 {c.phone}</div>}
+          {c.note && <div style={{ fontSize: 13, color: '#888', marginTop: 5, fontStyle: 'italic' }}>📝 {c.note}</div>}
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <div className="app-container">
       {activeTab === 'home' && renderHome()}
       {activeTab === 'stock' && renderStock()}
       {activeTab === 'deals' && renderDeals()}
+      {activeTab === 'contacts' && renderContacts()}
 
+      {/* ОКНО ПРОДАЖИ */}
       {sellingDeal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Продажа: {sellingDeal.model}</h3>
           <input className="input-field" type="number" placeholder="Цена продажи (₽)" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} autoFocus/>
+          
+          <select className="input-field" value={buyerId} onChange={(e) => setBuyerId(e.target.value)}>
+            <option value="">Кто купил? (Необязательно)</option>
+            {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
+          </select>
+
           <div className="modal-actions"><button className="btn-cancel" onClick={() => setSellingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmSell}>Продать</button></div>
         </div></div>
       )}
 
+      {/* ОКНО РАСХОДА */}
       {expenseDeal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Расход: {expenseDeal.model}</h3>
@@ -204,10 +285,12 @@ function App() {
         </div></div>
       )}
 
+      {/* НИЖНЕЕ МЕНЮ (4 кнопки) */}
       <div className="tab-bar">
         <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}><span className="tab-icon">📊</span> Главная</button>
         <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => setActiveTab('stock')}><span className="tab-icon">📦</span> Склад</button>
         <button className={`tab-button ${activeTab === 'deals' ? 'active' : ''}`} onClick={() => setActiveTab('deals')}><span className="tab-icon">💰</span> Сделки</button>
+        <button className={`tab-button ${activeTab === 'contacts' ? 'active' : ''}`} onClick={() => setActiveTab('contacts')}><span className="tab-icon">👥</span> Контакты</button>
       </div>
     </div>
   )

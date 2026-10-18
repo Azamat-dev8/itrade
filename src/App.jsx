@@ -9,6 +9,9 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
   
+  // Стейт для поиска
+  const [searchQuery, setSearchQuery] = useState('')
+
   // Поля для новой сделки
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
@@ -31,7 +34,6 @@ function App() {
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('Ремонт')
 
-  // Состояние для редактирования
   const [editingDeal, setEditingDeal] = useState(null)
   const [editModel, setEditModel] = useState('')
   const [editBuyPrice, setEditBuyPrice] = useState('')
@@ -52,6 +54,11 @@ function App() {
     fetchData()
   }, [])
 
+  // Сбрасываем поиск при смене вкладки
+  useEffect(() => {
+    setSearchQuery('')
+  }, [activeTab])
+
   const fetchData = async () => {
     const { data: dealsData } = await supabase
       .from('deals')
@@ -71,60 +78,43 @@ function App() {
     const { error } = await supabase
       .from('deals')
       .insert([{ 
-        model, 
-        buy_price: Number(buyPrice), 
-        status: 'in_stock',
-        storage_gb: storage ? Number(storage) : null,
-        battery_health: battery ? Number(battery) : null,
-        imei: imei || null,
-        seller_id: sellerId ? Number(sellerId) : null
+        model, buy_price: Number(buyPrice), status: 'in_stock',
+        storage_gb: storage ? Number(storage) : null, battery_health: battery ? Number(battery) : null,
+        imei: imei || null, seller_id: sellerId ? Number(sellerId) : null
       }])
 
     if (!error) {
       setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId('')
       fetchData() 
-    } else {
-      alert('Ошибка: ' + error.message)
-    }
+    } else { alert('Ошибка: ' + error.message) }
     setLoading(false)
   }
 
   const openEditModal = (deal) => {
     setEditingDeal(deal)
-    setEditModel(deal.model)
-    setEditBuyPrice(deal.buy_price)
-    setEditStorage(deal.storage_gb || '')
-    setEditBattery(deal.battery_health || '')
-    setEditImei(deal.imei || '')
-    setEditSellerId(deal.seller_id || '')
-    setEditSellPrice(deal.sell_price || '')
-    setEditBuyerId(deal.buyer_id || '')
+    setEditModel(deal.model); setEditBuyPrice(deal.buy_price); setEditStorage(deal.storage_gb || '')
+    setEditBattery(deal.battery_health || ''); setEditImei(deal.imei || ''); setEditSellerId(deal.seller_id || '')
+    setEditSellPrice(deal.sell_price || ''); setEditBuyerId(deal.buyer_id || '')
   }
 
   const saveEdit = async () => {
     if (!editModel || !editBuyPrice) return alert('Заполните модель и цену закупа')
-    
     const updates = {
-      model: editModel,
-      buy_price: Number(editBuyPrice),
-      storage_gb: editStorage ? Number(editStorage) : null,
-      battery_health: editBattery ? Number(editBattery) : null,
-      imei: editImei || null,
-      seller_id: editSellerId ? Number(editSellerId) : null,
+      model: editModel, buy_price: Number(editBuyPrice),
+      storage_gb: editStorage ? Number(editStorage) : null, battery_health: editBattery ? Number(editBattery) : null,
+      imei: editImei || null, seller_id: editSellerId ? Number(editSellerId) : null,
     }
-
     if (editingDeal.status === 'sold') {
       updates.sell_price = editSellPrice ? Number(editSellPrice) : null
       updates.buyer_id = editBuyerId ? Number(editBuyerId) : null
     }
-
     const { error } = await supabase.from('deals').update(updates).eq('id', editingDeal.id)
     if (!error) { setEditingDeal(null); fetchData() } 
-    else { alert('Ошибка при сохранении: ' + error.message) }
+    else { alert('Ошибка: ' + error.message) }
   }
 
   const deleteDeal = async (id) => {
-    if (!window.confirm('Удалить это устройство? Все расходы по нему тоже удалятся.')) return
+    if (!window.confirm('Удалить это устройство?')) return
     const { error } = await supabase.from('deals').delete().eq('id', id)
     if (!error) fetchData()
   }
@@ -141,12 +131,7 @@ function App() {
   const confirmSell = async () => {
     if (!sellPrice || isNaN(sellPrice) || Number(sellPrice) <= 0) return alert('Введите цену')
     const { error } = await supabase.from('deals')
-      .update({ 
-        sell_price: Number(sellPrice), 
-        status: 'sold', 
-        buyer_id: buyerId ? Number(buyerId) : null,
-        sold_at: new Date().toISOString() // Записываем точное время продажи
-      })
+      .update({ sell_price: Number(sellPrice), status: 'sold', buyer_id: buyerId ? Number(buyerId) : null, sold_at: new Date().toISOString() })
       .eq('id', sellingDeal.id)
     if (!error) { setSellingDeal(null); fetchData() }
   }
@@ -167,10 +152,21 @@ function App() {
   const totalProfit = totalRevenue - totalBuy - totalExp
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + e.amount, 0);
 
-  // --- РАСЧЕТ ДНЕЙ НА СКЛАДЕ ---
+  // --- ЛОГИКА ПОИСКА ---
+  // Фильтруем списки по модели или IMEI
+  const filterDealsByQuery = (list) => {
+    if (!searchQuery) return list;
+    const q = searchQuery.toLowerCase();
+    return list.filter(deal => 
+      deal.model.toLowerCase().includes(q) || 
+      (deal.imei && deal.imei.includes(q))
+    );
+  }
+  const filteredStock = filterDealsByQuery(inStockDeals);
+  const filteredSold = filterDealsByQuery(soldDeals);
+
   const getDaysOnStock = (deal) => {
     const start = new Date(deal.created_at);
-    // Если товар продан и есть дата продажи - считаем до нее, иначе до сегодня
     const end = (deal.status === 'sold' && deal.sold_at) ? new Date(deal.sold_at) : new Date();
     const diffTime = Math.abs(end - start);
     return Math.floor(diffTime / (1000 * 60 * 60 * 24));
@@ -179,12 +175,10 @@ function App() {
   const renderDaysBadge = (days, status) => {
     let bg = '#e5e5ea'; let color = '#333';
     if (status === 'in_stock') {
-      if (days >= 30) { bg = '#ffe4e1'; color = '#ff3b30'; } // Красный (залежался)
-      else if (days >= 15) { bg = '#fff3cd'; color = '#856404'; } // Желтый (пора снижать)
-      else { bg = '#d1f9d1'; color = '#28a745'; } // Зеленый (свежий)
-    } else {
-      bg = '#f0f0f0'; color = '#666'; // Серый для проданных
-    }
+      if (days >= 30) { bg = '#ffe4e1'; color = '#ff3b30'; }
+      else if (days >= 15) { bg = '#fff3cd'; color = '#856404'; }
+      else { bg = '#d1f9d1'; color = '#28a745'; }
+    } else { bg = '#f0f0f0'; color = '#666'; }
     
     return (
       <span style={{ background: bg, color: color, padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 'bold' }}>
@@ -199,6 +193,21 @@ function App() {
       {deal.storage_gb && <span style={{ background: '#e5e5ea', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>{deal.storage_gb} GB</span>}
       {deal.battery_health && <span style={{ background: deal.battery_health >= 85 ? '#d1f9d1' : '#ffe4e1', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>🔋 {deal.battery_health}%</span>}
       {deal.imei && <span style={{ background: '#e5e5ea', padding: '2px 8px', borderRadius: 4, fontSize: 12, color: '#666' }}>IMEI: ...{deal.imei.slice(-4)}</span>}
+    </div>
+  )
+
+  // Компонент поисковой строки
+  const renderSearchBar = () => (
+    <div style={{ position: 'relative', marginBottom: 15 }}>
+      <input 
+        className="input-field" 
+        type="text" 
+        placeholder="Поиск по модели или IMEI..." 
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        style={{ marginBottom: 0, paddingLeft: 35 }}
+      />
+      <span style={{ position: 'absolute', left: 12, top: 12, fontSize: 16, color: '#888' }}>🔍</span>
     </div>
   )
 
@@ -239,7 +248,14 @@ function App() {
         </form>
       </div>
 
-      {inStockDeals.map((deal) => {
+      {/* Строка поиска на складе */}
+      {inStockDeals.length > 0 && renderSearchBar()}
+
+      {filteredStock.length === 0 && searchQuery && (
+        <p style={{textAlign:'center', color:'#888'}}>По запросу "{searchQuery}" ничего не найдено</p>
+      )}
+
+      {filteredStock.map((deal) => {
         const expSum = getDealExpensesSum(deal);
         return (
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid #ff9500' }}>
@@ -268,7 +284,15 @@ function App() {
   const renderDeals = () => (
     <div>
       <h2>История сделок</h2>
-      {soldDeals.map((deal) => {
+      
+      {/* Строка поиска в сделках */}
+      {soldDeals.length > 0 && renderSearchBar()}
+
+      {filteredSold.length === 0 && searchQuery && (
+        <p style={{textAlign:'center', color:'#888'}}>По запросу "{searchQuery}" ничего не найдено</p>
+      )}
+
+      {filteredSold.map((deal) => {
         const expSum = getDealExpensesSum(deal);
         const margin = deal.sell_price - deal.buy_price - expSum; 
         return (
@@ -326,7 +350,7 @@ function App() {
       {activeTab === 'deals' && renderDeals()}
       {activeTab === 'contacts' && renderContacts()}
 
-      {/* ОКНА */}
+      {/* ОКНА ОСТАЛИСЬ БЕЗ ИЗМЕНЕНИЙ */}
       {sellingDeal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Продажа: {sellingDeal.model}</h3>

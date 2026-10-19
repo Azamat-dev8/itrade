@@ -4,7 +4,6 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList } f
 import Scanner from './Scanner'
 import './App.css'
 
-// --- БАЗА УСТРОЙСТВ (Проблема 2) ---
 const DEVICE_CATALOG = {
   'iPhone': [
     "iPhone 7", "iPhone 7 Plus", "iPhone 8", "iPhone 8 Plus", "iPhone X", "iPhone XR", "iPhone XS", "iPhone XS Max",
@@ -20,10 +19,17 @@ const DEVICE_CATALOG = {
     "MacBook Air M1", "MacBook Air M2", "MacBook Air M3", "MacBook Pro 13 M1", "MacBook Pro 14 M1", "MacBook Pro 16 M1", "MacBook Pro 14 M3", "MacBook Pro 16 M3"
   ],
   'Apple Watch': [
-    "Apple Watch Series 6", "Apple Watch Series 7", "Apple Watch Series 8", "Apple Watch Series 9", "Apple Watch SE", "Apple Watch Ultra", "Apple Watch Ultra 2"
+    "Apple Watch Series 4", "Apple Watch Series 5", "Apple Watch Series 6", "Apple Watch SE (2020)", 
+    "Apple Watch Series 7", "Apple Watch Series 8", "Apple Watch SE (2022)", "Apple Watch Ultra", 
+    "Apple Watch Series 9", "Apple Watch Ultra 2", "Apple Watch Series 10", "Apple Watch Series 11", 
+    "Apple Watch Series 12", "Apple Watch Ultra 3"
+  ],
+  'AirPods': [
+    "AirPods 2", "AirPods 3", "AirPods 4", "AirPods 5", 
+    "AirPods Pro", "AirPods Pro 2", "AirPods Pro 3", 
+    "AirPods Max"
   ]
 };
-
 const MY_CHANNEL_URL = "https://t.me/primesufa"; 
 
 function App() {
@@ -484,9 +490,27 @@ function App() {
             
             <input className="input-field" type="text" placeholder="Поиск (например, 15 pro)..." value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} style={{ marginBottom: 10 }}/>
             
-            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 10, marginBottom: 10 }}>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingTop: 5, paddingBottom: 10, marginBottom: 10, alignItems: 'center' }}>
               {Object.keys(DEVICE_CATALOG).map(cat => (
-                <button key={cat} onClick={() => setModelCategory(cat)} style={{ padding: '6px 12px', borderRadius: 20, border: 'none', backgroundColor: modelCategory === cat ? 'var(--accent)' : 'var(--bg-color)', color: modelCategory === cat ? '#fff' : 'var(--text-main)', fontWeight: 'bold', fontSize: 13 }}>{cat}</button>
+                <button 
+                  key={cat} 
+                  onClick={() => setModelCategory(cat)} 
+                  style={{ 
+                    padding: '8px 14px', 
+                    borderRadius: 20, 
+                    border: 'none', 
+                    backgroundColor: modelCategory === cat ? 'var(--accent)' : 'var(--bg-color)', 
+                    color: modelCategory === cat ? '#fff' : 'var(--text-main)', 
+                    fontWeight: 'bold', 
+                    fontSize: 13,
+                    whiteSpace: 'nowrap', // Запрещаем перенос текста
+                    flexShrink: 0,       // Запрещаем сжатие кнопок
+                    minHeight: 34,       // Задаем минимальную высоту
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}
+                >
+                  {cat}
+                </button>
               ))}
             </div>
 

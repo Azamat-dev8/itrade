@@ -530,7 +530,7 @@ function App() {
           <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://t.me/primestore8'); }} style={{ color: 'var(--accent)' }}>Служба поддержки: @primestore8</a>
         </div>
       </div>
-
+// update
       {showModelPicker && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>

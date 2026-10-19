@@ -5,8 +5,6 @@ import Scanner from './Scanner'
 import './App.css'
 
 function App() {
-  const [imeiCheckResult, setImeiCheckResult] = useState(null)
-const [isCheckingImei, setIsCheckingImei] = useState(false)
   const [user, setUser] = useState(null)
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
@@ -18,6 +16,10 @@ const [isCheckingImei, setIsCheckingImei] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [csvData, setCsvData] = useState('')
   const [showScanner, setShowScanner] = useState(false)
+
+  // Стейты для проверки IMEI
+  const [isCheckingImei, setIsCheckingImei] = useState(false)
+  const [imeiCheckResult, setImeiCheckResult] = useState(null)
 
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
@@ -69,6 +71,19 @@ const [isCheckingImei, setIsCheckingImei] = useState(false)
     const tg = window.Telegram?.WebApp
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(type)
   }
+
+  const fetchData = async () => {
+    const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name), buyer:buyer_id(name)').order('created_at', { ascending: false })
+    if (dealsData) setDeals(dealsData)
+
+    const { data: contactsData } = await supabase.from('contacts').select('*').order('name')
+    if (contactsData) setContacts(contactsData)
+
+    const { data: genExpData } = await supabase.from('expenses').select('*').is('deal_id', null).order('created_at', { ascending: false })
+    if (genExpData) setGeneralExpenses(genExpData)
+  }
+
+  // ФУНКЦИЯ ПРОВЕРКИ IMEI
   const checkImei = async (imeiToCheck) => {
     if (!imeiToCheck) return alert('Введите IMEI')
     setIsCheckingImei(true)
@@ -88,17 +103,6 @@ const [isCheckingImei, setIsCheckingImei] = useState(false)
       setIsCheckingImei(false)
     }
   }
-  const fetchData = async () => {
-    const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name), buyer:buyer_id(name)').order('created_at', { ascending: false })
-    if (dealsData) setDeals(dealsData)
-
-    // contactsData теперь включает created_at (так как используем *)
-    const { data: contactsData } = await supabase.from('contacts').select('*').order('name')
-    if (contactsData) setContacts(contactsData)
-
-    const { data: genExpData } = await supabase.from('expenses').select('*').is('deal_id', null).order('created_at', { ascending: false })
-    if (genExpData) setGeneralExpenses(genExpData)
-  }
 
   const addDeal = async (e) => {
     e.preventDefault()
@@ -111,6 +115,7 @@ const [isCheckingImei, setIsCheckingImei] = useState(false)
       }])
     if (!error) { 
       setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId(''); 
+      setImeiCheckResult(null); // Сбрасываем результат проверки
       fetchData(); haptic('medium'); 
     } else { alert('Ошибка: ' + error.message) }
     setLoading(false)
@@ -159,17 +164,11 @@ const [isCheckingImei, setIsCheckingImei] = useState(false)
       note: editContactNote || null
     }).eq('id', editingContact.id)
     
-    if (!error) { 
-      setEditingContact(null); 
-      fetchData(); 
-      haptic('medium'); 
-    } else {
-      alert('Ошибка при сохранении: ' + error.message)
-    }
+    if (!error) { setEditingContact(null); fetchData(); haptic('medium'); }
   }
 
   const deleteContact = async (id) => {
-    if (!window.confirm('Удалить этот контакт? (В сделках он останется, но имя исчезнет)')) return
+    if (!window.confirm('Удалить этот контакт?')) return
     const { error } = await supabase.from('contacts').delete().eq('id', id)
     if (!error) { fetchData(); haptic('heavy'); }
   }
@@ -395,28 +394,22 @@ const [isCheckingImei, setIsCheckingImei] = useState(false)
             <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px 16px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12 }}>📷</button>
           </div>
 
-          <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
-                      {/* Блок проверки IMEI */}
+          {/* БЛОК ПРОВЕРКИ IMEI */}
           <div style={{ marginBottom: 12 }}>
             <button
               type="button"
               onClick={() => checkImei(imei)}
               disabled={isCheckingImei || !imei}
               style={{
-                width: '100%',
-                padding: '12px',
-                backgroundColor: '#007aff',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                fontWeight: 'bold',
+                width: '100%', padding: '12px',
+                backgroundColor: '#007aff', color: 'white',
+                border: 'none', borderRadius: 8, fontWeight: 'bold',
                 opacity: (!imei || isCheckingImei) ? 0.5 : 1
               }}
             >
               {isCheckingImei ? 'Проверка...' : '🔍 Проверить IMEI'}
             </button>
 
-            {/* Отображение результата */}
             {imeiCheckResult && (
               <div style={{ marginTop: 10, padding: 12, backgroundColor: '#f0f2f5', borderRadius: 8 }}>
                 <h4 style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>Результат проверки:</h4>
@@ -427,7 +420,6 @@ const [isCheckingImei, setIsCheckingImei] = useState(false)
                 ) : (
                   <div style={{ fontSize: 13, lineHeight: 1.5 }}>
                     <div><strong>Статус:</strong> {imeiCheckResult.status || 'Успешно'}</div>
-                    {/* Если сервис вернул HTML ответ, выводим его как текст */}
                     {imeiCheckResult.message && typeof imeiCheckResult.message === 'string' && (
                       <div style={{ marginTop: 5 }}>{imeiCheckResult.message}</div>
                     )}
@@ -436,6 +428,8 @@ const [isCheckingImei, setIsCheckingImei] = useState(false)
               </div>
             )}
           </div>
+
+          <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
             <option value="">Кто продал? (Необязательно)</option>
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -501,7 +495,7 @@ const [isCheckingImei, setIsCheckingImei] = useState(false)
         <form onSubmit={addContact}>
           <input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/>
           <input className="input-field" type="text" placeholder="Телефон" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}/>
-          <input className="input-field" type="text" placeholder="Комментарий (скуп, продавец 15 про...)" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/>
+          <input className="input-field" type="text" placeholder="Комментарий (надёжный, торгуется...)" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/>
           <button className="btn-primary" type="submit">Сохранить</button>
         </form>
       </div>
@@ -520,7 +514,6 @@ const [isCheckingImei, setIsCheckingImei] = useState(false)
           {c.phone && <div style={{ color: 'var(--accent)', marginTop: 4, fontSize: 14 }}>📞 {c.phone}</div>}
           {c.note && <div style={{ color: '#888', fontSize: 13, marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}
           
-          {/* ВЫВОД ДАТЫ ДОБАВЛЕНИЯ */}
           <div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
             Добавлен: {new Date(c.created_at).toLocaleDateString('ru-RU')}
           </div>

@@ -291,7 +291,7 @@ function App() {
 
   const renderHome = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Дашборд</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
       <div className="main-profit-card">
         <h3>Чистая прибыль</h3>
         <div className="main-profit-value">{totalProfit} ₽</div>
@@ -394,7 +394,9 @@ function App() {
         </form>
       </div>
       {inStockDeals.length > 0 && renderSearchBar()}
-      {filteredStock.map((deal) => (
+      {filteredStock.map((deal) => {
+        const expSum = getDealExpensesSum(deal); // Считаем расходы
+        return (
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
             <div className="card-header">
               <div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div>
@@ -409,13 +411,22 @@ function App() {
                 <button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button>
               </div>
             </div>
+            
             {renderSpecs(deal)}
+            
+            {/* ВОТ ТОТ САМЫЙ БЛОК С ЦЕНОЙ И РАСХОДАМИ */}
+            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>
+              Закуп: {deal.buy_price} ₽ 
+              {expSum > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {expSum} ₽</span>}
+            </div>
+
             <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
               <button className="btn-cancel" style={{ padding: '12px' }} onClick={() => {setExpenseDeal(deal); setExpenseAmount(''); setExpenseCategory('Ремонт')}}>+ Расход</button>
               <button className="btn-success" style={{ flex: 1, padding: '12px' }} onClick={() => {setSellingDeal(deal); setSellPrice(''); setBuyerId('')}}>Продать</button>
             </div>
           </div>
-      ))}
+        )
+      })}
     </div>
   )
 

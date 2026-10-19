@@ -30,7 +30,8 @@ const DEVICE_CATALOG = {
     "AirPods Max"
   ]
 };
-const MY_CHANNEL_URL = "https://t.me/primesufa"; 
+
+const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут" // <-- ЗАМЕНИ НА СВОЙ КАНАЛ
 
 function App() {
   const [user, setUser] = useState(null)
@@ -41,13 +42,13 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
-    const [filterModels, setFilterModels] = useState([]) // Массив выбранных моделей
-  const [pickerMode, setPickerMode] = useState('purchase') // 'purchase', 'stock', 'deals'
   
-  // Умный поиск (Проблема 2)
+  // Умный поиск
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
   const [modelCategory, setModelCategory] = useState('iPhone')
+  const [pickerMode, setPickerMode] = useState('purchase') // 'purchase', 'stock', 'deals'
+  const [filterModels, setFilterModels] = useState([]) // Мульти-выбор
 
   // Состояния интерфейса
   const [showExportModal, setShowExportModal] = useState(false)
@@ -91,7 +92,7 @@ function App() {
   const [sellingDeal, setSellingDeal] = useState(null)
   const [sellPrice, setSellPrice] = useState('')
   const [buyerId, setBuyerId] = useState('')
-  const [sellWarranty, setSellWarranty] = useState('0') // Гарантия (Проблема 6)
+  const [sellWarranty, setSellWarranty] = useState('0')
   
   const [editingDeal, setEditingDeal] = useState(null)
   const [editModel, setEditModel] = useState('')
@@ -115,7 +116,9 @@ function App() {
   }, [])
 
   useEffect(() => { if (user) fetchData() }, [user])
-    useEffect(() => { 
+  
+  // Сбрасываем фильтры при смене вкладки
+  useEffect(() => { 
     setSearchQuery(''); 
     setFilterModels([]); 
   }, [activeTab])
@@ -191,7 +194,7 @@ function App() {
       sell_price: Number(sellPrice), status: 'sold', 
       buyer_id: buyerId ? Number(buyerId) : null, 
       sold_at: new Date().toISOString(),
-      warranty_months: Number(sellWarranty) // СОХРАНЯЕМ ГАРАНТИЮ
+      warranty_months: Number(sellWarranty)
     }).eq('id', sellingDeal.id)
     setSellingDeal(null); fetchData();
   }
@@ -216,6 +219,27 @@ function App() {
   const deleteContact = async (id) => { if (!window.confirm('Удалить контакт?')) return; await supabase.from('contacts').delete().eq('id', id); fetchData(); }
   const saveEdit = async () => { if (!editModel || !editBuyPrice) return; await supabase.from('deals').update({ model: editModel, buy_price: Number(editBuyPrice), storage_gb: editStorage ? Number(editStorage) : null, battery_health: editBattery ? Number(editBattery) : null }).eq('id', editingDeal.id); setEditingDeal(null); fetchData(); }
 
+  // ЛОГИКА ВЫБОРА МОДЕЛИ
+  const handleModelSelect = (modelName) => {
+    haptic();
+    if (pickerMode === 'purchase') {
+      setModel(modelName);
+      setShowModelPicker(false);
+      setModelSearch('');
+    } else {
+      setFilterModels(prev => 
+        prev.includes(modelName) 
+          ? prev.filter(m => m !== modelName) 
+          : [...prev, modelName]
+      );
+    }
+  }
+
+  const removeFilterModel = (modelName) => {
+    haptic();
+    setFilterModels(prev => prev.filter(m => m !== modelName));
+  }
+
   // СТАТИСТИКА
   const soldDeals = deals.filter(d => d.status === 'sold')
   const inStockDeals = deals.filter(d => d.status === 'in_stock')
@@ -233,30 +257,10 @@ function App() {
     if (!acc[monthYear]) acc[monthYear] = 0; acc[monthYear] += profit; return acc;
   }, {});
   const chartData = Object.entries(monthlyProfits).map(([name, profit]) => ({ name, profit })).reverse();
-  const handleModelSelect = (modelName) => {
-    haptic();
-    if (pickerMode === 'purchase') {
-      setModel(modelName);
-      setShowModelPicker(false);
-      setModelSearch('');
-    } else {
-      // Если фильтруем склад/сделки - добавляем или убираем из массива
-      setFilterModels(prev => 
-        prev.includes(modelName) 
-          ? prev.filter(m => m !== modelName) 
-          : [...prev, modelName]
-      );
-    }
-  }
 
-  const removeFilterModel = (modelName) => {
-    haptic();
-    setFilterModels(prev => prev.filter(m => m !== modelName));
-  }
-  // ФИЛЬТРАЦИЯ
+  // ФИЛЬТРАЦИЯ (МУЛЬТИ-ВЫБОР)
   const filterDealsByQuery = (list) => {
     return list.filter(deal => {
-      // Если массив пустой - показываем все. Если нет - проверяем, есть ли модель в массиве
       const matchesModel = filterModels.length > 0 ? filterModels.includes(deal.model) : true;
       const matchesSearch = searchQuery ? (deal.model.toLowerCase().includes(searchQuery.toLowerCase()) || (deal.imei && deal.imei.includes(searchQuery))) : true;
       return matchesModel && matchesSearch;
@@ -271,7 +275,6 @@ function App() {
     return Math.floor(Math.abs(end - start) / (1000 * 60 * 60 * 24));
   }
 
-  // ГАРАНТИЯ (Проблема 6)
   const getWarrantyBadge = (deal) => {
     if (!deal.warranty_months || deal.warranty_months === 0) return null;
     const end = new Date(deal.sold_at);
@@ -344,8 +347,7 @@ function App() {
         <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить устройство</h3>
         <form onSubmit={addDeal}>
           
-          {/* УМНЫЙ ВЫБОР МОДЕЛИ (Проблема 2) */}
-                    <div 
+          <div 
             className="input-field" 
             onClick={() => { setPickerMode('purchase'); setShowModelPicker(true); haptic(); }}
             style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
@@ -367,24 +369,10 @@ function App() {
             <input className="input-field" type="text" inputMode="numeric" placeholder="АКБ (%)" min="0" max="100" value={battery} onChange={(e) => { let val = Number(e.target.value.replace(/[^\d]/g, '')); if (val > 100) val = 100; setBattery(val || ''); }}/>
           </div>
 
-          {/* ИМЕЙ С КРЕСТИКОМ */}
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div style={{ flex: 1, position: 'relative' }}>
-              <input 
-                className="input-field" 
-                type="text" 
-                placeholder="IMEI" 
-                value={imei} 
-                onChange={(e) => setImei(e.target.value)} 
-                style={{ marginBottom: 10, paddingRight: 35 }}
-              />
-              {imei && (
-                <button 
-                  type="button"
-                  onClick={() => { setImei(''); haptic(); }}
-                  style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}
-                >✕</button>
-              )}
+              <input className="input-field" type="text" placeholder="IMEI" value={imei} onChange={(e) => setImei(e.target.value)} style={{ marginBottom: 10, paddingRight: 35 }}/>
+              {imei && <button type="button" onClick={() => { setImei(''); haptic(); }} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
             </div>
             <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12 }}>📷</button>
           </div>
@@ -407,27 +395,20 @@ function App() {
   const renderStock = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Склад</h2>
-                {inStockDeals.length > 0 && (
+      {inStockDeals.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ position: 'relative', flex: 1 }}>
               <input className="input-field" type="text" placeholder="Поиск по IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
               <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
             </div>
-            
-            <button 
-              className="input-field" 
-              style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }}
-              onClick={() => { setPickerMode('stock'); setShowModelPicker(true); haptic(); }}
-            >
+            <button className="input-field" style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }} onClick={() => { setPickerMode('stock'); setShowModelPicker(true); haptic(); }}>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModels.length > 0 ? 'var(--text-main)' : 'var(--text-muted)' }}>
                 {filterModels.length > 0 ? `Выбрано: ${filterModels.length}` : 'Все модели'}
               </span>
               <span style={{ opacity: 0.5 }}>▼</span>
             </button>
           </div>
-
-          {/* ЧИПСЫ ВЫБРАННЫХ МОДЕЛЕЙ */}
           {filterModels.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
               {filterModels.map(m => (
@@ -455,27 +436,30 @@ function App() {
   const renderDeals = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Сделки</h2>
-            {soldDeals.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <input className="input-field" type="text" placeholder="Поиск по IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
-            <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
-          </div>
-          
-          <button 
-            className="input-field" 
-            style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }}
-            onClick={() => { setPickerMode('deals'); setShowModelPicker(true); haptic(); }}
-          >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModel ? 'var(--text-main)' : 'var(--text-muted)' }}>
-              {filterModel || 'Все модели'}
-            </span>
-            {filterModel ? (
-              <span onClick={(e) => { e.stopPropagation(); setFilterModel(''); haptic(); }} style={{ padding: 5, color: '#888' }}>✕</span>
-            ) : (
+      {soldDeals.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <input className="input-field" type="text" placeholder="Поиск по IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
+              <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
+            </div>
+            <button className="input-field" style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }} onClick={() => { setPickerMode('deals'); setShowModelPicker(true); haptic(); }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModels.length > 0 ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                {filterModels.length > 0 ? `Выбрано: ${filterModels.length}` : 'Все модели'}
+              </span>
               <span style={{ opacity: 0.5 }}>▼</span>
-            )}
-          </button>
+            </button>
+          </div>
+          {filterModels.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+              {filterModels.map(m => (
+                <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: 'var(--accent)', color: 'white', padding: '4px 8px', borderRadius: 12, fontSize: 12, fontWeight: 'bold' }}>
+                  {m}
+                  <button onClick={() => removeFilterModel(m)} style={{ background: 'none', border: 'none', color: 'white', padding: 0, fontSize: 14, cursor: 'pointer', display: 'flex' }}>✕</button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {filteredSold.map((deal) => {
@@ -484,10 +468,7 @@ function App() {
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--success)' }}>
             <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model); setEditBuyPrice(deal.buy_price);}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
             {renderSpecs(deal)}
-            
-            {/* БЕЙДЖ ГАРАНТИИ (Проблема 6) */}
             <div style={{ marginBottom: 10 }}>{getWarrantyBadge(deal)}</div>
-
             <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500 }}>Закуп: {deal.buy_price.toLocaleString('ru-RU')} ₽ | Продажа: {deal.sell_price.toLocaleString('ru-RU')} ₽</div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Куплен: {new Date(deal.created_at).toLocaleDateString('ru-RU')} • Продан: {deal.sold_at ? new Date(deal.sold_at).toLocaleDateString('ru-RU') : '-'}</div>
             {deal.expenses && deal.expenses.length > 0 && <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6 }}>{deal.expenses.map(e => `${e.category}: ${e.amount}₽`).join(' • ')}</div>}
@@ -525,12 +506,11 @@ function App() {
       {activeTab === 'finance' && renderFinance()}
       {activeTab === 'contacts' && renderContacts()}
 
-      {/* БОКОВОЕ МЕНЮ */}
       <div className={`sidebar-overlay ${isMenuOpen ? 'open' : ''}`} onClick={() => setIsMenuOpen(false)}></div>
       <div className={`sidebar ${isMenuOpen ? 'open' : ''}`} style={{ overflow: 'hidden' }}>
         <div className="profile-section">
           <div className="profile-avatar" style={{ overflow: 'hidden', padding: 0 }}>{user?.photo_url ? <img src={user.photo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (user?.first_name ? user.first_name[0].toUpperCase() : 'U')}</div>
-          <div><div className="profile-name">{user?.first_name || 'Пользователь'}</div><div className="profile-status">{user?.username ? `@${user.username}` : 'PrimeTrade Pro'}</div></div>
+          <div><div className="profile-name">{user?.first_name || 'Пользователь'}</div><div className="profile-status">{user?.username ? `@${user.username}` : 'iTrade Pro'}</div></div>
         </div>
 
         <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10, overflowY: 'auto' }}>
@@ -538,7 +518,7 @@ function App() {
            <button onClick={() => { openExternalLink(MY_CHANNEL_URL); haptic('medium'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🛍 Мой канал</button>
            {isLeaderboardJoined && <button onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🏆 Рейтинг перекупов</button>}
            <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>
-           <button onClick={() => { const refLink = `https://t.me/Primetrade8_bot?start=ref_${user?.id}`; window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent('Попробуй PrimeTrade!')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🎁 Пригласи друга</button>
+           <button onClick={() => { const refLink = `https://t.me/Primetrade8_bot?start=ref_${user?.id}`; window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent('Попробуй iTrade!')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🎁 Пригласи друга</button>
            <button onClick={() => { window.open(`https://t.me/primestore8?text=${encodeURIComponent('Привет! Идея: ')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>💡 Предложить идею</button>
            <button onClick={() => { setShowSettingsModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>⚙️ Настройки</button>
         </div>
@@ -551,69 +531,30 @@ function App() {
         </div>
       </div>
 
-      {/* МОДАЛКА: УМНЫЙ ВЫБОР УСТРОЙСТВА (Проблема 2) */}
       {showModelPicker && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-                        <h3 style={{ marginTop: 0 }}>
+            <h3 style={{ marginTop: 0 }}>
               {pickerMode === 'purchase' ? 'Выберите устройство' : 'Выберите модели (можно несколько)'}
             </h3>
             
             <input className="input-field" type="text" placeholder="Поиск (например, 15 pro)..." value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} style={{ marginBottom: 10 }}/>
             
-                        {/* ВКЛАДКИ КАТЕГОРИЙ (С ПЕРЕНОСОМ НА НОВУЮ СТРОКУ) */}
-            <div style={{ 
-              display: 'flex', 
-              flexWrap: 'wrap', // <-- Разрешаем перенос на новую строку
-              gap: 8, 
-              paddingTop: 5, 
-              paddingBottom: 10, 
-              marginBottom: 10, 
-              alignItems: 'center',
-              justifyContent: 'center' // <-- Центрируем вкладки
-            }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, paddingTop: 5, paddingBottom: 10, marginBottom: 10, alignItems: 'center', justifyContent: 'center' }}>
               {Object.keys(DEVICE_CATALOG).map(cat => (
-                <button 
-                  key={cat} 
-                  onClick={() => setModelCategory(cat)} 
-                  style={{ 
-                    padding: '8px 14px', 
-                    borderRadius: 20, 
-                    border: 'none', 
-                    backgroundColor: modelCategory === cat ? 'var(--accent)' : 'var(--bg-color)', 
-                    color: modelCategory === cat ? '#fff' : 'var(--text-main)', 
-                    fontWeight: 'bold', 
-                    fontSize: 13,
-                    whiteSpace: 'nowrap', // Запрещаем ломать слово внутри кнопки
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}
-                >
+                <button key={cat} onClick={() => setModelCategory(cat)} style={{ padding: '8px 14px', borderRadius: 20, border: 'none', backgroundColor: modelCategory === cat ? 'var(--accent)' : 'var(--bg-color)', color: modelCategory === cat ? '#fff' : 'var(--text-main)', fontWeight: 'bold', fontSize: 13, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {cat}
                 </button>
               ))}
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {DEVICE_CATALOG[modelCategory]
+              {DEVICE_CATALOG[modelCategory]
                 .filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()))
                 .map(m => {
                   const isSelected = pickerMode !== 'purchase' && filterModels.includes(m);
                   return (
-                    <div 
-                      key={m} 
-                      onClick={() => handleModelSelect(m)} 
-                      style={{ 
-                        padding: '12px 16px', 
-                        backgroundColor: isSelected ? 'var(--accent)' : 'var(--bg-color)', 
-                        color: isSelected ? 'white' : 'var(--text-main)',
-                        borderRadius: 10, 
-                        cursor: 'pointer', 
-                        fontWeight: 500,
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}
-                    >
+                    <div key={m} onClick={() => handleModelSelect(m)} style={{ padding: '12px 16px', backgroundColor: isSelected ? 'var(--accent)' : 'var(--bg-color)', color: isSelected ? 'white' : 'var(--text-main)', borderRadius: 10, cursor: 'pointer', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       {m}
                       {isSelected && <span>✓</span>}
                     </div>
@@ -623,13 +564,14 @@ function App() {
             </div>
             
             <div className="modal-actions" style={{ marginTop: 15 }}>
-              <button className="btn-cancel" onClick={() => setShowModelPicker(false)}>Закрыть</button>
+              <button className="btn-primary" style={{ backgroundColor: pickerMode === 'purchase' ? 'var(--bg-color)' : 'var(--success)', color: pickerMode === 'purchase' ? 'var(--text-main)' : 'white' }} onClick={() => setShowModelPicker(false)}>
+                {pickerMode === 'purchase' ? 'Отмена' : 'Готово'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ОКНО ПРОДАЖИ (С ГАРАНТИЕЙ) */}
       {sellingDeal && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -651,17 +593,12 @@ function App() {
         </div>
       )}
 
-      {/* МОДАЛКИ НАСТРОЕК, РЕЙТИНГА, ПОДПИСКИ, ИНСТРУКЦИИ, РАСХОДОВ И РЕДАКТИРОВАНИЯ */}
       {showSettingsModal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>Настройки</h3>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0' }}><span>Тёмная тема</span><button onClick={toggleTheme} style={{ padding: '8px 16px', borderRadius: 20, background: isDarkTheme ? '#34c759' : '#e5e5ea', color: isDarkTheme ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}>{isDarkTheme ? 'ВКЛ' : 'ВЫКЛ'}</button></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0', borderTop: '1px solid var(--border)', paddingTop: 20 }}><div><div style={{ fontWeight: 'bold' }}>Рейтинг перекупов</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Показывать мою прибыль</div></div><button onClick={toggleLeaderboard} style={{ padding: '8px 16px', borderRadius: 20, background: isLeaderboardJoined ? '#34c759' : '#e5e5ea', color: isLeaderboardJoined ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}>{isLeaderboardJoined ? 'ВКЛ' : 'ВЫКЛ'}</button></div>
-                      <div className="modal-actions" style={{ marginTop: 15 }}>
-              <button className="btn-primary" style={{ backgroundColor: pickerMode === 'purchase' ? 'var(--bg-color)' : 'var(--success)', color: pickerMode === 'purchase' ? 'var(--text-main)' : 'white' }} onClick={() => setShowModelPicker(false)}>
-                {pickerMode === 'purchase' ? 'Отмена' : 'Готово'}
-              </button>
-            </div>
+          <div className="modal-actions"><button className="btn-cancel" onClick={() => setShowSettingsModal(false)}>Закрыть</button></div>
         </div></div>
       )}
       
@@ -670,7 +607,7 @@ function App() {
       )}
       
       {showSubModal && (
-        <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content"><h3 style={{ textAlign: 'center' }}>PrimeTrade PRO</h3><p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Пробный период: <strong style={{ color: '#34c759' }}>14 дней</strong></p><div className="pricing-grid"><div className="pricing-card" onClick={() => alert('Оплата 390 ₽...')}><div><div style={{ fontWeight: 'bold' }}>1 месяц</div><div style={{ fontSize: 12 }}>390 ₽</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div><div className="pricing-card" onClick={() => alert('Оплата 1990 ₽...')}><div><div style={{ fontWeight: 'bold' }}>6 месяцев</div><div style={{ fontSize: 12 }}>1990 ₽</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div><div className="pricing-card best-value" onClick={() => alert('Оплата 3590 ₽...')}><div className="best-value-badge">ВЫГОДНО</div><div><div style={{ fontWeight: 'bold' }}>12 месяцев</div><div style={{ fontSize: 12 }}>3590 ₽</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div></div><div className="modal-actions" style={{ marginTop: 20 }}><button className="btn-cancel" onClick={() => setShowSubModal(false)}>Закрыть</button></div></div></div>
+        <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content"><h3 style={{ textAlign: 'center' }}>iTrade PRO</h3><p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Пробный период: <strong style={{ color: '#34c759' }}>14 дней</strong></p><div className="pricing-grid"><div className="pricing-card" onClick={() => alert('Оплата 390 ₽...')}><div><div style={{ fontWeight: 'bold' }}>1 месяц</div><div style={{ fontSize: 12 }}>390 ₽</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div><div className="pricing-card" onClick={() => alert('Оплата 1990 ₽...')}><div><div style={{ fontWeight: 'bold' }}>6 месяцев</div><div style={{ fontSize: 12 }}>1990 ₽</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div><div className="pricing-card best-value" onClick={() => alert('Оплата 3590 ₽...')}><div className="best-value-badge">ВЫГОДНО</div><div><div style={{ fontWeight: 'bold' }}>12 месяцев</div><div style={{ fontSize: 12 }}>3590 ₽</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div></div><div className="modal-actions" style={{ marginTop: 20 }}><button className="btn-cancel" onClick={() => setShowSubModal(false)}>Закрыть</button></div></div></div>
       )}
       
       {showGuideModal && (
@@ -684,11 +621,7 @@ function App() {
       {editingContact && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать контакт</h3><input className="input-field" type="text" value={editContactName} onChange={(e) => setEditContactName(e.target.value)}/><input className="input-field" type="text" value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)}/><input className="input-field" type="text" value={editContactNote} onChange={(e) => setEditContactNote(e.target.value)}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingContact(null)}>Отмена</button><button className="btn-confirm" onClick={saveEditContact}>Сохранить</button></div></div></div>)}
 
       {showScanner && (
-        <Scanner 
-          key={Date.now()} 
-          onScan={(text) => { setImei(text); setShowScanner(false); }} 
-          onClose={() => setShowScanner(false)} 
-        />
+        <Scanner key={Date.now()} onScan={(text) => { setImei(text); setShowScanner(false); }} onClose={() => setShowScanner(false)} />
       )}
 
       <div className="tab-bar">

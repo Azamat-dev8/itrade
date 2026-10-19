@@ -41,7 +41,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
-    const [filterModel, setFilterModel] = useState('') // Выбранная модель для фильтра
+    const [filterModels, setFilterModels] = useState([]) // Массив выбранных моделей
   const [pickerMode, setPickerMode] = useState('purchase') // 'purchase', 'stock', 'deals'
   
   // Умный поиск (Проблема 2)
@@ -115,7 +115,10 @@ function App() {
   }, [])
 
   useEffect(() => { if (user) fetchData() }, [user])
-  useEffect(() => { setSearchQuery('') }, [activeTab])
+    useEffect(() => { 
+    setSearchQuery(''); 
+    setFilterModels([]); 
+  }, [activeTab])
 
   const haptic = (type = 'light') => {
     const tg = window.Telegram?.WebApp
@@ -230,15 +233,32 @@ function App() {
     if (!acc[monthYear]) acc[monthYear] = 0; acc[monthYear] += profit; return acc;
   }, {});
   const chartData = Object.entries(monthlyProfits).map(([name, profit]) => ({ name, profit })).reverse();
+  const handleModelSelect = (modelName) => {
+    haptic();
+    if (pickerMode === 'purchase') {
+      setModel(modelName);
+      setShowModelPicker(false);
+      setModelSearch('');
+    } else {
+      // Если фильтруем склад/сделки - добавляем или убираем из массива
+      setFilterModels(prev => 
+        prev.includes(modelName) 
+          ? prev.filter(m => m !== modelName) 
+          : [...prev, modelName]
+      );
+    }
+  }
 
+  const removeFilterModel = (modelName) => {
+    haptic();
+    setFilterModels(prev => prev.filter(m => m !== modelName));
+  }
   // ФИЛЬТРАЦИЯ
   const filterDealsByQuery = (list) => {
     return list.filter(deal => {
-      // Проверяем, совпадает ли выбранная модель
-      const matchesModel = filterModel ? deal.model === filterModel : true;
-      // Проверяем текстовый поиск (по модели или IMEI)
+      // Если массив пустой - показываем все. Если нет - проверяем, есть ли модель в массиве
+      const matchesModel = filterModels.length > 0 ? filterModels.includes(deal.model) : true;
       const matchesSearch = searchQuery ? (deal.model.toLowerCase().includes(searchQuery.toLowerCase()) || (deal.imei && deal.imei.includes(searchQuery))) : true;
-      
       return matchesModel && matchesSearch;
     })
   }
@@ -387,27 +407,37 @@ function App() {
   const renderStock = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Склад</h2>
-          {inStockDeals.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <input className="input-field" type="text" placeholder="Поиск по IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
-            <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
-          </div>
-          
-          <button 
-            className="input-field" 
-            style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }}
-            onClick={() => { setPickerMode('stock'); setShowModelPicker(true); haptic(); }}
-          >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModel ? 'var(--text-main)' : 'var(--text-muted)' }}>
-              {filterModel || 'Все модели'}
-            </span>
-            {filterModel ? (
-              <span onClick={(e) => { e.stopPropagation(); setFilterModel(''); haptic(); }} style={{ padding: 5, color: '#888' }}>✕</span>
-            ) : (
+                {inStockDeals.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <input className="input-field" type="text" placeholder="Поиск по IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
+              <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
+            </div>
+            
+            <button 
+              className="input-field" 
+              style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }}
+              onClick={() => { setPickerMode('stock'); setShowModelPicker(true); haptic(); }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModels.length > 0 ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                {filterModels.length > 0 ? `Выбрано: ${filterModels.length}` : 'Все модели'}
+              </span>
               <span style={{ opacity: 0.5 }}>▼</span>
-            )}
-          </button>
+            </button>
+          </div>
+
+          {/* ЧИПСЫ ВЫБРАННЫХ МОДЕЛЕЙ */}
+          {filterModels.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+              {filterModels.map(m => (
+                <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: 'var(--accent)', color: 'white', padding: '4px 8px', borderRadius: 12, fontSize: 12, fontWeight: 'bold' }}>
+                  {m}
+                  <button onClick={() => removeFilterModel(m)} style={{ background: 'none', border: 'none', color: 'white', padding: 0, fontSize: 14, cursor: 'pointer', display: 'flex' }}>✕</button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {filteredStock.map((deal) => (
@@ -525,8 +555,8 @@ function App() {
       {showModelPicker && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ marginTop: 0 }}>
-              {pickerMode === 'purchase' ? 'Выберите устройство' : 'Фильтр по модели'}
+                        <h3 style={{ marginTop: 0 }}>
+              {pickerMode === 'purchase' ? 'Выберите устройство' : 'Выберите модели (можно несколько)'}
             </h3>
             
             <input className="input-field" type="text" placeholder="Поиск (например, 15 pro)..." value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} style={{ marginBottom: 10 }}/>
@@ -564,22 +594,31 @@ function App() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {DEVICE_CATALOG[modelCategory]
+            {DEVICE_CATALOG[modelCategory]
                 .filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()))
-                .map(m => (
-                                    <div key={m} onClick={() => { 
-                    if (pickerMode === 'purchase') {
-                      setModel(m); 
-                    } else {
-                      setFilterModel(m); 
-                    }
-                    setShowModelPicker(false); 
-                    setModelSearch(''); 
-                    haptic(); 
-                  }} style={{ padding: '12px 16px', backgroundColor: 'var(--bg-color)', borderRadius: 10, cursor: 'pointer', fontWeight: 500 }}>
-                    {m}
-                  </div>
-                ))
+                .map(m => {
+                  const isSelected = pickerMode !== 'purchase' && filterModels.includes(m);
+                  return (
+                    <div 
+                      key={m} 
+                      onClick={() => handleModelSelect(m)} 
+                      style={{ 
+                        padding: '12px 16px', 
+                        backgroundColor: isSelected ? 'var(--accent)' : 'var(--bg-color)', 
+                        color: isSelected ? 'white' : 'var(--text-main)',
+                        borderRadius: 10, 
+                        cursor: 'pointer', 
+                        fontWeight: 500,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {m}
+                      {isSelected && <span>✓</span>}
+                    </div>
+                  )
+                })
               }
             </div>
             
@@ -618,7 +657,11 @@ function App() {
           <h3>Настройки</h3>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0' }}><span>Тёмная тема</span><button onClick={toggleTheme} style={{ padding: '8px 16px', borderRadius: 20, background: isDarkTheme ? '#34c759' : '#e5e5ea', color: isDarkTheme ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}>{isDarkTheme ? 'ВКЛ' : 'ВЫКЛ'}</button></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0', borderTop: '1px solid var(--border)', paddingTop: 20 }}><div><div style={{ fontWeight: 'bold' }}>Рейтинг перекупов</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Показывать мою прибыль</div></div><button onClick={toggleLeaderboard} style={{ padding: '8px 16px', borderRadius: 20, background: isLeaderboardJoined ? '#34c759' : '#e5e5ea', color: isLeaderboardJoined ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}>{isLeaderboardJoined ? 'ВКЛ' : 'ВЫКЛ'}</button></div>
-          <div className="modal-actions"><button className="btn-cancel" onClick={() => setShowSettingsModal(false)}>Закрыть</button></div>
+                      <div className="modal-actions" style={{ marginTop: 15 }}>
+              <button className="btn-primary" style={{ backgroundColor: pickerMode === 'purchase' ? 'var(--bg-color)' : 'var(--success)', color: pickerMode === 'purchase' ? 'var(--text-main)' : 'white' }} onClick={() => setShowModelPicker(false)}>
+                {pickerMode === 'purchase' ? 'Отмена' : 'Готово'}
+              </button>
+            </div>
         </div></div>
       )}
       

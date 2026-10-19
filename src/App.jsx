@@ -409,7 +409,10 @@ function App() {
           </select>
 
           {/* НОВЫЕ ПОЛЯ ДЛЯ РАСХОДОВ ПРИ ПОКУПКЕ */}
-          <div style={{ display: 'flex', gap: 10, marginTop: 5 }}>
+          <div style={{ marginTop: 10, marginBottom: 5, fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)' }}>
+            Расходы при покупке 👇
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 0 }}>
             <select className="input-field" value={newDealExpCat} onChange={(e) => setNewDealExpCat(e.target.value)}>
               <option value="Ремонт">Ремонт</option>
               <option value="Запчасти">Запчасти</option>
@@ -531,7 +534,7 @@ function App() {
 
   const renderFinance = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Расходы</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Доп. расходы</h2>
       <div className="card"><form onSubmit={addGeneralExpense}><input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={genExpAmount} onChange={(e) => setGenExpAmount(e.target.value.replace(/[^\d]/g, ''))}/><select className="input-field" value={genExpCategory} onChange={(e) => setGenExpCategory(e.target.value)}><option value="Реклама/Авито">Реклама/Авито</option><option value="Аренда">Аренда</option><option value="Прочее">Прочее</option></select><button className="btn-primary" type="submit" style={{backgroundColor: 'var(--danger)'}}>Добавить</button></form></div>
       {generalExpenses.map(exp => (<div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8 }}><div><div style={{ fontWeight: 600 }}>{exp.category}</div></div><div style={{ fontWeight: 700, color: 'var(--danger)' }}>-{(Number(exp.amount) || 0).toLocaleString('ru-RU')} ₽</div></div>))}
     </div>
@@ -717,7 +720,7 @@ function App() {
         <button className={`tab-button ${activeTab === 'purchase' ? 'active' : ''}`} onClick={() => { setActiveTab('purchase'); haptic(); }}><span className="tab-icon">🛒</span> Покупка</button>
         <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => { setActiveTab('stock'); haptic(); }}><span className="tab-icon">📦</span> Склад</button>
         <button className={`tab-button ${activeTab === 'deals' ? 'active' : ''}`} onClick={() => { setActiveTab('deals'); haptic(); }}><span className="tab-icon">💰</span> Сделки</button>
-        <button className={`tab-button ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => { setActiveTab('finance'); haptic(); }}><span className="tab-icon">💵</span> Расходы</button>
+        <button className={`tab-button ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => { setActiveTab('finance'); haptic(); }}><span className="tab-icon">💵</span> Доп.расх.</button>
         <button className={`tab-button ${activeTab === 'contacts' ? 'active' : ''}`} onClick={() => { setActiveTab('contacts'); haptic(); }}><span className="tab-icon">👥</span> Контакты</button>
       </div>
     </div>

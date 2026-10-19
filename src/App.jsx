@@ -183,10 +183,15 @@ function App() {
   }
 
   const saveEdit = async () => {
-    if (!editModel || !editBuyPrice) return alert('Заполните данные')
-    const updates = { model: editModel, buy_price: Number(editBuyPrice) }
-    await supabase.from('deals').update(updates).eq('id', editingDeal.id)
-    setEditingDeal(null); fetchData();
+    if (!editModel || !editBuyPrice) return alert('Заполните модель и цену')
+    const updates = { 
+      model: editModel, 
+      buy_price: Number(editBuyPrice),
+      storage_gb: editStorage ? Number(editStorage) : null,
+      battery_health: editBattery ? Number(editBattery) : null
+    }
+    const { error } = await supabase.from('deals').update(updates).eq('id', editingDeal.id)
+    if (!error) { setEditingDeal(null); fetchData(); haptic('medium'); } 
   }
 
   const deleteDeal = async (id) => {
@@ -258,7 +263,14 @@ function App() {
   const renderSpecs = (deal) => (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, marginBottom: 10 }}>
       {renderDaysBadge(getDaysOnStock(deal), deal.status)}
-      {deal.storage_gb && <span className="badge badge-gray">{deal.storage_gb} GB</span>}
+      
+      {/* Умный вывод памяти (1024 = 1 TB) */}
+      {deal.storage_gb && (
+        <span className="badge badge-gray">
+          {deal.storage_gb >= 1024 ? `${deal.storage_gb / 1024} TB` : `${deal.storage_gb} GB`}
+        </span>
+      )}
+      
       {deal.battery_health && <span className="badge badge-gray">🔋 {deal.battery_health}%</span>}
       {deal.imei && <span className="badge badge-gray">IMEI: ...{deal.imei.slice(-4)}</span>}
     </div>
@@ -330,9 +342,37 @@ function App() {
         <form onSubmit={addDeal}>
           <input className="input-field" type="text" placeholder="Модель" value={model} onChange={(e) => setModel(e.target.value)}/>
           <input className="input-field" type="number" placeholder="Цена закупа (₽)" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)}/>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <input className="input-field" type="number" placeholder="Память" value={storage} onChange={(e) => setStorage(e.target.value)}/>
-            <input className="input-field" type="number" placeholder="АКБ (%)" value={battery} onChange={(e) => setBattery(e.target.value)}/>
+                    <div style={{ display: 'flex', gap: 10 }}>
+            {/* Выпадающий список для памяти */}
+            <select 
+              className="input-field" 
+              value={storage} 
+              onChange={(e) => setStorage(e.target.value)}
+            >
+              <option value="">Память (ГБ)</option>
+              <option value="64">64 GB</option>
+              <option value="128">128 GB</option>
+              <option value="256">256 GB</option>
+              <option value="512">512 GB</option>
+              <option value="1024">1 TB</option>
+              <option value="2048">2 TB</option>
+            </select>
+
+            {/* Поле АКБ с ограничением 0-100 */}
+            <input 
+              className="input-field" 
+              type="number" 
+              placeholder="АКБ (%)" 
+              min="0" 
+              max="100"
+              value={battery} 
+              onChange={(e) => {
+                let val = Number(e.target.value);
+                if (val > 100) val = 100;
+                if (val < 0) val = 0;
+                setBattery(val || '');
+              }}
+            />
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <input className="input-field" type="text" placeholder="IMEI" value={imei} onChange={(e) => setImei(e.target.value)} style={{ flex: 1, marginBottom: 10 }}/>
@@ -348,7 +388,13 @@ function App() {
       {inStockDeals.length > 0 && renderSearchBar()}
       {filteredStock.map((deal) => (
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
-            <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model); setEditBuyPrice(deal.buy_price);}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
+            <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div><div><button className="icon-btn" onClick={() => {
+  setEditingDeal(deal); 
+  setEditModel(deal.model); 
+  setEditBuyPrice(deal.buy_price);
+  setEditStorage(deal.storage_gb || '');
+  setEditBattery(deal.battery_health || '');
+}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
             {renderSpecs(deal)}
             <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
               <button className="btn-cancel" style={{ padding: '12px' }} onClick={() => {setExpenseDeal(deal); setExpenseAmount(''); setExpenseCategory('Ремонт')}}>+ Расход</button>
@@ -486,8 +532,55 @@ function App() {
       
       {expenseDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Расход: {expenseDeal.model}</h3><input className="input-field" type="number" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} autoFocus/><select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmExpense}>Добавить</button></div></div></div>)}
       
-      {editingDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать</h3><input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/><input className="input-field" type="number" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value)}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={saveEdit}>Сохранить</button></div></div></div>)}
-      
+            {editingDeal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3>Редактировать: {editingDeal.model}</h3>
+            
+            <label style={{fontSize: 12, color: '#888'}}>Модель</label>
+            <input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/>
+            
+            <label style={{fontSize: 12, color: '#888'}}>Цена закупа (₽)</label>
+            <input className="input-field" type="number" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value)}/>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{fontSize: 12, color: '#888'}}>Память</label>
+                <select className="input-field" value={editStorage} onChange={(e) => setEditStorage(e.target.value)}>
+                  <option value="">Не указано</option>
+                  <option value="64">64 GB</option>
+                  <option value="128">128 GB</option>
+                  <option value="256">256 GB</option>
+                  <option value="512">512 GB</option>
+                  <option value="1024">1 TB</option>
+                  <option value="2048">2 TB</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{fontSize: 12, color: '#888'}}>АКБ (%)</label>
+                <input 
+                  className="input-field" 
+                  type="number" 
+                  min="0" 
+                  max="100"
+                  value={editBattery} 
+                  onChange={(e) => {
+                    let val = Number(e.target.value);
+                    if (val > 100) val = 100;
+                    if (val < 0) val = 0;
+                    setEditBattery(val || '');
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: 20 }}>
+              <button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button>
+              <button className="btn-confirm" onClick={saveEdit}>Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
       {editingContact && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать контакт</h3><input className="input-field" type="text" value={editContactName} onChange={(e) => setEditContactName(e.target.value)}/><input className="input-field" type="text" value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingContact(null)}>Отмена</button><button className="btn-confirm" onClick={saveEditContact}>Сохранить</button></div></div></div>)}
       
       {showExportModal && (<div className="modal-overlay"><div className="modal-content"><h3>Экспорт</h3><textarea value={csvData} readOnly style={{ width: '100%', height: 150, padding: 10, borderRadius: 12, border: '1px solid #ccc', fontSize: 12, marginBottom: 15 }} /><div className="modal-actions"><button className="btn-cancel" onClick={() => setShowExportModal(false)}>Закрыть</button><button className="btn-confirm" onClick={() => { navigator.clipboard.writeText(csvData); alert('Скопировано!'); setShowExportModal(false); }}>Копировать</button></div></div></div>)}

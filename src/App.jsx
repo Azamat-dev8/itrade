@@ -528,7 +528,7 @@ function App() {
            <button 
              onClick={() => {
                const refLink = `https://t.me/Primetrade8_bot?start=ref_${user?.id}`;
-               const shareText = `Привет! Попробуй iTrade — удобное приложение для учета техники Apple прямо в Telegram 🍏`;
+               const shareText = `Привет! Попробуй PrimeTrade — удобное приложение для учета техники Apple прямо в Telegram 🍏`;
                window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
                haptic('medium');
              }}
@@ -540,7 +540,7 @@ function App() {
            {/* Кнопка "Предложить идею" */}
            <button 
              onClick={() => {
-               const feedbackText = `Привет! У меня есть идея по улучшению iTrade: `;
+               const feedbackText = `Привет! У меня есть идея по улучшению PrimeTrade: `;
                window.open(`https://t.me/primestore8?text=${encodeURIComponent(feedbackText)}`, '_blank');
                haptic('medium');
              }}

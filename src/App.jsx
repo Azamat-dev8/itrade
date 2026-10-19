@@ -512,7 +512,7 @@ function App() {
           <div><div className="profile-name">{user?.first_name || 'Пользователь'}</div><div className="profile-status">{user?.username ? `@${user.username}` : 'PrimeTrade Pro'}</div></div>
         </div>
 
-        <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10 }}>
+        <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10, overflowY: 'auto', paddingRight: '5px' }}>
            
            <button 
              onClick={() => { setShowSubModal(true); setIsMenuOpen(false); }}

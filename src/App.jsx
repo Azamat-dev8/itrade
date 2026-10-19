@@ -17,7 +17,7 @@ function App() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [csvData, setCsvData] = useState('')
   const [showScanner, setShowScanner] = useState(false)
-
+  const [showSubModal, setShowSubModal] = useState(false)
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [storage, setStorage] = useState('')
@@ -619,28 +619,94 @@ function App() {
         
         {/* Профиль пользователя */}
         <div className="profile-section">
-          <div className="profile-avatar">
-            {user?.first_name ? user.first_name[0].toUpperCase() : 'U'}
-          </div>
+          <div className="profile-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+  {user?.photo_url ? (
+    <img src={user.photo_url} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+  ) : (
+    user?.first_name ? user.first_name[0].toUpperCase() : 'U'
+  )}
+</div>
           <div>
             <div className="profile-name">{user?.first_name || 'Пользователь'}</div>
             <div className="profile-status">{user?.username ? `@${user.username}` : 'iTrade Pro'}</div>
           </div>
         </div>
 
-        {/* Меню навигации */}
-        <div className="sidebar-links">
-           <div style={{fontSize: 13, color: 'var(--text-muted)', marginBottom: 5}}>Настройки и поддержка</div>
-           {/* Сюда можно добавить пункты меню в будущем */}
+               {/* Ссылки в меню */}
+        <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+           <button 
+             className="sidebar-pro-btn" 
+             onClick={() => { setShowSubModal(true); setIsMenuOpen(false); haptic(); }}
+           >
+             ⭐ Подписка
+           </button>
         </div>
 
         {/* Юридическая информация и поддержка (в самом низу) */}
         <div className="sidebar-footer">
+          <div style={{fontSize: 13, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 'bold'}}>
+            Настройки и поддержка
+          </div>
           <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://telegra.ph/Polzovatelskoe-soglashenie-10-19-40'); }}>Пользовательское соглашение</a>
           <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://telegra.ph/Politika-konfidencialnosti-10-19-87'); }}>Политика конфиденциальности</a>
           <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://t.me/primestore8'); }} style={{ color: 'var(--accent)' }}>Служба поддержки: @primestore8</a>
         </div>
-      </div>
+      </div> {/* <-- ЭТА ЗАКРЫВАЮЩАЯ СКОБКА ЗАКРЫВАЕТ SIDEBAR */}
+            {/* МОДАЛКА ПОДПИСКИ */}
+      {showSubModal && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }}>
+          <div className="modal-content" style={{ maxHeight: '90vh' }}>
+            <h3 style={{ marginTop: 0, textAlign: 'center' }}>iTrade PRO</h3>
+            <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, marginBottom: 15 }}>
+              Ваш статус: <strong style={{ color: '#34c759' }}>Пробный период (осталось 14 дней)</strong>
+            </p>
+
+            <div className="card" style={{ padding: 15, marginBottom: 15 }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: 14 }}>Что дает подписка:</h4>
+              <ul className="pro-features">
+                <li><span>📦</span> Неограниченное количество сделок</li>
+                <li><span>📊</span> Продвинутая аналитика и графики</li>
+                <li><span>📷</span> Сканер IMEI без ограничений</li>
+                <li><span>💾</span> Экспорт в Excel и CRM в 1 клик</li>
+              </ul>
+            </div>
+
+            <div className="pricing-grid">
+              {/* 1 месяц */}
+              <div className="pricing-card" onClick={() => alert('Переход к оплате за 390 ₽...')}>
+                <div>
+                  <div style={{ fontWeight: 'bold', fontSize: 16 }}>1 месяц</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>390 ₽ / мес</div>
+                </div>
+                <div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>Выбрать</div>
+              </div>
+
+              {/* 6 месяцев */}
+              <div className="pricing-card" onClick={() => alert('Переход к оплате за 1990 ₽...')}>
+                <div>
+                  <div style={{ fontWeight: 'bold', fontSize: 16 }}>6 месяцев</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>1990 ₽ (332 ₽/мес)</div>
+                </div>
+                <div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>Выбрать</div>
+              </div>
+
+              {/* 12 месяцев */}
+              <div className="pricing-card best-value" onClick={() => alert('Переход к оплате за 3590 ₽...')}>
+                <div className="best-value-badge">ВЫГОДНО</div>
+                <div>
+                  <div style={{ fontWeight: 'bold', fontSize: 16 }}>12 месяцев</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>3590 ₽ (299 ₽/мес)</div>
+                </div>
+                <div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>Выбрать</div>
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: 20 }}>
+              <button className="btn-cancel" onClick={() => setShowSubModal(false)}>Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="tab-bar">
         <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon">📊</span> Главная</button>
         <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => { setActiveTab('stock'); haptic(); }}><span className="tab-icon">📦</span> Склад</button>
@@ -650,6 +716,7 @@ function App() {
       </div>
     </div>
   )
+  
 }
 
 export default App

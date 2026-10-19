@@ -5,6 +5,8 @@ import Scanner from './Scanner'
 import './App.css'
 
 function App() {
+  const [imeiCheckResult, setImeiCheckResult] = useState(null)
+const [isCheckingImei, setIsCheckingImei] = useState(false)
   const [user, setUser] = useState(null)
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
@@ -67,7 +69,25 @@ function App() {
     const tg = window.Telegram?.WebApp
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(type)
   }
+  const checkImei = async (imeiToCheck) => {
+    if (!imeiToCheck) return alert('Введите IMEI')
+    setIsCheckingImei(true)
+    setImeiCheckResult(null)
+    haptic('medium')
 
+    try {
+      const { data, error } = await supabase.functions.invoke('imei-check', {
+        body: { imei: imeiToCheck },
+      })
+
+      if (error) throw error
+      setImeiCheckResult(data)
+    } catch (err) {
+      alert('Ошибка при проверке IMEI: ' + err.message)
+    } finally {
+      setIsCheckingImei(false)
+    }
+  }
   const fetchData = async () => {
     const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name), buyer:buyer_id(name)').order('created_at', { ascending: false })
     if (dealsData) setDeals(dealsData)
@@ -376,6 +396,46 @@ function App() {
           </div>
 
           <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
+                      {/* Блок проверки IMEI */}
+          <div style={{ marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={() => checkImei(imei)}
+              disabled={isCheckingImei || !imei}
+              style={{
+                width: '100%',
+                padding: '12px',
+                backgroundColor: '#007aff',
+                color: 'white',
+                border: 'none',
+                borderRadius: 8,
+                fontWeight: 'bold',
+                opacity: (!imei || isCheckingImei) ? 0.5 : 1
+              }}
+            >
+              {isCheckingImei ? 'Проверка...' : '🔍 Проверить IMEI'}
+            </button>
+
+            {/* Отображение результата */}
+            {imeiCheckResult && (
+              <div style={{ marginTop: 10, padding: 12, backgroundColor: '#f0f2f5', borderRadius: 8 }}>
+                <h4 style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>Результат проверки:</h4>
+                {imeiCheckResult.error || imeiCheckResult.status === 'error' ? (
+                  <p style={{ color: '#ff3b30', margin: 0, fontSize: 13 }}>
+                    {imeiCheckResult.error || imeiCheckResult.message}
+                  </p>
+                ) : (
+                  <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+                    <div><strong>Статус:</strong> {imeiCheckResult.status || 'Успешно'}</div>
+                    {/* Если сервис вернул HTML ответ, выводим его как текст */}
+                    {imeiCheckResult.message && typeof imeiCheckResult.message === 'string' && (
+                      <div style={{ marginTop: 5 }}>{imeiCheckResult.message}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
             <option value="">Кто продал? (Необязательно)</option>
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>

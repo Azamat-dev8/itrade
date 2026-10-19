@@ -9,6 +9,7 @@ function App() {
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
     const [isDarkTheme, setIsDarkTheme] = useState(false)
+      const [isLeaderboardJoined, setIsLeaderboardJoined] = useState(false)
   const [generalExpenses, setGeneralExpenses] = useState([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
@@ -100,14 +101,59 @@ function App() {
     haptic('medium');
   }
   const fetchData = async () => {
-    const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name), buyer:buyer_id(name)').order('created_at', { ascending: false })
+     const fetchData = async () => {
+    if (!user) return; // Ждем, пока загрузится пользователь
+    
+    // 1. Загружаем сделки ТОЛЬКО текущего пользователя
+    const { data: dealsData } = await supabase
+      .from('deals')
+      .select('*, expenses(*), seller:seller_id(name), buyer:buyer_id(name)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
     if (dealsData) setDeals(dealsData)
 
-    const { data: contactsData } = await supabase.from('contacts').select('*').order('name')
+    // 2. Загружаем контакты ТОЛЬКО текущего пользователя
+    const { data: contactsData } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('name')
     if (contactsData) setContacts(contactsData)
 
-    const { data: genExpData } = await supabase.from('expenses').select('*').is('deal_id', null).order('created_at', { ascending: false })
+    // 3. Загружаем общие расходы ТОЛЬКО текущего пользователя
+    const { data: genExpData } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('user_id', user.id)
+      .is('deal_id', null)
+      .order('created_at', { ascending: false })
     if (genExpData) setGeneralExpenses(genExpData)
+
+    // 4. Загружаем профиль (проверяем, включен ли рейтинг)
+    const { data: profileData } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('telegram_id', user.id)
+      .single()
+    
+    if (profileData) {
+      setIsLeaderboardJoined(profileData.show_in_leaderboard)
+    } else {
+      // Если профиля нет (пользователь зашел впервые) — создаем его
+      await supabase.from('user_profiles').insert([{ 
+        telegram_id: user.id, 
+        user_name: user.first_name || user.username || 'Аноним', 
+        show_in_leaderboard: false 
+      }])
+    }
+
+    // 5. Загружаем топ-10 рейтинга
+    const { data: lbData } = await supabase
+      .from('public_leaderboard')
+      .select('*')
+      .order('gross_profit', { ascending: false })
+      .limit(10)
+    if (lbData) setLeaderboard(lbData)
   }
 
   const addDeal = async (e) => {
@@ -656,7 +702,7 @@ function App() {
       {showSubModal && (
         <div className="modal-overlay" style={{ zIndex: 2000 }}>
           <div className="modal-content" style={{ maxHeight: '90vh' }}>
-            <h3 style={{ marginTop: 0, textAlign: 'center' }}>iTrade PRO</h3>
+            <h3 style={{ marginTop: 0, textAlign: 'center' }}>PrimeTrade PRO</h3>
             <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, marginBottom: 15 }}>
               Ваш статус: <strong style={{ color: '#34c759' }}>Пробный период (осталось 14 дней)</strong>
             </p>

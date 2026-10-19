@@ -8,6 +8,7 @@ function App() {
   const [user, setUser] = useState(null)
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
+    const [isDarkTheme, setIsDarkTheme] = useState(false)
   const [generalExpenses, setGeneralExpenses] = useState([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
@@ -57,9 +58,27 @@ function App() {
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
-    if (tg) { tg.ready(); tg.expand(); setUser(tg.initDataUnsafe?.user || null) }
+    if (tg) { 
+      tg.ready(); 
+      tg.expand(); 
+      setUser(tg.initDataUnsafe?.user || null) 
+
+      // МАГИЯ ТЕМНОЙ ТЕМЫ
+      const applyTheme = () => {
+        const isDark = tg.colorScheme === 'dark';
+        document.body.classList.toggle('dark-theme', isDark);
+        setIsDarkTheme(isDark);
+      }
+
+      applyTheme() // Применяем при загрузке
+      tg.onEvent('themeChanged', applyTheme) // Слушаем смену темы
+
+      return () => {
+        tg.offEvent('themeChanged', applyTheme)
+      }
+    }
     fetchData()
-  }, [])
+  }, [])  
 
   useEffect(() => { setSearchQuery('') }, [activeTab])
 
@@ -307,8 +326,16 @@ function App() {
               <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
-                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                <Bar dataKey="profit" fill="#34c759" radius={[6, 6, 0, 0]} />
+                                <Tooltip 
+                  cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} 
+                  contentStyle={{ 
+                    borderRadius: 12, border: 'none', 
+                    backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff',
+                    color: isDarkTheme ? '#ffffff' : '#000000',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)' 
+                  }} 
+                />
+                   <Bar dataKey="profit" fill="#34c759" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

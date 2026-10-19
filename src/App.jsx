@@ -469,7 +469,14 @@ function App() {
             {/* НОМЕР ПРОДАВЦА НА СКЛАДЕ */}
             {deal.seller && (
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
-                👤 Продавец: {deal.seller.name} {deal.seller.phone && <a href={`tel:${deal.seller.phone}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>({deal.seller.phone})</a>}
+                👤 Продавец: {deal.seller.name} {deal.seller.phone && (
+  <button 
+    onClick={() => handlePhoneCall(deal.seller.phone)} 
+    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
+  >
+    ({deal.seller.phone})
+  </button>
+)}
               </div>
             )}
 
@@ -518,7 +525,14 @@ function App() {
             
             {/* НОМЕРА ТЕЛЕФОНОВ В СДЕЛКАХ */}
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
-              {deal.seller && <div>👤 Купил у: {deal.seller.name} {deal.seller.phone && <a href={`tel:${deal.seller.phone}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>({deal.seller.phone})</a>}</div>}
+              {deal.seller && <div>👤 Купил у: {deal.seller.name} {deal.seller.phone && (
+  <button 
+    onClick={() => handlePhoneCall(deal.seller.phone)} 
+    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
+  >
+    ({deal.seller.phone})
+  </button>
+)}</div>}
               {deal.buyer && <div style={{ marginTop: 2 }}>👤 Продал: {deal.buyer.name} {deal.buyer.phone && <a href={`tel:${deal.buyer.phone}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>({deal.buyer.phone})</a>}</div>}
             </div>
 
@@ -539,28 +553,38 @@ function App() {
       {generalExpenses.map(exp => (<div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8 }}><div><div style={{ fontWeight: 600 }}>{exp.category}</div></div><div style={{ fontWeight: 700, color: 'var(--danger)' }}>-{(Number(exp.amount) || 0).toLocaleString('ru-RU')} ₽</div></div>))}
     </div>
   )
+  const handlePhoneCall = (phone) => {
+    if (!phone) return;
+    // Очищаем номер от всех символов, кроме цифр и плюса
+    const cleanPhone = phone.replace(/[^\d+]/g, '');
+    const tg = window.Telegram?.WebApp;
+    
+    haptic('medium');
 
+    // Проверяем платформу через Telegram SDK или userAgent
+    const isIOS = tg?.platform === 'ios' || /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isIOS) {
+      // Специальный протокол для iOS, который открывает звонилку с номером[reference:2]
+      window.open(`wtai://wp/mc;${cleanPhone}`, '_blank');
+    } else {
+      // Для Android, Desktop и остальных
+      window.open(`tel:${cleanPhone}`, '_blank');
+    }
+  };
   const renderContacts = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Контакты</h2>
       <div className="card"><form onSubmit={addContact}><input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/><input className="input-field" type="text" placeholder="Телефон" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}/><input className="input-field" type="text" placeholder="Комментарий" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/><button className="btn-primary" type="submit">Сохранить</button></form></div>
       {contacts.map((c) => (<div key={c.id} className="card" style={{ padding: 16 }}><div className="card-header"><div style={{ fontWeight: 600, fontSize: 16 }}>{c.name || 'Без имени'}</div><div><button className="icon-btn" onClick={() => {setEditingContact(c); setEditContactName(c.name || ''); setEditContactPhone(c.phone || ''); setEditContactNote(c.note || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button></div></div>{c.phone && (
-  <a 
-    href={`tel:${c.phone}`} 
-    style={{ 
-      display: 'inline-flex', 
-      alignItems: 'center', 
-      gap: 5, 
-      color: 'var(--accent)', 
-      textDecoration: 'none', 
-      marginTop: 6, 
-      fontSize: 15,
-      fontWeight: '500'
-    }}
+  <button 
+    onClick={() => handlePhoneCall(c.phone)}
+    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontSize: 15, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, cursor: 'pointer', textDecoration: 'underline' }}
   >
     📞 {c.phone}
-  </a>
-)}{c.note && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}<div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>Добавлен: {new Date(c.created_at || Date.now()).toLocaleDateString('ru-RU')}</div></div>))}
+  </button>
+)}
+{c.note && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}<div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>Добавлен: {new Date(c.created_at || Date.now()).toLocaleDateString('ru-RU')}</div></div>))}
     </div>
   )
 

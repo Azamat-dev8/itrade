@@ -19,6 +19,7 @@ function App() {
   const [generalExpenses, setGeneralExpenses] = useState([])
   const [leaderboard, setLeaderboard] = useState([])
   const [loading, setLoading] = useState(false)
+    const [showSuccessMsg, setShowSuccessMsg] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
     const [modelFilter, setModelFilter] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -158,16 +159,26 @@ function App() {
     e.preventDefault()
     if (!model || !buyPrice || !user) return alert('Заполните модель и цену')
     setLoading(true)
+    
     const { error } = await supabase.from('deals').insert([{ 
         model, buy_price: Number(buyPrice), status: 'in_stock',
         storage_gb: storage ? Number(storage) : null, battery_health: battery ? Number(battery) : null,
         imei: imei || null, seller_id: sellerId ? Number(sellerId) : null,
         user_id: user.id, user_name: user.first_name || 'Аноним'
       }])
+      
     if (!error) { 
       setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId(''); 
-      fetchData(); haptic('medium'); 
-    } else { alert('Ошибка: ' + error.message) }
+      fetchData(); 
+      haptic('medium'); 
+      
+      // Показываем уведомление
+      setShowSuccessMsg(true);
+      // Скрываем его через 3 секунды
+      setTimeout(() => setShowSuccessMsg(false), 3000);
+    } else { 
+      alert('Ошибка: ' + error.message) 
+    }
     setLoading(false)
   }
 
@@ -432,7 +443,42 @@ function App() {
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           
-          <button className="btn-primary" type="submit" disabled={loading}>Сохранить на склад</button>
+                    <button className="btn-primary" type="submit" disabled={loading}>
+            {loading ? 'Сохранение...' : 'Сохранить на склад'}
+          </button>
+          
+          {/* ИСЧЕЗАЮЩЕЕ УВЕДОМЛЕНИЕ */}
+          {showSuccessMsg && (
+            <div style={{
+              marginTop: 10, padding: 12, 
+              backgroundColor: 'rgba(52, 199, 89, 0.15)', 
+              color: '#34c759', 
+              textAlign: 'center', 
+              borderRadius: 12, 
+              fontSize: 14, 
+              fontWeight: 'bold',
+              animation: 'fadeIn 0.3s ease-out'
+            }}>
+              ✅ Устройство успешно сохранено!
+            </div>
+          )}
+
+          {/* КНОПКА ПЕРЕЙТИ НА СКЛАД */}
+          <button 
+            type="button" 
+            onClick={() => { setActiveTab('stock'); haptic(); }}
+            style={{ 
+              marginTop: 12, width: '100%', padding: '16px', 
+              backgroundColor: 'transparent', 
+              color: 'var(--text-main)', 
+              border: '1px solid var(--border)', 
+              borderRadius: 12, fontWeight: 'bold', fontSize: 16,
+              display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8
+            }}
+          >
+            📦 Перейти на склад
+          </button>
+        
         </form>
       </div>
     </div>

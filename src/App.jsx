@@ -273,7 +273,7 @@ function App() {
 
   const renderSpecs = (deal) => (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, marginBottom: 10 }}>
-      {renderDaysBadge(getDaysOnStock(deal), deal.status)}
+      {getDaysOnStock(deal) > 0 && renderDaysBadge(getDaysOnStock(deal), deal.status)}
       {deal.storage_gb && (
         <span className="badge badge-gray">
           {deal.storage_gb >= 1024 ? `${deal.storage_gb / 1024} TB` : `${deal.storage_gb} GB`}
@@ -404,7 +404,7 @@ function App() {
       </div>
       {inStockDeals.length > 0 && renderSearchBar()}
       {filteredStock.map((deal) => {
-        const expSum = getDealExpensesSum(deal); // Считаем расходы
+        const expSum = getDealExpensesSum(deal); 
         return (
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
             <div className="card-header">
@@ -423,10 +423,12 @@ function App() {
             
             {renderSpecs(deal)}
             
-            {/* ВОТ ТОТ САМЫЙ БЛОК С ЦЕНОЙ И РАСХОДАМИ */}
             <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>
               Закуп: {deal.buy_price} ₽ 
               {expSum > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {expSum} ₽</span>}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+              Дата закупа: {new Date(deal.created_at).toLocaleDateString('ru-RU')}
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
@@ -447,9 +449,37 @@ function App() {
         const margin = deal.sell_price - deal.buy_price - getDealExpensesSum(deal); 
         return (
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--success)' }}>
-            <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model); setEditBuyPrice(deal.buy_price);}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
+            <div className="card-header">
+              <div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div>
+              <div>
+                <button className="icon-btn" onClick={() => {
+                  setEditingDeal(deal); 
+                  setEditModel(deal.model); 
+                  setEditBuyPrice(deal.buy_price);
+                }}>✏️</button>
+                <button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button>
+              </div>
+            </div>
+            
             {renderSpecs(deal)}
-            <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16 }}>Прибыль: {margin} ₽</div>
+            
+            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>
+              Закуп: {deal.buy_price} ₽ | Продажа: {deal.sell_price} ₽
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+              Дата закупа: {new Date(deal.created_at).toLocaleDateString('ru-RU')}
+            </div>
+            
+            {/* Вывод списка расходов, если они есть */}
+            {deal.expenses && deal.expenses.length > 0 && (
+              <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6 }}>
+                {deal.expenses.map(e => `${e.category}: ${e.amount}₽`).join(' • ')}
+              </div>
+            )}
+
+            <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10 }}>
+              Чистая прибыль: {margin} ₽
+            </div>
           </div>
         )
       })}

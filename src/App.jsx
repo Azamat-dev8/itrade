@@ -544,7 +544,23 @@ function App() {
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Контакты</h2>
       <div className="card"><form onSubmit={addContact}><input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/><input className="input-field" type="text" placeholder="Телефон" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}/><input className="input-field" type="text" placeholder="Комментарий" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/><button className="btn-primary" type="submit">Сохранить</button></form></div>
-      {contacts.map((c) => (<div key={c.id} className="card" style={{ padding: 16 }}><div className="card-header"><div style={{ fontWeight: 600, fontSize: 16 }}>{c.name || 'Без имени'}</div><div><button className="icon-btn" onClick={() => {setEditingContact(c); setEditContactName(c.name || ''); setEditContactPhone(c.phone || ''); setEditContactNote(c.note || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button></div></div>{c.phone && <div style={{ color: 'var(--accent)', marginTop: 4 }}>📞 {c.phone}</div>}{c.note && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}<div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>Добавлен: {new Date(c.created_at || Date.now()).toLocaleDateString('ru-RU')}</div></div>))}
+      {contacts.map((c) => (<div key={c.id} className="card" style={{ padding: 16 }}><div className="card-header"><div style={{ fontWeight: 600, fontSize: 16 }}>{c.name || 'Без имени'}</div><div><button className="icon-btn" onClick={() => {setEditingContact(c); setEditContactName(c.name || ''); setEditContactPhone(c.phone || ''); setEditContactNote(c.note || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button></div></div>{c.phone && (
+  <a 
+    href={`tel:${c.phone}`} 
+    style={{ 
+      display: 'inline-flex', 
+      alignItems: 'center', 
+      gap: 5, 
+      color: 'var(--accent)', 
+      textDecoration: 'none', 
+      marginTop: 6, 
+      fontSize: 15,
+      fontWeight: '500'
+    }}
+  >
+    📞 {c.phone}
+  </a>
+)}{c.note && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}<div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>Добавлен: {new Date(c.created_at || Date.now()).toLocaleDateString('ru-RU')}</div></div>))}
     </div>
   )
 

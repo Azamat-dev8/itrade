@@ -41,6 +41,8 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
+    const [filterModel, setFilterModel] = useState('') // Выбранная модель для фильтра
+  const [pickerMode, setPickerMode] = useState('purchase') // 'purchase', 'stock', 'deals'
   
   // Умный поиск (Проблема 2)
   const [showModelPicker, setShowModelPicker] = useState(false)
@@ -231,9 +233,14 @@ function App() {
 
   // ФИЛЬТРАЦИЯ
   const filterDealsByQuery = (list) => {
-    if (!searchQuery) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter(deal => deal.model.toLowerCase().includes(q) || (deal.imei && deal.imei.includes(q)))
+    return list.filter(deal => {
+      // Проверяем, совпадает ли выбранная модель
+      const matchesModel = filterModel ? deal.model === filterModel : true;
+      // Проверяем текстовый поиск (по модели или IMEI)
+      const matchesSearch = searchQuery ? (deal.model.toLowerCase().includes(searchQuery.toLowerCase()) || (deal.imei && deal.imei.includes(searchQuery))) : true;
+      
+      return matchesModel && matchesSearch;
+    })
   }
   const filteredStock = filterDealsByQuery(inStockDeals);
   const filteredSold = filterDealsByQuery(soldDeals);
@@ -318,9 +325,9 @@ function App() {
         <form onSubmit={addDeal}>
           
           {/* УМНЫЙ ВЫБОР МОДЕЛИ (Проблема 2) */}
-          <div 
+                    <div 
             className="input-field" 
-            onClick={() => { setShowModelPicker(true); haptic(); }}
+            onClick={() => { setPickerMode('purchase'); setShowModelPicker(true); haptic(); }}
             style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
           >
             <span style={{ color: model ? 'var(--text-main)' : 'var(--text-muted)' }}>
@@ -380,12 +387,27 @@ function App() {
   const renderStock = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Склад</h2>
-      {inStockDeals.length > 0 && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+          {inStockDeals.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <div style={{ position: 'relative', flex: 1 }}>
-            <input className="input-field" type="text" placeholder="Поиск..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
+            <input className="input-field" type="text" placeholder="Поиск по IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
             <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
           </div>
+          
+          <button 
+            className="input-field" 
+            style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }}
+            onClick={() => { setPickerMode('stock'); setShowModelPicker(true); haptic(); }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModel ? 'var(--text-main)' : 'var(--text-muted)' }}>
+              {filterModel || 'Все модели'}
+            </span>
+            {filterModel ? (
+              <span onClick={(e) => { e.stopPropagation(); setFilterModel(''); haptic(); }} style={{ padding: 5, color: '#888' }}>✕</span>
+            ) : (
+              <span style={{ opacity: 0.5 }}>▼</span>
+            )}
+          </button>
         </div>
       )}
       {filteredStock.map((deal) => (
@@ -403,10 +425,27 @@ function App() {
   const renderDeals = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Сделки</h2>
-      {soldDeals.length > 0 && (
-        <div style={{ position: 'relative', marginBottom: 16 }}>
-          <input className="input-field" type="text" placeholder="Поиск..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 40 }}/>
-          <span style={{ position: 'absolute', left: 14, top: 15, fontSize: 16, color: '#888' }}>🔍</span>
+            {soldDeals.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input className="input-field" type="text" placeholder="Поиск по IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
+            <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
+          </div>
+          
+          <button 
+            className="input-field" 
+            style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }}
+            onClick={() => { setPickerMode('deals'); setShowModelPicker(true); haptic(); }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModel ? 'var(--text-main)' : 'var(--text-muted)' }}>
+              {filterModel || 'Все модели'}
+            </span>
+            {filterModel ? (
+              <span onClick={(e) => { e.stopPropagation(); setFilterModel(''); haptic(); }} style={{ padding: 5, color: '#888' }}>✕</span>
+            ) : (
+              <span style={{ opacity: 0.5 }}>▼</span>
+            )}
+          </button>
         </div>
       )}
       {filteredSold.map((deal) => {
@@ -486,7 +525,9 @@ function App() {
       {showModelPicker && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ marginTop: 0 }}>Выберите устройство</h3>
+            <h3 style={{ marginTop: 0 }}>
+              {pickerMode === 'purchase' ? 'Выберите устройство' : 'Фильтр по модели'}
+            </h3>
             
             <input className="input-field" type="text" placeholder="Поиск (например, 15 pro)..." value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} style={{ marginBottom: 10 }}/>
             
@@ -526,7 +567,16 @@ function App() {
               {DEVICE_CATALOG[modelCategory]
                 .filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()))
                 .map(m => (
-                  <div key={m} onClick={() => { setModel(m); setShowModelPicker(false); setModelSearch(''); haptic(); }} style={{ padding: '12px 16px', backgroundColor: 'var(--bg-color)', borderRadius: 10, cursor: 'pointer', fontWeight: 500 }}>
+                                    <div key={m} onClick={() => { 
+                    if (pickerMode === 'purchase') {
+                      setModel(m); 
+                    } else {
+                      setFilterModel(m); 
+                    }
+                    setShowModelPicker(false); 
+                    setModelSearch(''); 
+                    haptic(); 
+                  }} style={{ padding: '12px 16px', backgroundColor: 'var(--bg-color)', borderRadius: 10, cursor: 'pointer', fontWeight: 500 }}>
                     {m}
                   </div>
                 ))

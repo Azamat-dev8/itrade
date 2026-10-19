@@ -492,17 +492,41 @@ function App() {
         </div>
 
         <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10 }}>
-           <button className="sidebar-pro-btn" onClick={() => { setShowSubModal(true); setIsMenuOpen(false); }}>⭐ Моя подписка</button>
+           
+           {/* Оранжевая кнопка подписки */}
+           <button 
+             onClick={() => { setShowSubModal(true); setIsMenuOpen(false); }}
+             style={{
+               width: '100%', padding: '16px',
+               background: 'linear-gradient(135deg, #ff9500, #ff3b30)', // Оранжево-красный градиент
+               color: 'white', border: 'none', borderRadius: '12px',
+               fontWeight: 'bold', fontSize: '16px',
+               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+               boxShadow: '0 4px 12px rgba(255, 149, 0, 0.3)'
+             }}
+           >
+             ⭐ Моя подписка
+           </button>
            
            {isLeaderboardJoined && (
-             <button className="btn-primary" style={{ backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)' }} onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }}>🏆 Рейтинг перекупов</button>
+             <button 
+               onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }}
+               style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}
+             >
+               🏆 Рейтинг перекупов
+             </button>
            )}
            
-           <button className="btn-primary" style={{ backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)' }} onClick={() => { setShowSettingsModal(true); setIsMenuOpen(false); }}>⚙️ Настройки</button>
+           <button 
+             onClick={() => { setShowSettingsModal(true); setIsMenuOpen(false); }}
+             style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}
+           >
+             ⚙️ Настройки
+           </button>
         </div>
 
         <div className="sidebar-footer">
-          <div style={{fontSize: 13, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 'bold'}}>Настройки и поддержка</div>
+          <div style={{fontSize: 13, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 'bold'}}>Конфиденциальность и поддержка</div>
           <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://telegra.ph/Polzovatelskoe-soglashenie-10-19-40'); }}>Пользовательское соглашение</a>
           <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://telegra.ph/Politika-konfidencialnosti-10-19-87'); }}>Политика конфиденциальности</a>
           <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://t.me/primestore8'); }} style={{ color: 'var(--accent)' }}>Служба поддержки: @primestore8</a>

@@ -353,7 +353,14 @@ function App() {
       <div className="card">
         <form onSubmit={addDeal}>
           <input className="input-field" type="text" placeholder="Модель" value={model} onChange={(e) => setModel(e.target.value)}/>
-          <input className="input-field" type="number" placeholder="Цена закупа (₽)" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)}/>
+                    <input 
+            className="input-field" 
+            type="text" 
+            inputMode="numeric" 
+            placeholder="Цена закупа (₽)" 
+            value={buyPrice} 
+            onChange={(e) => setBuyPrice(e.target.value.replace(/[^\d]/g, ''))}
+          />
           
           <div style={{ display: 'flex', gap: 10 }}>
             <select className="input-field" value={storage} onChange={(e) => setStorage(e.target.value)}>
@@ -667,10 +674,55 @@ function App() {
         </div></div>
       )}
 
-      {sellingDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Продажа: {sellingDeal.model}</h3><input className="input-field" type="number" placeholder="Цена (₽)" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} autoFocus/><select className="input-field" value={buyerId} onChange={(e) => setBuyerId(e.target.value)}><option value="">Кто купил?</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><div className="modal-actions"><button className="btn-cancel" onClick={() => setSellingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmSell}>Продать</button></div></div></div>)}
-      
-      {expenseDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Расход: {expenseDeal.model}</h3><input className="input-field" type="number" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} autoFocus/><select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmExpense}>Добавить</button></div></div></div>)}
-      
+            {sellingDeal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Продажа: {sellingDeal.model}</h3>
+            <input 
+              className="input-field" 
+              type="text" 
+              inputMode="numeric" 
+              placeholder="Цена (₽)" 
+              value={sellPrice} 
+              onChange={(e) => setSellPrice(e.target.value.replace(/[^\d]/g, ''))} 
+              autoFocus
+            />
+            <select className="input-field" value={buyerId} onChange={(e) => setBuyerId(e.target.value)}>
+              <option value="">Кто купил?</option>
+              {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setSellingDeal(null)}>Отмена</button>
+              <button className="btn-confirm" onClick={confirmSell}>Продать</button>
+            </div>
+          </div>
+        </div>
+      )}
+            {expenseDeal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Расход: {expenseDeal.model}</h3>
+            <input 
+              className="input-field" 
+              type="text" 
+              inputMode="numeric" 
+              placeholder="Сумма (₽)" 
+              value={expenseAmount} 
+              onChange={(e) => setExpenseAmount(e.target.value.replace(/[^\d]/g, ''))} 
+              autoFocus
+            />
+            <select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}>
+              <option value="Ремонт">Ремонт</option>
+              <option value="Запчасти">Запчасти</option>
+              <option value="Такси">Такси</option>
+            </select>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button>
+              <button className="btn-confirm" onClick={confirmExpense}>Добавить</button>
+            </div>
+          </div>
+        </div>
+      )}
       {editingDeal && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
@@ -680,7 +732,13 @@ function App() {
             <input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/>
             
             <label style={{fontSize: 12, color: '#888'}}>Цена закупа (₽)</label>
-            <input className="input-field" type="number" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value)}/>
+            <input 
+  className="input-field" 
+  type="text" 
+  inputMode="numeric" 
+  value={editBuyPrice} 
+  onChange={(e) => setEditBuyPrice(e.target.value.replace(/[^\d]/g, ''))}
+/>
 
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1 }}>

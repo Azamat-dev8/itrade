@@ -6,6 +6,8 @@ import './App.css'
 
 function App() {
   const [user, setUser] = useState(null)
+    // Ссылка на твой канал с техникой
+  const MY_CHANNEL_URL = "https://t.me/primesufa" 
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
   const [generalExpenses, setGeneralExpenses] = useState([])
@@ -525,7 +527,19 @@ function App() {
            >
              ⭐ Моя подписка
            </button>
-           
+                      {/* Кнопка Канала с техникой */}
+           <button 
+             onClick={() => { openExternalLink(MY_CHANNEL_URL); haptic('medium'); }}
+             style={{ 
+               width: '100%', padding: '16px', 
+               backgroundColor: 'rgba(36, 129, 204, 0.1)', 
+               color: 'var(--accent)', 
+               border: '1px solid var(--accent)', 
+               borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' 
+             }}
+           >
+             🛍 Канал с проверенной техникой
+           </button>
            {isLeaderboardJoined && (
              <button 
                onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }}

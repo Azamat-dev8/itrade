@@ -455,7 +455,7 @@ function App() {
           <div className="profile-avatar" style={{ overflow: 'hidden', padding: 0 }}>
             {user?.photo_url ? <img src={user.photo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (user?.first_name ? user.first_name[0].toUpperCase() : 'U')}
           </div>
-          <div><div className="profile-name">{user?.first_name || 'Пользователь'}</div><div className="profile-status">{user?.username ? `@${user.username}` : 'iTrade Pro'}</div></div>
+          <div><div className="profile-name">{user?.first_name || 'Пользователь'}</div><div className="profile-status">{user?.username ? `@${user.username}` : 'PrimeTrade Pro'}</div></div>
         </div>
 
         <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10 }}>
@@ -517,7 +517,7 @@ function App() {
 
       {showSubModal && (
         <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content">
-            <h3 style={{ textAlign: 'center' }}>iTrade PRO</h3>
+            <h3 style={{ textAlign: 'center' }}>PrimeTrade PRO</h3>
             <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Пробный период: <strong style={{ color: '#34c759' }}>14 дней</strong></p>
             <div className="pricing-grid">
               <div className="pricing-card" onClick={() => alert('Переход к оплате за 390 ₽...')}><div><div style={{ fontWeight: 'bold' }}>1 месяц</div><div style={{ fontSize: 12 }}>390 ₽ / мес</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div>

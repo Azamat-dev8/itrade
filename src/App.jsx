@@ -13,7 +13,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
-
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [csvData, setCsvData] = useState('')
   const [showScanner, setShowScanner] = useState(false)
@@ -81,7 +81,14 @@ function App() {
   }, [])  
 
   useEffect(() => { setSearchQuery('') }, [activeTab])
-
+  const openExternalLink = (url) => {
+    const tg = window.Telegram?.WebApp;
+    if (tg?.openLink) {
+      tg.openLink(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  }
   const haptic = (type = 'light') => {
     const tg = window.Telegram?.WebApp
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(type)
@@ -302,7 +309,7 @@ function App() {
   const renderHome = () => (
     <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h2 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Дашборд</h2>
+        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
         <button 
           onClick={toggleTheme} 
           style={{ 
@@ -317,7 +324,7 @@ function App() {
         >
           {isDarkTheme ? '☀️' : '🌙'}
         </button>
-      </div>
+      </div>  
       
       <div className="main-profit-card">
         <h3>Чистая прибыль</h3>
@@ -367,7 +374,7 @@ function App() {
 
   const renderFinance = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Финансы</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Финансы</h2>
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0 }}>Быстрые расходы</h3>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -400,7 +407,7 @@ function App() {
 
   const renderStock = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Склад</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Склад</h2>
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить</h3>
         <form onSubmit={addDeal}>
@@ -449,7 +456,7 @@ function App() {
 
   const renderDeals = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Сделки</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Сделки</h2>
       {soldDeals.length > 0 && renderSearchBar()}
       {filteredSold.map((deal) => {
         const expSum = getDealExpensesSum(deal);
@@ -475,7 +482,7 @@ function App() {
 
   const renderContacts = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Контакты</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50  }}>Контакты</h2>
       
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить контакт</h3>
@@ -510,6 +517,7 @@ function App() {
   )
 
   return (
+    
     <div className="app-container">
       {activeTab === 'home' && renderHome()}
       {activeTab === 'stock' && renderStock()}
@@ -596,7 +604,43 @@ function App() {
       {showScanner && (
         <Scanner onScan={(text) => setImei(text)} onClose={() => setShowScanner(false)} />
       )}
+      {/* КНОПКА ГАМБУРГЕР */}
+      <button 
+        className="hamburger-btn" 
+        onClick={() => { setIsMenuOpen(true); haptic(); }}
+        style={{ position: 'absolute', top: '16px', left: '16px' }} // absolute, чтобы не перекрывать контент при скролле
+      >
+        ☰
+      </button>
 
+      {/* ОВЕРЛЕЙ И САМО МЕНЮ */}
+      <div className={`sidebar-overlay ${isMenuOpen ? 'open' : ''}`} onClick={() => setIsMenuOpen(false)}></div>
+      <div className={`sidebar ${isMenuOpen ? 'open' : ''}`}>
+        
+        {/* Профиль пользователя */}
+        <div className="profile-section">
+          <div className="profile-avatar">
+            {user?.first_name ? user.first_name[0].toUpperCase() : 'U'}
+          </div>
+          <div>
+            <div className="profile-name">{user?.first_name || 'Пользователь'}</div>
+            <div className="profile-status">{user?.username ? `@${user.username}` : 'iTrade Pro'}</div>
+          </div>
+        </div>
+
+        {/* Меню навигации */}
+        <div className="sidebar-links">
+           <div style={{fontSize: 13, color: 'var(--text-muted)', marginBottom: 5}}>Настройки и поддержка</div>
+           {/* Сюда можно добавить пункты меню в будущем */}
+        </div>
+
+        {/* Юридическая информация и поддержка (в самом низу) */}
+        <div className="sidebar-footer">
+          <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://telegra.ph/Polzovatelskoe-soglashenie-10-19-40'); }}>Пользовательское соглашение</a>
+          <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://telegra.ph/Politika-konfidencialnosti-10-19-87'); }}>Политика конфиденциальности</a>
+          <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://t.me/primestore8'); }} style={{ color: 'var(--accent)' }}>Служба поддержки: @primestore8</a>
+        </div>
+      </div>
       <div className="tab-bar">
         <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon">📊</span> Главная</button>
         <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => { setActiveTab('stock'); haptic(); }}><span className="tab-icon">📦</span> Склад</button>

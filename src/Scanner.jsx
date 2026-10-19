@@ -4,17 +4,15 @@ import { BrowserMultiFormatReader } from '@zxing/browser';
 export default function Scanner({ onScan, onClose }) {
   const videoRef = useRef(null);
   const videoTrackRef = useRef(null);
+  const controlsRef = useRef(null); // Сохраняем контролы в ref, чтобы иметь к ним доступ при очистке
   const [error, setError] = useState('');
   const [scanStatus, setScanStatus] = useState('Наведите камеру на штрихкод IMEI');
   const [isTorchOn, setIsTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
-  
-  // НОВОЕ: Состояние для экранного фонарика
   const [screenLightOn, setScreenLightOn] = useState(false);
 
   useEffect(() => {
     const codeReader = new BrowserMultiFormatReader();
-    let controls;
 
     const startScanner = async () => {
       try {
@@ -25,13 +23,12 @@ export default function Scanner({ onScan, onClose }) {
         const track = stream.getVideoTracks()[0];
         videoTrackRef.current = track;
 
-        // Пытаемся проверить поддержку фонарика
         const capabilities = track.getCapabilities ? track.getCapabilities() : {};
         if (capabilities.torch) {
           setHasTorch(true);
         }
 
-        controls = await codeReader.decodeFromStream(
+        controlsRef.current = await codeReader.decodeFromStream(
           stream,
           videoRef.current,
           (result, err) => {
@@ -40,8 +37,13 @@ export default function Scanner({ onScan, onClose }) {
               const cleanText = rawText.replace(/\D/g, '');
 
               if (cleanText.length === 15) {
+                // ПРИНУДИТЕЛЬНО ВЫКЛЮЧАЕМ ФОНАРИК ПЕРЕД ЗАКРЫТИЕМ
+                if (track.getCapabilities()?.torch) {
+                  track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+                }
+                
                 onScan(cleanText);
-                controls.stop();
+                controlsRef.current.stop();
                 track.stop();
                 onClose();
               } else {
@@ -58,13 +60,21 @@ export default function Scanner({ onScan, onClose }) {
 
     startScanner();
 
+    // ОЧИСТКА ПРИ ЗАКРЫТИИ (нажатие на "Отмена" или свайп)
     return () => {
-      if (controls) controls.stop();
-      if (videoTrackRef.current) videoTrackRef.current.stop();
+      if (videoTrackRef.current) {
+        // Если фонарик поддерживается, принудительно выключаем его перед остановкой камеры
+        if (videoTrackRef.current.getCapabilities()?.torch) {
+          videoTrackRef.current.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+        }
+        videoTrackRef.current.stop();
+      }
+      if (controlsRef.current) {
+        controlsRef.current.stop();
+      }
     };
   }, [onScan, onClose]);
 
-  // Переключение настоящего фонарика
   const toggleTorch = async () => {
     if (videoTrackRef.current && hasTorch) {
       try {
@@ -79,14 +89,12 @@ export default function Scanner({ onScan, onClose }) {
     }
   };
 
-  // Переключение экранного фонарика
   const toggleScreenLight = () => {
     setScreenLightOn(!screenLightOn);
   };
 
   return (
     <div className="modal-overlay" style={{ zIndex: 9999 }}>
-      {/* Если включен экранный фонарик, делаем фон белым */}
       <div className="modal-content" style={{ 
         padding: 15, 
         textAlign: 'center',
@@ -106,7 +114,6 @@ export default function Scanner({ onScan, onClose }) {
         </div>
         
         <div style={{ display: 'flex', gap: 10, marginTop: 15, flexWrap: 'wrap' }}>
-          {/* Кнопка настоящего фонарика (если поддерживается) */}
           {hasTorch && (
             <button 
               onClick={toggleTorch}
@@ -121,7 +128,6 @@ export default function Scanner({ onScan, onClose }) {
             </button>
           )}
           
-          {/* Кнопка экранного фонарика (работает всегда) */}
           <button 
             onClick={toggleScreenLight}
             style={{ 

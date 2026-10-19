@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import Scanner from './Scanner'
 import './App.css'
 
@@ -37,6 +37,7 @@ function App() {
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactNote, setContactNote] = useState('')
+  
   const [editingContact, setEditingContact] = useState(null)
   const [editContactName, setEditContactName] = useState('')
   const [editContactPhone, setEditContactPhone] = useState('')
@@ -54,9 +55,12 @@ function App() {
   const [sellingDeal, setSellingDeal] = useState(null)
   const [sellPrice, setSellPrice] = useState('')
   const [buyerId, setBuyerId] = useState('')
+  
   const [editingDeal, setEditingDeal] = useState(null)
   const [editModel, setEditModel] = useState('')
   const [editBuyPrice, setEditBuyPrice] = useState('')
+  const [editStorage, setEditStorage] = useState('')
+  const [editBattery, setEditBattery] = useState('')
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
@@ -173,7 +177,11 @@ function App() {
 
   const saveEditContact = async () => {
     if (!editContactName) return alert('Введите имя')
-    const { error } = await supabase.from('contacts').update({ name: editContactName, phone: editContactPhone, note: editContactNote }).eq('id', editingContact.id)
+    const { error } = await supabase.from('contacts').update({ 
+      name: editContactName, 
+      phone: editContactPhone, 
+      note: editContactNote 
+    }).eq('id', editingContact.id)
     if (!error) { setEditingContact(null); fetchData(); haptic('medium'); }
   }
 
@@ -183,7 +191,7 @@ function App() {
   }
 
   const saveEdit = async () => {
-    if (!editModel || !editBuyPrice) return alert('Заполните модель и цену')
+    if (!editModel || !editBuyPrice) return alert('Заполните данные')
     const updates = { 
       model: editModel, 
       buy_price: Number(editBuyPrice),
@@ -263,14 +271,11 @@ function App() {
   const renderSpecs = (deal) => (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, marginBottom: 10 }}>
       {renderDaysBadge(getDaysOnStock(deal), deal.status)}
-      
-      {/* Умный вывод памяти (1024 = 1 TB) */}
       {deal.storage_gb && (
         <span className="badge badge-gray">
           {deal.storage_gb >= 1024 ? `${deal.storage_gb / 1024} TB` : `${deal.storage_gb} GB`}
         </span>
       )}
-      
       {deal.battery_health && <span className="badge badge-gray">🔋 {deal.battery_health}%</span>}
       {deal.imei && <span className="badge badge-gray">IMEI: ...{deal.imei.slice(-4)}</span>}
     </div>
@@ -299,6 +304,8 @@ function App() {
         <div><h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3><div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.length} шт.</div></div>
         <button className="btn-success" onClick={exportToCSV} style={{ padding: '12px 16px' }}>📥 Экспорт</button>
       </div>
+      
+      {/* ОБНОВЛЕННЫЙ ГРАФИК */}
       {chartData.length > 0 && (
         <div className="card">
           <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Прибыль по месяцам</h3>
@@ -308,7 +315,11 @@ function App() {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
                 <Tooltip cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} />
-                <Bar dataKey="profit" fill="#34c759" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="profit" radius={[6, 6, 0, 0]}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -342,13 +353,9 @@ function App() {
         <form onSubmit={addDeal}>
           <input className="input-field" type="text" placeholder="Модель" value={model} onChange={(e) => setModel(e.target.value)}/>
           <input className="input-field" type="number" placeholder="Цена закупа (₽)" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)}/>
-                    <div style={{ display: 'flex', gap: 10 }}>
-            {/* Выпадающий список для памяти */}
-            <select 
-              className="input-field" 
-              value={storage} 
-              onChange={(e) => setStorage(e.target.value)}
-            >
+          
+          <div style={{ display: 'flex', gap: 10 }}>
+            <select className="input-field" value={storage} onChange={(e) => setStorage(e.target.value)}>
               <option value="">Память (ГБ)</option>
               <option value="64">64 GB</option>
               <option value="128">128 GB</option>
@@ -358,7 +365,6 @@ function App() {
               <option value="2048">2 TB</option>
             </select>
 
-            {/* Поле АКБ с ограничением 0-100 */}
             <input 
               className="input-field" 
               type="number" 
@@ -374,6 +380,7 @@ function App() {
               }}
             />
           </div>
+
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <input className="input-field" type="text" placeholder="IMEI" value={imei} onChange={(e) => setImei(e.target.value)} style={{ flex: 1, marginBottom: 10 }}/>
             <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12 }}>📷</button>
@@ -388,13 +395,19 @@ function App() {
       {inStockDeals.length > 0 && renderSearchBar()}
       {filteredStock.map((deal) => (
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
-            <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div><div><button className="icon-btn" onClick={() => {
-  setEditingDeal(deal); 
-  setEditModel(deal.model); 
-  setEditBuyPrice(deal.buy_price);
-  setEditStorage(deal.storage_gb || '');
-  setEditBattery(deal.battery_health || '');
-}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
+            <div className="card-header">
+              <div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div>
+              <div>
+                <button className="icon-btn" onClick={() => {
+                  setEditingDeal(deal); 
+                  setEditModel(deal.model); 
+                  setEditBuyPrice(deal.buy_price);
+                  setEditStorage(deal.storage_gb || '');
+                  setEditBattery(deal.battery_health || '');
+                }}>✏️</button>
+                <button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button>
+              </div>
+            </div>
             {renderSpecs(deal)}
             <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
               <button className="btn-cancel" style={{ padding: '12px' }} onClick={() => {setExpenseDeal(deal); setExpenseAmount(''); setExpenseCategory('Ремонт')}}>+ Расход</button>
@@ -429,11 +442,31 @@ function App() {
         <form onSubmit={addContact}>
           <input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/>
           <input className="input-field" type="text" placeholder="Телефон" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}/>
+          <input className="input-field" type="text" placeholder="Комментарий (надежный, торгуется...)" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/>
           <button className="btn-primary" type="submit">Сохранить</button>
         </form>
       </div>
       {contacts.map((c) => (
-        <div key={c.id} className="card" style={{ padding: 16 }}><div className="card-header"><div style={{ fontWeight: 600, fontSize: 16 }}>{c.name}</div><div><button className="icon-btn" onClick={() => {setEditingContact(c); setEditContactName(c.name); setEditContactPhone(c.phone || '')}}>✏️</button><button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button></div></div>{c.phone && <div style={{ color: 'var(--accent)' }}>📞 {c.phone}</div>}</div>
+        <div key={c.id} className="card" style={{ padding: 16 }}>
+          <div className="card-header">
+            <div style={{ fontWeight: 600, fontSize: 16 }}>{c.name}</div>
+            <div>
+              <button className="icon-btn" onClick={() => {
+                setEditingContact(c); 
+                setEditContactName(c.name); 
+                setEditContactPhone(c.phone || '');
+                setEditContactNote(c.note || '');
+              }}>✏️</button>
+              <button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button>
+            </div>
+          </div>
+          {c.phone && <div style={{ color: 'var(--accent)', marginTop: 4 }}>📞 {c.phone}</div>}
+          {c.note && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}
+          
+          <div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+            Добавлен: {new Date(c.created_at).toLocaleDateString('ru-RU')}
+          </div>
+        </div>
       ))}
     </div>
   )
@@ -455,7 +488,7 @@ function App() {
           <div className="profile-avatar" style={{ overflow: 'hidden', padding: 0 }}>
             {user?.photo_url ? <img src={user.photo_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (user?.first_name ? user.first_name[0].toUpperCase() : 'U')}
           </div>
-          <div><div className="profile-name">{user?.first_name || 'Пользователь'}</div><div className="profile-status">{user?.username ? `@${user.username}` : 'PrimeTrade Pro'}</div></div>
+          <div><div className="profile-name">{user?.first_name || 'Пользователь'}</div><div className="profile-status">{user?.username ? `@${user.username}` : 'iTrade Pro'}</div></div>
         </div>
 
         <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10 }}>
@@ -517,7 +550,7 @@ function App() {
 
       {showSubModal && (
         <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content">
-            <h3 style={{ textAlign: 'center' }}>PrimeTrade PRO</h3>
+            <h3 style={{ textAlign: 'center' }}>iTrade PRO</h3>
             <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Пробный период: <strong style={{ color: '#34c759' }}>14 дней</strong></p>
             <div className="pricing-grid">
               <div className="pricing-card" onClick={() => alert('Переход к оплате за 390 ₽...')}><div><div style={{ fontWeight: 'bold' }}>1 месяц</div><div style={{ fontSize: 12 }}>390 ₽ / мес</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div>
@@ -532,7 +565,7 @@ function App() {
       
       {expenseDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Расход: {expenseDeal.model}</h3><input className="input-field" type="number" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} autoFocus/><select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmExpense}>Добавить</button></div></div></div>)}
       
-            {editingDeal && (
+      {editingDeal && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
             <h3>Редактировать: {editingDeal.model}</h3>
@@ -581,7 +614,24 @@ function App() {
           </div>
         </div>
       )}
-      {editingContact && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать контакт</h3><input className="input-field" type="text" value={editContactName} onChange={(e) => setEditContactName(e.target.value)}/><input className="input-field" type="text" value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingContact(null)}>Отмена</button><button className="btn-confirm" onClick={saveEditContact}>Сохранить</button></div></div></div>)}
+      
+      {editingContact && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Редактировать контакт</h3>
+            <label style={{fontSize: 12, color: '#888'}}>Имя</label>
+            <input className="input-field" type="text" value={editContactName} onChange={(e) => setEditContactName(e.target.value)}/>
+            <label style={{fontSize: 12, color: '#888'}}>Телефон</label>
+            <input className="input-field" type="text" value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)}/>
+            <label style={{fontSize: 12, color: '#888'}}>Комментарий</label>
+            <input className="input-field" type="text" value={editContactNote} onChange={(e) => setEditContactNote(e.target.value)}/>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setEditingContact(null)}>Отмена</button>
+              <button className="btn-confirm" onClick={saveEditContact}>Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {showExportModal && (<div className="modal-overlay"><div className="modal-content"><h3>Экспорт</h3><textarea value={csvData} readOnly style={{ width: '100%', height: 150, padding: 10, borderRadius: 12, border: '1px solid #ccc', fontSize: 12, marginBottom: 15 }} /><div className="modal-actions"><button className="btn-cancel" onClick={() => setShowExportModal(false)}>Закрыть</button><button className="btn-confirm" onClick={() => { navigator.clipboard.writeText(csvData); alert('Скопировано!'); setShowExportModal(false); }}>Копировать</button></div></div></div>)}
       

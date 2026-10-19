@@ -605,8 +605,33 @@ function App() {
       )}
       {showGuideModal && (
         <div className="modal-overlay" style={{ zIndex: 2000 }}>
-          <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>📚 Как пользоваться</h3>
+          <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            
+            {/* БЕЛЫЙ КРЕСТИК */}
+            <button
+              onClick={() => setShowGuideModal(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: '#00000088', // Полупрозрачный черный фон для контраста
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '16px',
+                cursor: 'pointer',
+                zIndex: 10
+              }}
+            >
+              ✕
+            </button>
+
+            <h3 style={{ paddingRight: 30 }}>📚 Как пользоваться</h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}>
               <div>
@@ -638,8 +663,15 @@ function App() {
               </div>
             </div>
 
-            <div className="modal-actions" style={{ marginTop: 25 }}>
-              <button className="btn-confirm" style={{ backgroundColor: 'var(--accent)' }} onClick={() => setShowGuideModal(false)}>Понятно</button>
+            {/* БОЛЬШАЯ КНОПКА "ПОНЯТНО" */}
+            <div style={{ marginTop: 25 }}>
+              <button 
+                className="btn-primary" 
+                style={{ backgroundColor: 'var(--accent)', width: '100%', padding: '16px' }} 
+                onClick={() => setShowGuideModal(false)}
+              >
+                Понятно
+              </button>
             </div>
           </div>
         </div>

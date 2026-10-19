@@ -8,6 +8,9 @@ export default function Scanner({ onScan, onClose }) {
   const [scanStatus, setScanStatus] = useState('Наведите камеру на штрихкод IMEI');
   const [isTorchOn, setIsTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
+  
+  // НОВОЕ: Состояние для экранного фонарика
+  const [screenLightOn, setScreenLightOn] = useState(false);
 
   useEffect(() => {
     const codeReader = new BrowserMultiFormatReader();
@@ -15,22 +18,19 @@ export default function Scanner({ onScan, onClose }) {
 
     const startScanner = async () => {
       try {
-        // Запрашиваем камеру вручную, чтобы получить доступ к видеопотоку
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment' }
         });
 
-        // Получаем видеодорожку
         const track = stream.getVideoTracks()[0];
         videoTrackRef.current = track;
 
-        // Проверяем, поддерживает ли устройство фонарик (в основном Android)
-        const capabilities = track.getCapabilities();
+        // Пытаемся проверить поддержку фонарика
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
         if (capabilities.torch) {
           setHasTorch(true);
         }
 
-        // Запускаем сканер на полученном потоке
         controls = await codeReader.decodeFromStream(
           stream,
           videoRef.current,
@@ -42,7 +42,7 @@ export default function Scanner({ onScan, onClose }) {
               if (cleanText.length === 15) {
                 onScan(cleanText);
                 controls.stop();
-                track.stop(); // Выключаем камеру
+                track.stop();
                 onClose();
               } else {
                 setScanStatus('Это не IMEI. Ищем дальше...');
@@ -58,14 +58,13 @@ export default function Scanner({ onScan, onClose }) {
 
     startScanner();
 
-    // Очистка при закрытии
     return () => {
       if (controls) controls.stop();
       if (videoTrackRef.current) videoTrackRef.current.stop();
     };
   }, [onScan, onClose]);
 
-  // Функция переключения фонарика
+  // Переключение настоящего фонарика
   const toggleTorch = async () => {
     if (videoTrackRef.current && hasTorch) {
       try {
@@ -80,11 +79,22 @@ export default function Scanner({ onScan, onClose }) {
     }
   };
 
+  // Переключение экранного фонарика
+  const toggleScreenLight = () => {
+    setScreenLightOn(!screenLightOn);
+  };
+
   return (
     <div className="modal-overlay" style={{ zIndex: 9999 }}>
-      <div className="modal-content" style={{ padding: 15, textAlign: 'center' }}>
-        <h3>Сканирование IMEI</h3>
-        <p style={{ fontSize: 13, color: scanStatus.includes('не IMEI') ? '#ff3b30' : '#666', minHeight: 18 }}>
+      {/* Если включен экранный фонарик, делаем фон белым */}
+      <div className="modal-content" style={{ 
+        padding: 15, 
+        textAlign: 'center',
+        backgroundColor: screenLightOn ? '#ffffff' : 'var(--card-bg)',
+        transition: 'background-color 0.2s'
+      }}>
+        <h3 style={{ color: screenLightOn ? '#000' : 'var(--text-main)' }}>Сканирование IMEI</h3>
+        <p style={{ fontSize: 13, color: screenLightOn ? '#333' : 'var(--text-muted)', minHeight: 18 }}>
           {scanStatus}
         </p>
         
@@ -95,13 +105,13 @@ export default function Scanner({ onScan, onClose }) {
           <div style={{ position: 'absolute', top: '25%', left: '10%', right: '10%', bottom: '25%', border: '2px solid #34c759', borderRadius: 10 }}></div>
         </div>
         
-        {/* Кнопки под камерой */}
-        <div style={{ display: 'flex', gap: 10, marginTop: 15 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 15, flexWrap: 'wrap' }}>
+          {/* Кнопка настоящего фонарика (если поддерживается) */}
           {hasTorch && (
             <button 
               onClick={toggleTorch}
               style={{ 
-                flex: 1, padding: '14px', 
+                flex: '1 0 40%', padding: '14px', 
                 backgroundColor: isTorchOn ? '#ff9500' : '#e5e5ea', 
                 color: isTorchOn ? 'white' : 'black', 
                 border: 'none', borderRadius: 12, fontWeight: 'bold', fontSize: 16 
@@ -111,14 +121,33 @@ export default function Scanner({ onScan, onClose }) {
             </button>
           )}
           
+          {/* Кнопка экранного фонарика (работает всегда) */}
+          <button 
+            onClick={toggleScreenLight}
+            style={{ 
+              flex: '1 0 40%', padding: '14px', 
+              backgroundColor: screenLightOn ? '#fff' : '#e5e5ea', 
+              color: screenLightOn ? '#000' : 'black', 
+              border: '1px solid #ccc', borderRadius: 12, fontWeight: 'bold', fontSize: 16 
+            }}
+          >
+            💡 Экран
+          </button>
+
           <button 
             className="btn-cancel" 
-            style={{ flex: hasTorch ? 1 : 2 }} 
+            style={{ flex: '1 0 100%', padding: '14px' }} 
             onClick={onClose}
           >
             Отмена
           </button>
         </div>
+        
+        {screenLightOn && (
+          <p style={{ fontSize: 12, color: '#666', marginTop: 10 }}>
+            Направьте белый экран на штрихкод для подсветки.
+          </p>
+        )}
       </div>
     </div>
   );

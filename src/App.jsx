@@ -466,11 +466,13 @@ function App() {
             <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>
               Закуп: {deal.buy_price} ₽ | Продажа: {deal.sell_price} ₽
             </div>
+            
+            {/* ВОТ ЗДЕСЬ ДОБАВИЛАСЬ ДАТА ПРОДАЖИ */}
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
               Дата закупа: {new Date(deal.created_at).toLocaleDateString('ru-RU')}
+              {deal.sold_at && ` • Дата продажи: ${new Date(deal.sold_at).toLocaleDateString('ru-RU')}`}
             </div>
             
-            {/* Вывод списка расходов, если они есть */}
             {deal.expenses && deal.expenses.length > 0 && (
               <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6 }}>
                 {deal.expenses.map(e => `${e.category}: ${e.amount}₽`).join(' • ')}
@@ -485,6 +487,7 @@ function App() {
       })}
     </div>
   )
+ 
 
   const renderContacts = () => (
     <div>

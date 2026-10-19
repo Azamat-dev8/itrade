@@ -31,7 +31,7 @@ const DEVICE_CATALOG = {
   ]
 };
 
-const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут" // <-- ЗАМЕНИ НА СВОЙ КАНАЛ
+const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут"
 
 function App() {
   const [user, setUser] = useState(null)
@@ -136,14 +136,12 @@ function App() {
     if (tg?.openLink) tg.openLink(url); else window.open(url, '_blank');
   }
 
+  // ИСПРАВЛЕННАЯ ФУНКЦИЯ ЗВОНКА (универсальная)
   const handlePhoneCall = (phone) => {
     if (!phone) return;
     const cleanPhone = phone.replace(/[^\d+]/g, '');
-    const tg = window.Telegram?.WebApp;
     haptic('medium');
-    const isIOS = tg?.platform === 'ios' || /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isIOS) window.open(`wtai://wp/mc;${cleanPhone}`, '_blank');
-    else window.open(`tel:${cleanPhone}`, '_blank');
+    window.open(`tel:${cleanPhone}`, '_blank');
   };
 
   const fetchData = async () => {
@@ -158,7 +156,6 @@ function App() {
     const { data: genExpData } = await supabase.from('expenses').select('*').eq('user_id', user.id).is('deal_id', null).order('created_at', { ascending: false })
     if (genExpData) setGeneralExpenses(genExpData)
 
-    // Загружаем профиль
     const { data: profileInfo } = await supabase.from('user_profiles').select('*').eq('telegram_id', user.id).single()
     if (profileInfo) {
       setProfileData(profileInfo)
@@ -167,7 +164,6 @@ function App() {
       setShowChart(profileInfo.show_chart !== false)
       setDailySummary(profileInfo.daily_summary || false)
     } else {
-      // Создаем профиль, если его нет
       const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false }
       await supabase.from('user_profiles').insert([newProf])
       setProfileData(newProf)
@@ -178,12 +174,10 @@ function App() {
     if (lbData) setLeaderboard(lbData)
   }
 
-  // ФУНКЦИИ ОБНОВЛЕНИЯ НАСТРОЕК
   const updateSetting = async (key, value) => {
     haptic('medium');
     if (!user) return;
     
-    // Оптимистичное обновление (чтобы UI не ждал)
     if (key === 'hide_amounts') setHideAmounts(value)
     if (key === 'show_chart') setShowChart(value)
     if (key === 'daily_summary') setDailySummary(value)
@@ -284,7 +278,6 @@ function App() {
 
   const removeFilterModel = (modelName) => { haptic(); setFilterModels(prev => prev.filter(m => m !== modelName)); }
 
-  // МАТЕМАТИКА И ФОРМАТИРОВАНИЕ
   const formatMoney = (amount) => {
     if (hideAmounts) return '*** ₽';
     return (Number(amount) || 0).toLocaleString('ru-RU') + ' ₽';
@@ -360,7 +353,6 @@ function App() {
         <button className="btn-success" onClick={handleExportClick} style={{ padding: '12px 16px' }}>📥 Экспорт</button>
       </div>
       
-      {/* СКРЫТИЕ ГРАФИКА ПО НАСТРОЙКАМ */}
       {showChart && chartData.length > 0 && (
         <div className="card">
           <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Прибыль по месяцам</h3>
@@ -565,7 +557,6 @@ function App() {
     </div>
   )
 
-  // НОВЫЙ ПОЛНОЦЕННЫЙ ЭКРАН НАСТРОЕК
   const renderSettings = () => (
     <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
@@ -636,7 +627,7 @@ function App() {
         </div>
       </div>
 
-      {/* ОПАСНАЯ ЗОНА (СБРОС) */}
+      {/* ОПАСНАЯ ЗОНА */}
       <div className="card" style={{ border: '1px solid var(--danger)', backgroundColor: 'rgba(255, 59, 48, 0.05)' }}>
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--danger)' }}>Опасная зона</h3>
         <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Удаление аккаунта безвозвратно удалит все ваши сделки, расходы и контакты.</p>
@@ -678,13 +669,11 @@ function App() {
            <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>
            <button onClick={() => { const refLink = `https://t.me/Primetrade8_bot?start=ref_${user?.id || ''}`; window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent('Попробуй iTrade!')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🎁 Пригласи друга</button>
            <button onClick={() => { window.open(`https://t.me/primestore8?text=${encodeURIComponent('Привет! Идея: ')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>💡 Предложить идею</button>
-           
-           {/* КНОПКА НАСТРОЕК ТЕПЕРЬ ВЕДЕТ НА НОВЫЙ ЭКРАН */}
            <button onClick={() => { setActiveTab('settings'); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>⚙️ Настройки</button>
         </div>
       </div>
 
-      {/* ВСЕ ОСТАЛЬНЫЕ МОДАЛКИ (Подписка, Инструкция, Рейтинг, Сканер, Экспорт и т.д.) */}
+      {/* МОДАЛКИ */}
       {showModelPicker && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>

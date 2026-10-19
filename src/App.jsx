@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
 import Scanner from './Scanner'
 import './App.css'
 
@@ -314,14 +314,35 @@ function App() {
           <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Прибыль по месяцам</h3>
           <div style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
-                <Tooltip cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} />
-                <Bar dataKey="profit" radius={[6, 6, 0, 0]}>
+                
+                {/* Убрали YAxis, так как цифры теперь на самих столбцах */}
+                
+                <Tooltip 
+                  cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} 
+                  contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} 
+                  formatter={(value) => [`${value.toLocaleString('ru-RU')} ₽`, 'Прибыль']}
+                />
+                
+                {/* maxBarSize делает столбцы узкими */}
+                <Bar dataKey="profit" maxBarSize={45} radius={[6, 6, 0, 0]}>
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} />
                   ))}
+                  
+                  {/* LabelList выводит белый жирный шрифт прямо внутри столбца */}
+                  <LabelList 
+                    dataKey="profit" 
+                    position="center" 
+                    fill="#ffffff" 
+                    style={{ fontWeight: 'bold', fontSize: 13, textShadow: '0 1px 2px rgba(0,0,0,0.4)' }} 
+                    formatter={(value) => {
+                      if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                      if (value >= 1000) return (value / 1000).toFixed(0) + 'k';
+                      return value;
+                    }}
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

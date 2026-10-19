@@ -3,7 +3,13 @@ import { supabase } from './supabaseClient'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
 import Scanner from './Scanner'
 import './App.css'
-
+const IPHONE_MODELS = [
+  "iPhone 7", "iPhone 7 Plus", "iPhone 8", "iPhone 8 Plus", "iPhone X", "iPhone XR", "iPhone XS", "iPhone XS Max",
+  "iPhone 11", "iPhone 11 Pro", "iPhone 11 Pro Max", "iPhone SE (2020)", "iPhone 12 mini", "iPhone 12", "iPhone 12 Pro", "iPhone 12 Pro Max",
+  "iPhone 13 mini", "iPhone 13", "iPhone 13 Pro", "iPhone 13 Pro Max", "iPhone SE (2022)", "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro", "iPhone 14 Pro Max",
+  "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max", "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max",
+  "iPhone 17", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 18", "iPhone 18 Pro", "iPhone 18 Pro Max", "iPhone Duo"
+];
 function App() {
   const [user, setUser] = useState(null)
     // Ссылка на твой канал с техникой
@@ -14,6 +20,7 @@ function App() {
   const [leaderboard, setLeaderboard] = useState([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('home')
+    const [modelFilter, setModelFilter] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
   // Состояния интерфейса
@@ -252,8 +259,16 @@ function App() {
     const q = searchQuery.toLowerCase();
     return list.filter(deal => deal.model.toLowerCase().includes(q) || (deal.imei && deal.imei.includes(q)))
   }
-  const filteredStock = filterDealsByQuery(inStockDeals);
+  
+  // Фильтр для склада (учитывает и поиск, и выбранную модель)
+  const filteredStock = inStockDeals.filter(deal => {
+    const matchesSearch = searchQuery ? (deal.model.toLowerCase().includes(searchQuery.toLowerCase()) || (deal.imei && deal.imei.includes(searchQuery))) : true;
+    const matchesModel = modelFilter ? deal.model === modelFilter : true;
+    return matchesSearch && matchesModel;
+  });
+  
   const filteredSold = filterDealsByQuery(soldDeals);
+  
 
   const getDaysOnStock = (deal) => {
     const start = new Date(deal.created_at);
@@ -369,21 +384,20 @@ function App() {
       ))}
     </div>
   )
-
-  const renderStock = () => (
+  const renderPurchase = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Склад</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Покупка</h2>
       <div className="card">
+        <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить устройство</h3>
         <form onSubmit={addDeal}>
-          <input className="input-field" type="text" placeholder="Модель" value={model} onChange={(e) => setModel(e.target.value)}/>
-                    <input 
-            className="input-field" 
-            type="text" 
-            inputMode="numeric" 
-            placeholder="Цена закупа (₽)" 
-            value={buyPrice} 
-            onChange={(e) => setBuyPrice(e.target.value.replace(/[^\d]/g, ''))}
-          />
+          
+          {/* Выбор модели из списка */}
+          <select className="input-field" value={model} onChange={(e) => setModel(e.target.value)}>
+            <option value="">Выберите модель</option>
+            {IPHONE_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+
+          <input className="input-field" type="text" inputMode="numeric" placeholder="Цена закупа (₽)" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value.replace(/[^\d]/g, ''))}/>
           
           <div style={{ display: 'flex', gap: 10 }}>
             <select className="input-field" value={storage} onChange={(e) => setStorage(e.target.value)}>
@@ -397,14 +411,10 @@ function App() {
             </select>
 
             <input 
-              className="input-field" 
-              type="number" 
-              placeholder="АКБ (%)" 
-              min="0" 
-              max="100"
+              className="input-field" type="text" inputMode="numeric" placeholder="АКБ (%)" min="0" max="100"
               value={battery} 
               onChange={(e) => {
-                let val = Number(e.target.value);
+                let val = Number(e.target.value.replace(/[^\d]/g, ''));
                 if (val > 100) val = 100;
                 if (val < 0) val = 0;
                 setBattery(val || '');
@@ -416,14 +426,37 @@ function App() {
             <input className="input-field" type="text" placeholder="IMEI" value={imei} onChange={(e) => setImei(e.target.value)} style={{ flex: 1, marginBottom: 10 }}/>
             <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12 }}>📷</button>
           </div>
+          
           <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
             <option value="">Кто продал? (Необязательно)</option>
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          
           <button className="btn-primary" type="submit" disabled={loading}>Сохранить на склад</button>
         </form>
       </div>
-      {inStockDeals.length > 0 && renderSearchBar()}
+    </div>
+  )
+  const renderStock = () => (
+    <div>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Склад</h2>
+      
+      {/* ПАНЕЛЬ ПОИСКА И ФИЛЬТРА */}
+      {inStockDeals.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input className="input-field" type="text" placeholder="Поиск..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
+            <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
+          </div>
+          <select className="input-field" style={{ flex: 1, marginBottom: 0 }} value={modelFilter} onChange={(e) => setModelFilter(e.target.value)}>
+            <option value="">Все модели</option>
+            {IPHONE_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+      )}
+
+      {filteredStock.length === 0 && <p style={{textAlign: 'center', color: '#888', marginTop: 20}}>Ничего не найдено</p>}
+
       {filteredStock.map((deal) => {
         const expSum = getDealExpensesSum(deal); 
         return (
@@ -445,8 +478,8 @@ function App() {
             {renderSpecs(deal)}
             
             <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>
-              Закуп: {deal.buy_price} ₽ 
-              {expSum > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {expSum} ₽</span>}
+              Закуп: {deal.buy_price.toLocaleString('ru-RU')} ₽ 
+              {expSum > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {expSum.toLocaleString('ru-RU')} ₽</span>}
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
               Дата закупа: {new Date(deal.created_at).toLocaleDateString('ru-RU')}

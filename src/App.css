@@ -110,9 +110,23 @@ button:active { transform: scale(0.97); opacity: 0.8; }
   padding-bottom: env(safe-area-inset-bottom);
   transition: background-color 0.3s, border-color 0.3s;
 }
-.tab-button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: none; background: none; color: var(--text-muted); font-size: 10px; font-weight: 500; gap: 4px; }
+.tab-button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 9px; /* <-- Уменьшили с 10px */
+  font-weight: 500;
+  gap: 2px;
+}
 .tab-button.active { color: var(--accent); }
-.tab-icon { font-size: 22px; }
+.tab-icon {
+  font-size: 20px; /* <-- Уменьшили с 22px */
+}
 
 /* --- МОДАЛЬНЫЕ ОКНА --- */
 .modal-overlay {

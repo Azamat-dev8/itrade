@@ -490,7 +490,17 @@ function App() {
             
             <input className="input-field" type="text" placeholder="Поиск (например, 15 pro)..." value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} style={{ marginBottom: 10 }}/>
             
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingTop: 5, paddingBottom: 10, marginBottom: 10, alignItems: 'center' }}>
+                        {/* ВКЛАДКИ КАТЕГОРИЙ (С ПЕРЕНОСОМ НА НОВУЮ СТРОКУ) */}
+            <div style={{ 
+              display: 'flex', 
+              flexWrap: 'wrap', // <-- Разрешаем перенос на новую строку
+              gap: 8, 
+              paddingTop: 5, 
+              paddingBottom: 10, 
+              marginBottom: 10, 
+              alignItems: 'center',
+              justifyContent: 'center' // <-- Центрируем вкладки
+            }}>
               {Object.keys(DEVICE_CATALOG).map(cat => (
                 <button 
                   key={cat} 
@@ -503,9 +513,7 @@ function App() {
                     color: modelCategory === cat ? '#fff' : 'var(--text-main)', 
                     fontWeight: 'bold', 
                     fontSize: 13,
-                    whiteSpace: 'nowrap', // Запрещаем перенос текста
-                    flexShrink: 0,       // Запрещаем сжатие кнопок
-                    minHeight: 34,       // Задаем минимальную высоту
+                    whiteSpace: 'nowrap', // Запрещаем ломать слово внутри кнопки
                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}
                 >

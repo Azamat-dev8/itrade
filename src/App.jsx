@@ -223,10 +223,28 @@ function App() {
     if (!error) { setEditingDeal(null); fetchData(); haptic('medium'); } 
   }
 
-  const deleteDeal = async (id) => {
-    if (!window.confirm('Удалить устройство?')) return
-    await supabase.from('deals').delete().eq('id', id); fetchData();
-  }
+    const clearAllData = async () => {
+    if (!window.confirm('Вы уверены, что хотите полностью очистить все данные? Это действие нельзя отменить.')) return;
+    
+    setLoading(true);
+    
+    try {
+      // Удаляем сделки
+      await supabase.from('deals').delete().eq('user_id', user.id);
+      // Удаляем расходы
+      await supabase.from('expenses').delete().eq('user_id', user.id);
+      // Удаляем контакты
+      await supabase.from('contacts').delete().eq('user_id', user.id);
+      
+      // Обновляем данные на экране
+      fetchData();
+      haptic('heavy');
+    } catch (error) {
+      alert('Ошибка при очистке: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const confirmSell = async () => {
     if (!sellPrice) return alert('Введите цену')
@@ -332,6 +350,29 @@ function App() {
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div><h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3><div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.length} шт.</div></div>
         <button className="btn-success" onClick={exportToCSV} style={{ padding: '12px 16px' }}>📥 Экспорт</button>
+              <div className="card">
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--danger)' }}>Управление данными</h3>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 5 }}>
+          Полностью удалить всю историю продаж, расходов и контактов.
+        </p>
+        <button 
+          onClick={clearAllData}
+          disabled={loading}
+          style={{
+            width: '100%',
+            padding: '14px',
+            backgroundColor: 'transparent',
+            color: 'var(--danger)',
+            border: '1px solid var(--danger)',
+            borderRadius: '12px',
+            fontWeight: 'bold',
+            fontSize: '16px',
+            marginTop: '10px'
+          }}
+        >
+          🗑️ Очистить статистику
+        </button>
+      </div>
       </div>
       
       {/* ОБНОВЛЕННЫЙ ГРАФИК */}

@@ -17,10 +17,6 @@ function App() {
   const [csvData, setCsvData] = useState('')
   const [showScanner, setShowScanner] = useState(false)
 
-  // Стейты для проверки IMEI
-  const [isCheckingImei, setIsCheckingImei] = useState(false)
-  const [imeiCheckResult, setImeiCheckResult] = useState(null)
-
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [storage, setStorage] = useState('')
@@ -83,27 +79,6 @@ function App() {
     if (genExpData) setGeneralExpenses(genExpData)
   }
 
-  // ФУНКЦИЯ ПРОВЕРКИ IMEI
-  const checkImei = async (imeiToCheck) => {
-    if (!imeiToCheck) return alert('Введите IMEI')
-    setIsCheckingImei(true)
-    setImeiCheckResult(null)
-    haptic('medium')
-
-    try {
-      const { data, error } = await supabase.functions.invoke('imei-check', {
-        body: { imei: imeiToCheck },
-      })
-
-      if (error) throw error
-      setImeiCheckResult(data)
-    } catch (err) {
-      alert('Ошибка при проверке IMEI: ' + err.message)
-    } finally {
-      setIsCheckingImei(false)
-    }
-  }
-
   const addDeal = async (e) => {
     e.preventDefault()
     if (!model || !buyPrice) return alert('Заполните модель и цену')
@@ -115,7 +90,6 @@ function App() {
       }])
     if (!error) { 
       setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId(''); 
-      setImeiCheckResult(null); // Сбрасываем результат проверки
       fetchData(); haptic('medium'); 
     } else { alert('Ошибка: ' + error.message) }
     setLoading(false)
@@ -392,41 +366,6 @@ function App() {
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <input className="input-field" type="text" placeholder="IMEI" value={imei} onChange={(e) => setImei(e.target.value)} style={{ flex: 1, marginBottom: 10 }}/>
             <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px 16px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12 }}>📷</button>
-          </div>
-
-          {/* БЛОК ПРОВЕРКИ IMEI */}
-          <div style={{ marginBottom: 12 }}>
-            <button
-              type="button"
-              onClick={() => checkImei(imei)}
-              disabled={isCheckingImei || !imei}
-              style={{
-                width: '100%', padding: '12px',
-                backgroundColor: '#007aff', color: 'white',
-                border: 'none', borderRadius: 8, fontWeight: 'bold',
-                opacity: (!imei || isCheckingImei) ? 0.5 : 1
-              }}
-            >
-              {isCheckingImei ? 'Проверка...' : '🔍 Проверить IMEI'}
-            </button>
-
-            {imeiCheckResult && (
-              <div style={{ marginTop: 10, padding: 12, backgroundColor: '#f0f2f5', borderRadius: 8 }}>
-                <h4 style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>Результат проверки:</h4>
-                {imeiCheckResult.error || imeiCheckResult.status === 'error' ? (
-                  <p style={{ color: '#ff3b30', margin: 0, fontSize: 13 }}>
-                    {imeiCheckResult.error || imeiCheckResult.message}
-                  </p>
-                ) : (
-                  <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-                    <div><strong>Статус:</strong> {imeiCheckResult.status || 'Успешно'}</div>
-                    {imeiCheckResult.message && typeof imeiCheckResult.message === 'string' && (
-                      <div style={{ marginTop: 5 }}>{imeiCheckResult.message}</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>

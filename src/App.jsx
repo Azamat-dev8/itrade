@@ -584,6 +584,7 @@ function App() {
       <button className="hamburger-btn" onClick={() => { setIsMenuOpen(true); haptic(); }} style={{ position: 'absolute', top: 16, left: 16 }}>☰</button>
 
       {activeTab === 'home' && renderHome()}
+      {activeTab === 'purchase' && renderPurchase()}
       {activeTab === 'stock' && renderStock()}
       {activeTab === 'deals' && renderDeals()}
       {activeTab === 'finance' && renderFinance()}
@@ -934,11 +935,17 @@ function App() {
       
       {showScanner && (<Scanner onScan={(text) => setImei(text)} onClose={() => setShowScanner(false)} />)}
 
-      <div className="tab-bar">
+           <div className="tab-bar">
         <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon">📊</span> Главная</button>
+        
+        <button className={`tab-button ${activeTab === 'purchase' ? 'active' : ''}`} onClick={() => { setActiveTab('purchase'); haptic(); }}><span className="tab-icon">🛒</span> Покупка</button>
+        
         <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => { setActiveTab('stock'); haptic(); }}><span className="tab-icon">📦</span> Склад</button>
+        
         <button className={`tab-button ${activeTab === 'deals' ? 'active' : ''}`} onClick={() => { setActiveTab('deals'); haptic(); }}><span className="tab-icon">💰</span> Сделки</button>
+        
         <button className={`tab-button ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => { setActiveTab('finance'); haptic(); }}><span className="tab-icon">💵</span> Финансы</button>
+        
         <button className={`tab-button ${activeTab === 'contacts' ? 'active' : ''}`} onClick={() => { setActiveTab('contacts'); haptic(); }}><span className="tab-icon">👥</span> Контакты</button>
       </div>
     </div>

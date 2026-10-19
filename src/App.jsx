@@ -20,6 +20,7 @@ function App() {
   const [showScanner, setShowScanner] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showSubModal, setShowSubModal] = useState(false)
+    const [showGuideModal, setShowGuideModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false)
   const [isDarkTheme, setIsDarkTheme] = useState(false)
@@ -493,12 +494,11 @@ function App() {
 
         <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10 }}>
            
-           {/* Оранжевая кнопка подписки */}
            <button 
              onClick={() => { setShowSubModal(true); setIsMenuOpen(false); }}
              style={{
                width: '100%', padding: '16px',
-               background: 'linear-gradient(135deg, #ff9500, #ff3b30)', // Оранжево-красный градиент
+               background: 'linear-gradient(135deg, #ff9500, #ff3b30)',
                color: 'white', border: 'none', borderRadius: '12px',
                fontWeight: 'bold', fontSize: '16px',
                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
@@ -516,6 +516,38 @@ function App() {
                🏆 Рейтинг перекупов
              </button>
            )}
+
+           <button 
+             onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }}
+             style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}
+           >
+             📚 Как пользоваться
+           </button>
+           
+           {/* Кнопка "Пригласи друга" */}
+           <button 
+             onClick={() => {
+               const refLink = `https://t.me/Primetrade8_bot?start=ref_${user?.id}`;
+               const shareText = `Привет! Попробуй iTrade — удобное приложение для учета техники Apple прямо в Telegram 🍏`;
+               window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
+               haptic('medium');
+             }}
+             style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}
+           >
+             🎁 Пригласи друга
+           </button>
+
+           {/* Кнопка "Предложить идею" */}
+           <button 
+             onClick={() => {
+               const feedbackText = `Привет! У меня есть идея по улучшению iTrade: `;
+               window.open(`https://t.me/primestore8?text=${encodeURIComponent(feedbackText)}`, '_blank');
+               haptic('medium');
+             }}
+             style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}
+           >
+             💡 Предложить идею
+           </button>
            
            <button 
              onClick={() => { setShowSettingsModal(true); setIsMenuOpen(false); }}
@@ -524,7 +556,6 @@ function App() {
              ⚙️ Настройки
            </button>
         </div>
-
         <div className="sidebar-footer">
           <div style={{fontSize: 13, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 'bold'}}>Конфиденциальность и поддержка</div>
           <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://telegra.ph/Polzovatelskoe-soglashenie-10-19-40'); }}>Пользовательское соглашение</a>
@@ -554,7 +585,47 @@ function App() {
           <div className="modal-actions"><button className="btn-cancel" onClick={() => setShowSettingsModal(false)}>Закрыть</button></div>
         </div></div>
       )}
+      {showGuideModal && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }}>
+          <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3>📚 Как пользоваться</h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}>
+              <div>
+                <div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>1. Добавление на склад</div>
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>
+                  Перейдите во вкладку «Склад». Введите модель, цену закупа, память и состояние АКБ. Для быстрого ввода IMEI нажмите на оранжевую кнопку с камерой 📷 и наведите на штрихкод коробки.
+                </div>
+              </div>
 
+              <div>
+                <div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>2. Продажа устройства</div>
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>
+                  Когда вы продали телефон, найдите его на вкладке «Склад» и нажмите кнопку «Продать». Введите сумму продажи. Телефон автоматически переедет во вкладку «Сделки», а прибыль пересчитается на главном экране.
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>3. Учет расходов</div>
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>
+                  Если вы потратились на ремонт, такси или запчасти для конкретного телефона, нажмите «+ Расход» на его карточке. Общие траты (аренда, реклама) вносите во вкладке «Финансы».
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>4. Контакты</div>
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>
+                  Записывайте людей, с которыми работаете. Оставляйте заметки («торгуется», «кинул», «скуп»), чтобы в будущем быстрее принимать решения.
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: 25 }}>
+              <button className="btn-confirm" style={{ backgroundColor: 'var(--accent)' }} onClick={() => setShowGuideModal(false)}>Понятно</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showLeaderboardModal && (
         <div className="modal-overlay"><div className="modal-content">
           <h3>🏆 Топ перекупов</h3>

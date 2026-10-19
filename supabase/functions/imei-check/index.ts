@@ -49,7 +49,7 @@ serve(async (req: Request) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: chat_id,
-        text: "💎 *Выберите тариф iTrade PRO:*\n\n" +
+        text: "💎 *Выберите тариф PrimeTrade PRO:*\n\n" +
               "• 1 месяц — 390 ₽\n" +
               "• 6 месяцев — 1990 ₽\n" +
               "• 12 месяцев — 3590 ₽ (выгодно)\n\n" +

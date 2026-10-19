@@ -86,7 +86,12 @@ function App() {
     const tg = window.Telegram?.WebApp
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(type)
   }
-
+  const toggleTheme = () => {
+    const isNowDark = !isDarkTheme;
+    setIsDarkTheme(isNowDark);
+    document.body.classList.toggle('dark-theme', isNowDark);
+    haptic('medium');
+  }
   const fetchData = async () => {
     const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name), buyer:buyer_id(name)').order('created_at', { ascending: false })
     if (dealsData) setDeals(dealsData)
@@ -296,7 +301,23 @@ function App() {
 
   const renderHome = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20 }}>Дашборд</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h2 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Дашборд</h2>
+        <button 
+          onClick={toggleTheme} 
+          style={{ 
+            background: 'var(--card-bg)', 
+            border: '1px solid var(--border)', 
+            borderRadius: '50%', 
+            width: 40, height: 40, 
+            fontSize: 18, 
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+          }}
+        >
+          {isDarkTheme ? '☀️' : '🌙'}
+        </button>
+      </div>
       
       <div className="main-profit-card">
         <h3>Чистая прибыль</h3>

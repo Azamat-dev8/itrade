@@ -338,44 +338,54 @@ function App() {
   const renderHome = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
+      
+      {/* 1. СИНИЙ БЛОК ЧИСТАЯ ПРИБЫЛЬ */}
       <div className="main-profit-card">
         <h3>Чистая прибыль</h3>
-        <div className="main-profit-value">{totalProfit} ₽</div>
+        <div className="main-profit-value" style={{ fontSize: totalProfit > 999999 ? 28 : 38 }}>
+          {totalProfit.toLocaleString('ru-RU')} ₽
+        </div>
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>
-          <div className="stat-row"><span>Выручка:</span> <span>{totalRevenue} ₽</span></div>
-          <div className="stat-row"><span>Закупки:</span> <span>{totalBuy} ₽</span></div>
-          <div className="stat-row" style={{ marginBottom: 0 }}><span>Расходы:</span> <span>{totalDealExp + totalGenExp} ₽</span></div>
+          <div className="stat-row"><span>Выручка:</span> <span>{totalRevenue.toLocaleString('ru-RU')} ₽</span></div>
+          <div className="stat-row"><span>Закупки:</span> <span>{totalBuy.toLocaleString('ru-RU')} ₽</span></div>
+          <div className="stat-row" style={{ marginBottom: 0 }}><span>Расходы:</span> <span>{(totalDealExp + totalGenExp).toLocaleString('ru-RU')} ₽</span></div>
         </div>
       </div>
+
+      {/* 2. НОВАЯ ГОРИЗОНТАЛЬНАЯ КНОПКА ОЧИСТКИ */}
+      <button 
+        onClick={clearAllData}
+        disabled={loading}
+        style={{
+          width: '100%',
+          padding: '12px',
+          marginBottom: '16px', // Отступ снизу, чтобы не прилипала к следующей карточке
+          backgroundColor: 'var(--card-bg)',
+          color: 'var(--danger)',
+          border: '1px solid var(--danger)',
+          borderRadius: '12px',
+          fontWeight: 'bold',
+          fontSize: '14px',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+        }}
+      >
+        🗑️ Очистить статистику
+      </button>
+
+      {/* 3. КАРТОЧКА СКЛАД И ЭКСПОРТ */}
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div><h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3><div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.length} шт.</div></div>
+        <div>
+          <h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3>
+          <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.length} шт.</div>
+        </div>
         <button className="btn-success" onClick={exportToCSV} style={{ padding: '12px 16px' }}>📥 Экспорт</button>
-              <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--danger)' }}>Управление данными</h3>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 5 }}>
-          Полностью удалить всю историю продаж, расходов и контактов.
-        </p>
-        <button 
-          onClick={clearAllData}
-          disabled={loading}
-          style={{
-            width: '100%',
-            padding: '14px',
-            backgroundColor: 'transparent',
-            color: 'var(--danger)',
-            border: '1px solid var(--danger)',
-            borderRadius: '12px',
-            fontWeight: 'bold',
-            fontSize: '16px',
-            marginTop: '10px'
-          }}
-        >
-          🗑️ Очистить статистику
-        </button>
-      </div>
       </div>
       
-      {/* ОБНОВЛЕННЫЙ ГРАФИК */}
+      {/* 4. ГРАФИК */}
       {chartData.length > 0 && (
         <div className="card">
           <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Прибыль по месяцам</h3>
@@ -383,22 +393,15 @@ function App() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
-                
-                {/* Убрали YAxis, так как цифры теперь на самих столбцах */}
-                
                 <Tooltip 
                   cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} 
                   contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} 
                   formatter={(value) => [`${value.toLocaleString('ru-RU')} ₽`, 'Прибыль']}
                 />
-                
-                {/* maxBarSize делает столбцы узкими */}
                 <Bar dataKey="profit" maxBarSize={45} radius={[6, 6, 0, 0]}>
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} />
                   ))}
-                  
-                  {/* LabelList выводит белый жирный шрифт прямо внутри столбца */}
                   <LabelList 
                     dataKey="profit" 
                     position="center" 

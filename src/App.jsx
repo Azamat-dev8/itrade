@@ -31,7 +31,7 @@ const DEVICE_CATALOG = {
   ]
 };
 
-const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут" // <-- ЗАМЕНИ НА СВОЙ КАНАЛ
+const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут"
 
 function App() {
   const [user, setUser] = useState(null)
@@ -43,14 +43,12 @@ function App() {
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
   
-  // Умный поиск
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
   const [modelCategory, setModelCategory] = useState('iPhone')
-  const [pickerMode, setPickerMode] = useState('purchase') // 'purchase', 'stock', 'deals'
-  const [filterModels, setFilterModels] = useState([]) // Мульти-выбор
+  const [pickerMode, setPickerMode] = useState('purchase')
+  const [filterModels, setFilterModels] = useState([])
 
-  // Состояния интерфейса
   const [showExportModal, setShowExportModal] = useState(false)
   const [csvData, setCsvData] = useState('')
   const [showScanner, setShowScanner] = useState(false)
@@ -63,7 +61,6 @@ function App() {
   const [isLeaderboardJoined, setIsLeaderboardJoined] = useState(false)
   const [showSuccessMsg, setShowSuccessMsg] = useState(false)
 
-  // Поля для сделки
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [storage, setStorage] = useState('')
@@ -71,7 +68,6 @@ function App() {
   const [imei, setImei] = useState('')
   const [sellerId, setSellerId] = useState('')
   
-  // Поля для контакта
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactNote, setContactNote] = useState('')
@@ -80,7 +76,6 @@ function App() {
   const [editContactPhone, setEditContactPhone] = useState('')
   const [editContactNote, setEditContactNote] = useState('')
 
-  // Поля для расходов
   const [genExpAmount, setGenExpAmount] = useState('')
   const [genExpCategory, setGenExpCategory] = useState('Реклама/Авито')
   const [genExpNote, setGenExpNote] = useState('')
@@ -88,7 +83,6 @@ function App() {
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('Ремонт')
 
-  // Продажа и редактирование
   const [sellingDeal, setSellingDeal] = useState(null)
   const [sellPrice, setSellPrice] = useState('')
   const [buyerId, setBuyerId] = useState('')
@@ -97,8 +91,6 @@ function App() {
   const [editingDeal, setEditingDeal] = useState(null)
   const [editModel, setEditModel] = useState('')
   const [editBuyPrice, setEditBuyPrice] = useState('')
-  const [editStorage, setEditStorage] = useState('')
-  const [editBattery, setEditBattery] = useState('')
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
@@ -116,12 +108,7 @@ function App() {
   }, [])
 
   useEffect(() => { if (user) fetchData() }, [user])
-  
-  // Сбрасываем фильтры при смене вкладки
-  useEffect(() => { 
-    setSearchQuery(''); 
-    setFilterModels([]); 
-  }, [activeTab])
+  useEffect(() => { setSearchQuery(''); setFilterModels([]); }, [activeTab])
 
   const haptic = (type = 'light') => {
     const tg = window.Telegram?.WebApp
@@ -217,9 +204,8 @@ function App() {
   const confirmExpense = async () => { if (!expenseAmount || !user) return; await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount: Number(expenseAmount), category: expenseCategory, user_id: user.id }]); setExpenseDeal(null); fetchData(); }
   const saveEditContact = async () => { if (!editContactName) return; await supabase.from('contacts').update({ name: editContactName, phone: editContactPhone, note: editContactNote }).eq('id', editingContact.id); setEditingContact(null); fetchData(); }
   const deleteContact = async (id) => { if (!window.confirm('Удалить контакт?')) return; await supabase.from('contacts').delete().eq('id', id); fetchData(); }
-  const saveEdit = async () => { if (!editModel || !editBuyPrice) return; await supabase.from('deals').update({ model: editModel, buy_price: Number(editBuyPrice), storage_gb: editStorage ? Number(editStorage) : null, battery_health: editBattery ? Number(editBattery) : null }).eq('id', editingDeal.id); setEditingDeal(null); fetchData(); }
+  const saveEdit = async () => { if (!editModel || !editBuyPrice) return; await supabase.from('deals').update({ model: editModel, buy_price: Number(editBuyPrice) }).eq('id', editingDeal.id); setEditingDeal(null); fetchData(); }
 
-  // ЛОГИКА ВЫБОРА МОДЕЛИ
   const handleModelSelect = (modelName) => {
     haptic();
     if (pickerMode === 'purchase') {
@@ -228,9 +214,7 @@ function App() {
       setModelSearch('');
     } else {
       setFilterModels(prev => 
-        prev.includes(modelName) 
-          ? prev.filter(m => m !== modelName) 
-          : [...prev, modelName]
+        prev.includes(modelName) ? prev.filter(m => m !== modelName) : [...prev, modelName]
       );
     }
   }
@@ -240,29 +224,27 @@ function App() {
     setFilterModels(prev => prev.filter(m => m !== modelName));
   }
 
-  // СТАТИСТИКА
   const soldDeals = deals.filter(d => d.status === 'sold')
   const inStockDeals = deals.filter(d => d.status === 'in_stock')
-  const totalBuy = deals.reduce((sum, deal) => sum + deal.buy_price, 0)
-  const totalDealExp = deals.reduce((sum, deal) => sum + (deal.expenses || []).reduce((s, e) => s + e.amount, 0), 0)
-  const totalGenExp = generalExpenses.reduce((sum, exp) => sum + exp.amount, 0)
-  const totalRevenue = soldDeals.reduce((sum, deal) => sum + deal.sell_price, 0)
+  const totalBuy = deals.reduce((sum, deal) => sum + (Number(deal.buy_price) || 0), 0)
+  const totalDealExp = deals.reduce((sum, deal) => sum + (deal.expenses || []).reduce((s, e) => s + (Number(e.amount) || 0), 0), 0)
+  const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0)
+  const totalRevenue = soldDeals.reduce((sum, deal) => sum + (Number(deal.sell_price) || 0), 0)
   const totalProfit = totalRevenue - totalBuy - totalDealExp - totalGenExp
-  const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + e.amount, 0);
+  const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   const monthlyProfits = soldDeals.reduce((acc, deal) => {
-    const date = new Date(deal.sold_at || deal.created_at);
+    const date = new Date(deal.sold_at || deal.created_at || Date.now());
     const monthYear = date.toLocaleString('ru-RU', { month: 'short', year: '2-digit' });
-    const profit = deal.sell_price - deal.buy_price - getDealExpensesSum(deal);
+    const profit = (Number(deal.sell_price) || 0) - (Number(deal.buy_price) || 0) - getDealExpensesSum(deal);
     if (!acc[monthYear]) acc[monthYear] = 0; acc[monthYear] += profit; return acc;
   }, {});
   const chartData = Object.entries(monthlyProfits).map(([name, profit]) => ({ name, profit })).reverse();
 
-  // ФИЛЬТРАЦИЯ (МУЛЬТИ-ВЫБОР)
   const filterDealsByQuery = (list) => {
     return list.filter(deal => {
       const matchesModel = filterModels.length > 0 ? filterModels.includes(deal.model) : true;
-      const matchesSearch = searchQuery ? (deal.model.toLowerCase().includes(searchQuery.toLowerCase()) || (deal.imei && deal.imei.includes(searchQuery))) : true;
+      const matchesSearch = searchQuery ? (String(deal.model || '').toLowerCase().includes(searchQuery.toLowerCase()) || (deal.imei && String(deal.imei).includes(searchQuery))) : true;
       return matchesModel && matchesSearch;
     })
   }
@@ -270,21 +252,18 @@ function App() {
   const filteredSold = filterDealsByQuery(soldDeals);
 
   const getDaysOnStock = (deal) => {
-    const start = new Date(deal.created_at);
+    const start = new Date(deal.created_at || Date.now());
     const end = (deal.status === 'sold' && deal.sold_at) ? new Date(deal.sold_at) : new Date();
     return Math.floor(Math.abs(end - start) / (1000 * 60 * 60 * 24));
   }
 
   const getWarrantyBadge = (deal) => {
     if (!deal.warranty_months || deal.warranty_months === 0) return null;
-    const end = new Date(deal.sold_at);
-    end.setMonth(end.getMonth() + deal.warranty_months);
+    const end = new Date(deal.sold_at || Date.now());
+    end.setMonth(end.getMonth() + Number(deal.warranty_months));
     const now = new Date();
     const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-
-    if (daysLeft > 0) {
-      return <span className="badge badge-green" style={{marginTop: 6, display: 'inline-block'}}>🛡️ Гарантия до {end.toLocaleDateString('ru-RU')} ({daysLeft} дн.)</span>
-    }
+    if (daysLeft > 0) return <span className="badge badge-green" style={{marginTop: 6, display: 'inline-block'}}>🛡️ Гарантия до {end.toLocaleDateString('ru-RU')} ({daysLeft} дн.)</span>
     return <span className="badge badge-red" style={{marginTop: 6, display: 'inline-block'}}>🛡️ Гарантия истекла {end.toLocaleDateString('ru-RU')}</span>
   }
 
@@ -293,21 +272,20 @@ function App() {
       {getDaysOnStock(deal) > 0 && <span className={`badge ${deal.status === 'sold' ? 'badge-gray' : 'badge-green'}`}>⏱ {getDaysOnStock(deal)} дн.</span>}
       {deal.storage_gb && <span className="badge badge-gray">{deal.storage_gb >= 1024 ? `${deal.storage_gb / 1024} TB` : `${deal.storage_gb} GB`}</span>}
       {deal.battery_health && <span className="badge badge-gray">🔋 {deal.battery_health}%</span>}
-      {deal.imei && <span className="badge badge-gray">IMEI: ...{deal.imei.slice(-4)}</span>}
+      {deal.imei && <span className="badge badge-gray">IMEI: ...{String(deal.imei).slice(-4)}</span>}
     </div>
   )
 
-  // --- ЭКРАНЫ ---
   const renderHome = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
       <div className="main-profit-card">
         <h3>Чистая прибыль</h3>
-        <div className="main-profit-value" style={{ fontSize: totalProfit > 999999 ? 28 : 38 }}>{totalProfit.toLocaleString('ru-RU')} ₽</div>
+        <div className="main-profit-value" style={{ fontSize: totalProfit > 999999 ? 28 : 38 }}>{(totalProfit || 0).toLocaleString('ru-RU')} ₽</div>
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>
-          <div className="stat-row"><span>Выручка:</span> <span>{totalRevenue.toLocaleString('ru-RU')} ₽</span></div>
-          <div className="stat-row"><span>Закупки:</span> <span>{totalBuy.toLocaleString('ru-RU')} ₽</span></div>
-          <div className="stat-row" style={{ marginBottom: 0 }}><span>Расходы:</span> <span>{(totalDealExp + totalGenExp).toLocaleString('ru-RU')} ₽</span></div>
+          <div className="stat-row"><span>Выручка:</span> <span>{(totalRevenue || 0).toLocaleString('ru-RU')} ₽</span></div>
+          <div className="stat-row"><span>Закупки:</span> <span>{(totalBuy || 0).toLocaleString('ru-RU')} ₽</span></div>
+          <div className="stat-row" style={{ marginBottom: 0 }}><span>Расходы:</span> <span>{((totalDealExp + totalGenExp) || 0).toLocaleString('ru-RU')} ₽</span></div>
         </div>
       </div>
 
@@ -327,7 +305,7 @@ function App() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
-                <Tooltip cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} formatter={(value) => [`${value.toLocaleString('ru-RU')} ₽`, 'Прибыль']} />
+                <Tooltip cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} formatter={(value) => [`${(value || 0).toLocaleString('ru-RU')} ₽`, 'Прибыль']} />
                 <Bar dataKey="profit" maxBarSize={45} radius={[6, 6, 0, 0]}>
                   {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} />)}
                   <LabelList dataKey="profit" position="center" fill="#ffffff" style={{ fontWeight: 'bold', fontSize: 13, textShadow: '0 1px 2px rgba(0,0,0,0.4)' }} formatter={(value) => { if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'; if (value >= 1000) return (value / 1000).toFixed(0) + 'k'; return value; }} />
@@ -346,15 +324,8 @@ function App() {
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить устройство</h3>
         <form onSubmit={addDeal}>
-          
-          <div 
-            className="input-field" 
-            onClick={() => { setPickerMode('purchase'); setShowModelPicker(true); haptic(); }}
-            style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-          >
-            <span style={{ color: model ? 'var(--text-main)' : 'var(--text-muted)' }}>
-              {model || 'Выберите модель устройства...'}
-            </span>
+          <div className="input-field" onClick={() => { setPickerMode('purchase'); setShowModelPicker(true); haptic(); }} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: model ? 'var(--text-main)' : 'var(--text-muted)' }}>{model || 'Выберите модель устройства...'}</span>
             <span style={{ opacity: 0.5 }}>▼</span>
           </div>
 
@@ -403,9 +374,7 @@ function App() {
               <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
             </div>
             <button className="input-field" style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }} onClick={() => { setPickerMode('stock'); setShowModelPicker(true); haptic(); }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModels.length > 0 ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                {filterModels.length > 0 ? `Выбрано: ${filterModels.length}` : 'Все модели'}
-              </span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModels.length > 0 ? 'var(--text-main)' : 'var(--text-muted)' }}>{filterModels.length > 0 ? `Выбрано: ${filterModels.length}` : 'Все модели'}</span>
               <span style={{ opacity: 0.5 }}>▼</span>
             </button>
           </div>
@@ -423,10 +392,10 @@ function App() {
       )}
       {filteredStock.map((deal) => (
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
-            <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model); setEditBuyPrice(deal.buy_price);}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
+            <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model || 'Без названия'}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
             {renderSpecs(deal)}
-            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>Закуп: {deal.buy_price.toLocaleString('ru-RU')} ₽ {getDealExpensesSum(deal) > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {getDealExpensesSum(deal).toLocaleString('ru-RU')} ₽</span>}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Дата закупа: {new Date(deal.created_at).toLocaleDateString('ru-RU')}</div>
+            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>Закуп: {(Number(deal.buy_price) || 0).toLocaleString('ru-RU')} ₽ {getDealExpensesSum(deal) > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {getDealExpensesSum(deal).toLocaleString('ru-RU')} ₽</span>}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Дата закупа: {new Date(deal.created_at || Date.now()).toLocaleDateString('ru-RU')}</div>
             <div style={{ display: 'flex', gap: 10, marginTop: 14 }}><button className="btn-cancel" style={{ padding: '12px' }} onClick={() => {setExpenseDeal(deal); setExpenseAmount('');}}>+ Расход</button><button className="btn-success" style={{ flex: 1, padding: '12px' }} onClick={() => {setSellingDeal(deal); setSellPrice(''); setSellWarranty('0');}}>Продать</button></div>
           </div>
       ))}
@@ -444,9 +413,7 @@ function App() {
               <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
             </div>
             <button className="input-field" style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }} onClick={() => { setPickerMode('deals'); setShowModelPicker(true); haptic(); }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModels.length > 0 ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                {filterModels.length > 0 ? `Выбрано: ${filterModels.length}` : 'Все модели'}
-              </span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModels.length > 0 ? 'var(--text-main)' : 'var(--text-muted)' }}>{filterModels.length > 0 ? `Выбрано: ${filterModels.length}` : 'Все модели'}</span>
               <span style={{ opacity: 0.5 }}>▼</span>
             </button>
           </div>
@@ -463,14 +430,14 @@ function App() {
         </div>
       )}
       {filteredSold.map((deal) => {
-        const margin = deal.sell_price - deal.buy_price - getDealExpensesSum(deal); 
+        const margin = (Number(deal.sell_price) || 0) - (Number(deal.buy_price) || 0) - getDealExpensesSum(deal); 
         return (
           <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--success)' }}>
-            <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model); setEditBuyPrice(deal.buy_price);}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
+            <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model || 'Без названия'}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
             {renderSpecs(deal)}
             <div style={{ marginBottom: 10 }}>{getWarrantyBadge(deal)}</div>
-            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500 }}>Закуп: {deal.buy_price.toLocaleString('ru-RU')} ₽ | Продажа: {deal.sell_price.toLocaleString('ru-RU')} ₽</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Куплен: {new Date(deal.created_at).toLocaleDateString('ru-RU')} • Продан: {deal.sold_at ? new Date(deal.sold_at).toLocaleDateString('ru-RU') : '-'}</div>
+            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500 }}>Закуп: {(Number(deal.buy_price) || 0).toLocaleString('ru-RU')} ₽ | Продажа: {(Number(deal.sell_price) || 0).toLocaleString('ru-RU')} ₽</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Куплен: {new Date(deal.created_at || Date.now()).toLocaleDateString('ru-RU')} • Продан: {deal.sold_at ? new Date(deal.sold_at).toLocaleDateString('ru-RU') : '-'}</div>
             {deal.expenses && deal.expenses.length > 0 && <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6 }}>{deal.expenses.map(e => `${e.category}: ${e.amount}₽`).join(' • ')}</div>}
             <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10 }}>Чистая прибыль: {margin.toLocaleString('ru-RU')} ₽</div>
           </div>
@@ -483,7 +450,7 @@ function App() {
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Финансы</h2>
       <div className="card"><form onSubmit={addGeneralExpense}><input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={genExpAmount} onChange={(e) => setGenExpAmount(e.target.value.replace(/[^\d]/g, ''))}/><select className="input-field" value={genExpCategory} onChange={(e) => setGenExpCategory(e.target.value)}><option value="Реклама/Авито">Реклама/Авито</option><option value="Аренда">Аренда</option><option value="Прочее">Прочее</option></select><button className="btn-primary" type="submit" style={{backgroundColor: 'var(--danger)'}}>Добавить</button></form></div>
-      {generalExpenses.map(exp => (<div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8 }}><div><div style={{ fontWeight: 600 }}>{exp.category}</div></div><div style={{ fontWeight: 700, color: 'var(--danger)' }}>-{exp.amount.toLocaleString('ru-RU')} ₽</div></div>))}
+      {generalExpenses.map(exp => (<div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8 }}><div><div style={{ fontWeight: 600 }}>{exp.category}</div></div><div style={{ fontWeight: 700, color: 'var(--danger)' }}>-{(Number(exp.amount) || 0).toLocaleString('ru-RU')} ₽</div></div>))}
     </div>
   )
 
@@ -491,7 +458,7 @@ function App() {
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Контакты</h2>
       <div className="card"><form onSubmit={addContact}><input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/><input className="input-field" type="text" placeholder="Телефон" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}/><input className="input-field" type="text" placeholder="Комментарий" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/><button className="btn-primary" type="submit">Сохранить</button></form></div>
-      {contacts.map((c) => (<div key={c.id} className="card" style={{ padding: 16 }}><div className="card-header"><div style={{ fontWeight: 600, fontSize: 16 }}>{c.name}</div><div><button className="icon-btn" onClick={() => {setEditingContact(c); setEditContactName(c.name); setEditContactPhone(c.phone || ''); setEditContactNote(c.note || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button></div></div>{c.phone && <div style={{ color: 'var(--accent)', marginTop: 4 }}>📞 {c.phone}</div>}{c.note && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}<div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>Добавлен: {new Date(c.created_at).toLocaleDateString('ru-RU')}</div></div>))}
+      {contacts.map((c) => (<div key={c.id} className="card" style={{ padding: 16 }}><div className="card-header"><div style={{ fontWeight: 600, fontSize: 16 }}>{c.name || 'Без имени'}</div><div><button className="icon-btn" onClick={() => {setEditingContact(c); setEditContactName(c.name || ''); setEditContactPhone(c.phone || ''); setEditContactNote(c.note || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button></div></div>{c.phone && <div style={{ color: 'var(--accent)', marginTop: 4 }}>📞 {c.phone}</div>}{c.note && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}<div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>Добавлен: {new Date(c.created_at || Date.now()).toLocaleDateString('ru-RU')}</div></div>))}
     </div>
   )
 
@@ -518,7 +485,7 @@ function App() {
            <button onClick={() => { openExternalLink(MY_CHANNEL_URL); haptic('medium'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🛍 Мой канал</button>
            {isLeaderboardJoined && <button onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🏆 Рейтинг перекупов</button>}
            <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>
-           <button onClick={() => { const refLink = `https://t.me/Primetrade8_bot?start=ref_${user?.id}`; window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent('Попробуй iTrade!')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🎁 Пригласи друга</button>
+           <button onClick={() => { const refLink = `https://t.me/Primetrade8_bot?start=ref_${user?.id || ''}`; window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent('Попробуй iTrade!')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🎁 Пригласи друга</button>
            <button onClick={() => { window.open(`https://t.me/primestore8?text=${encodeURIComponent('Привет! Идея: ')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>💡 Предложить идею</button>
            <button onClick={() => { setShowSettingsModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>⚙️ Настройки</button>
         </div>
@@ -530,13 +497,11 @@ function App() {
           <a href="#" className="footer-link" onClick={(e) => { e.preventDefault(); openExternalLink('https://t.me/primestore8'); }} style={{ color: 'var(--accent)' }}>Служба поддержки: @primestore8</a>
         </div>
       </div>
-// update
+
       {showModelPicker && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ marginTop: 0 }}>
-              {pickerMode === 'purchase' ? 'Выберите устройство' : 'Выберите модели (можно несколько)'}
-            </h3>
+            <h3 style={{ marginTop: 0 }}>{pickerMode === 'purchase' ? 'Выберите устройство' : 'Выберите модели (можно несколько)'}</h3>
             
             <input className="input-field" type="text" placeholder="Поиск (например, 15 pro)..." value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} style={{ marginBottom: 10 }}/>
             
@@ -549,9 +514,7 @@ function App() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {DEVICE_CATALOG[modelCategory]
-                .filter(m => m.toLowerCase().includes(modelSearch.toLowerCase()))
-                .map(m => {
+              {(DEVICE_CATALOG[modelCategory] || []).filter(m => String(m).toLowerCase().includes(modelSearch.toLowerCase())).map(m => {
                   const isSelected = pickerMode !== 'purchase' && filterModels.includes(m);
                   return (
                     <div key={m} onClick={() => handleModelSelect(m)} style={{ padding: '12px 16px', backgroundColor: isSelected ? 'var(--accent)' : 'var(--bg-color)', color: isSelected ? 'white' : 'var(--text-main)', borderRadius: 10, cursor: 'pointer', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -575,7 +538,7 @@ function App() {
       {sellingDeal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h3>Продажа: {sellingDeal.model}</h3>
+            <h3>Продажа: {sellingDeal.model || 'Устройство'}</h3>
             <input className="input-field" type="text" inputMode="numeric" placeholder="Цена (₽)" value={sellPrice} onChange={(e) => setSellPrice(e.target.value.replace(/[^\d]/g, ''))} autoFocus/>
             <select className="input-field" value={buyerId} onChange={(e) => setBuyerId(e.target.value)}><option value="">Кто купил?</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
             
@@ -603,7 +566,7 @@ function App() {
       )}
       
       {showLeaderboardModal && (
-        <div className="modal-overlay"><div className="modal-content"><h3>🏆 Топ перекупов</h3>{leaderboard.map((lb, idx) => (<div key={lb.user_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><span style={{ fontSize: 18 }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx+1}.`}</span><span style={{ fontWeight: 600 }}>{lb.user_name} {lb.user_id === user.id ? '(Вы)' : ''}</span></div><span style={{ fontWeight: 'bold', color: 'var(--success)' }}>{lb.gross_profit.toLocaleString('ru-RU')} ₽</span></div>))}<div className="modal-actions"><button className="btn-cancel" onClick={() => setShowLeaderboardModal(false)}>Закрыть</button></div></div></div>
+        <div className="modal-overlay"><div className="modal-content"><h3>🏆 Топ перекупов</h3>{leaderboard.map((lb, idx) => (<div key={lb.user_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><span style={{ fontSize: 18 }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx+1}.`}</span><span style={{ fontWeight: 600 }}>{lb.user_name} {lb.user_id === user?.id ? '(Вы)' : ''}</span></div><span style={{ fontWeight: 'bold', color: 'var(--success)' }}>{(Number(lb.gross_profit) || 0).toLocaleString('ru-RU')} ₽</span></div>))}<div className="modal-actions"><button className="btn-cancel" onClick={() => setShowLeaderboardModal(false)}>Закрыть</button></div></div></div>
       )}
       
       {showSubModal && (
@@ -614,7 +577,7 @@ function App() {
         <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}><button onClick={() => setShowGuideModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: '#00000088', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 16 }}>✕</button><h3 style={{ paddingRight: 30 }}>📚 Как пользоваться</h3><div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>1. Добавление на склад</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Перейдите во вкладку «Покупка». Выберите модель, цену, память и АКБ. IMEI можно отсканировать камерой.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>2. Продажа устройства</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>На вкладке «Склад» нажмите «Продать». Укажите цену и срок гарантии. Телефон переедет в «Сделки».</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>3. Учет расходов</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Нажмите «+ Расход» на карточке телефона для учета ремонта. Общие траты вносите в «Финансах».</div></div></div><div style={{ marginTop: 25 }}><button className="btn-primary" style={{ backgroundColor: 'var(--accent)', width: '100%', padding: '16px' }} onClick={() => setShowGuideModal(false)}>Понятно</button></div></div></div>
       )}
 
-      {expenseDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Расход: {expenseDeal.model}</h3><input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value.replace(/[^\d]/g, ''))} autoFocus/><select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmExpense}>Добавить</button></div></div></div>)}
+      {expenseDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Расход: {expenseDeal.model || 'Устройство'}</h3><input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value.replace(/[^\d]/g, ''))} autoFocus/><select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmExpense}>Добавить</button></div></div></div>)}
       
       {editingDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать</h3><input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/><input className="input-field" type="text" inputMode="numeric" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value.replace(/[^\d]/g, ''))}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={saveEdit}>Сохранить</button></div></div></div>)}
       

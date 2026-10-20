@@ -1578,13 +1578,10 @@ function App() {
                             <button 
                 className="btn-primary" 
                 disabled={isProcessingPayment}
-                                                   onClick={async () => {
+                 onClick={async () => {
                   haptic('heavy');
                   setIsProcessingPayment(true);
                   
-                  // 1. Открываем пустую вкладку СРАЗУ (чтобы браузер не блокировал)
-                  const newWindow = window.open('', '_blank');
-
                   try {
                     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
                     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -1610,20 +1607,22 @@ function App() {
                     const data = await response.json();
                     
                     if (data?.redirect) {
-                      // 2. Перенаправляем нашу открытую вкладку на ссылку оплаты
-                      if (newWindow) {
-                        newWindow.location.href = data.redirect;
-                      } else if (window.Telegram?.WebApp?.openLink) {
+                      // Если мы в Telegram, используем нативный метод (он самый лучший)
+                      if (window.Telegram?.WebApp?.openLink) {
                         window.Telegram.WebApp.openLink(data.redirect);
                       } else {
-                        alert('Не удалось открыть окно. Ссылка: ' + data.redirect);
+                        // Если в браузере, создаем ссылку и "кликаем" по ней
+                        const a = document.createElement('a');
+                        a.href = data.redirect;
+                        a.target = '_blank';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
                       }
                     } else {
-                      if (newWindow) newWindow.close();
                       alert('Сервер не вернул ссылку на оплату');
                     }
                   } catch (err) {
-                    if (newWindow) newWindow.close();
                     alert('Ошибка: ' + err.message);
                   } finally {
                     setIsProcessingPayment(false);

@@ -31,7 +31,7 @@ const DEVICE_CATALOG = {
   ]
 };
 
-const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут" // <-- ЗАМЕНИ НА СВОЙ КАНАЛ
+const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут"
 
 function App() {
   const [user, setUser] = useState(null)
@@ -65,7 +65,7 @@ function App() {
   const [showChart, setShowChart] = useState(true)
   const [dailySummary, setDailySummary] = useState(false)
   
-  const [budget, setBudget] = useState(100000)
+  const [budget, setBudget] = useState(0)
   const [showBudgetModal, setShowBudgetModal] = useState(false)
   const [tempBudget, setTempBudget] = useState('')
 
@@ -87,7 +87,8 @@ function App() {
   const [editContactNote, setEditContactNote] = useState('')
 
   const [genExpAmount, setGenExpAmount] = useState('')
-  const [genExpCategory, setGenExpCategory] = useState('Реклама/Авито')
+  const [genExpCategory, setGenExpCategory] = useState('Авито')
+  const [customGenExpCategory, setCustomGenExpCategory] = useState('')
   const [genExpNote, setGenExpNote] = useState('')
   const [expenseDeal, setExpenseDeal] = useState(null)
   const [expenseAmount, setExpenseAmount] = useState('')
@@ -163,9 +164,9 @@ function App() {
       setHideAmounts(profileInfo.hide_amounts || false)
       setShowChart(profileInfo.show_chart !== false)
       setDailySummary(profileInfo.daily_summary || false)
-      setBudget(Number(profileInfo.resale_budget) || 100000)
+      setBudget(Number(profileInfo.resale_budget) || 0) // Если 0, значит не задан
     } else {
-      const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 100000 }
+      const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 }
       await supabase.from('user_profiles').insert([newProf])
       setProfileData(newProf)
       setDisplayName(newProf.display_name)
@@ -207,10 +208,21 @@ function App() {
     setShowBudgetModal(false);
   }
 
+  const clearAllData = async () => {
+    if (!window.confirm('ВНИМАНИЕ! Это удалит ВСЕ ваши сделки, контакты и расходы. Продолжить?')) return;
+    setLoading(true);
+    try {
+      await supabase.from('deals').delete().eq('user_id', user.id);
+      await supabase.from('expenses').delete().eq('user_id', user.id);
+      await supabase.from('contacts').delete().eq('user_id', user.id);
+      fetchData(); haptic('heavy');
+    } catch (error) { alert('Ошибка: ' + error.message); } 
+    finally { setLoading(false); }
+  };
+
   const handleResetAccount = async () => {
-    if (!window.confirm('ВНИМАНИЕ! Это удалит ВСЕ ваши сделки, контакты, расходы и настройки. Вы уверены?')) return;
+    if (!window.confirm('ВНИМАНИЕ! Это удалит ВСЕ ваши данные И профиль. Вы уверены?')) return;
     if (!window.confirm('Точно уверены? Это действие нельзя отменить.')) return;
-    
     setLoading(true);
     try {
       await supabase.from('deals').delete().eq('user_id', user.id);
@@ -270,7 +282,15 @@ function App() {
     setCsvData([headers.join(';'), ...rows].join('\n')); setShowExportModal(true);
   }
 
-  const addGeneralExpense = async (e) => { e.preventDefault(); if (!genExpAmount || !user) return; await supabase.from('expenses').insert([{ amount: Number(genExpAmount), category: genExpCategory, note: genExpNote || null, user_id: user.id }]); setGenExpAmount(''); setGenExpNote(''); fetchData(); }
+  const addGeneralExpense = async (e) => {
+    e.preventDefault();
+    if (!genExpAmount || !user) return;
+    const finalCategory = genExpCategory === 'Свой вариант' ? (customGenExpCategory || 'Другое') : genExpCategory;
+    await supabase.from('expenses').insert([{ amount: Number(genExpAmount), category: finalCategory, note: genExpNote || null, user_id: user.id }]);
+    setGenExpAmount(''); setGenExpNote(''); setCustomGenExpCategory(''); setGenExpCategory('Авито');
+    fetchData(); haptic('medium');
+  }
+
   const addContact = async (e) => { e.preventDefault(); if (!contactName || !user) return; await supabase.from('contacts').insert([{ name: contactName, phone: contactPhone, note: contactNote, user_id: user.id }]); setContactName(''); setContactPhone(''); setContactNote(''); fetchData(); }
   const deleteDeal = async (id) => { if (!window.confirm('Удалить устройство?')) return; await supabase.from('deals').delete().eq('id', id); fetchData(); }
   const confirmExpense = async () => { if (!expenseAmount || !user) return; await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount: Number(expenseAmount), category: expenseCategory, user_id: user.id }]); setExpenseDeal(null); fetchData(); }
@@ -291,27 +311,21 @@ function App() {
     return (Number(amount) || 0).toLocaleString('ru-RU') + ' ₽';
   }
 
-  // ВАЖНО: Функция объявлена до использования
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   // --- МАТЕМАТИКА ---
   const soldDeals = deals.filter(d => d.status === 'sold')
   const inStockDeals = deals.filter(d => d.status === 'in_stock')
   
-  // 1. Замороженные средства (вложено в товар на складе)
   const totalInvestedInStock = inStockDeals.reduce((sum, deal) => sum + (Number(deal.buy_price) || 0) + getDealExpensesSum(deal), 0)
-  
-  // 2. Свободные деньги (Бюджет минус замороженные)
   const freeCash = budget - totalInvestedInStock
 
-  // 3. РЕАЛИЗОВАННАЯ ПРИБЫЛЬ (только с продаж, без общих расходов)
   const totalRevenue = soldDeals.reduce((sum, deal) => sum + (Number(deal.sell_price) || 0), 0)
   const totalBuySold = soldDeals.reduce((sum, deal) => sum + (Number(deal.buy_price) || 0), 0)
   const totalExpSold = soldDeals.reduce((sum, deal) => sum + getDealExpensesSum(deal), 0)
   
   const realizedProfit = totalRevenue - totalBuySold - totalExpSold;
 
-  // 4. НОВАЯ СТАТИСТИКА ДЛЯ КАРТОЧКИ
   const avgProfit = soldDeals.length > 0 ? realizedProfit / soldDeals.length : 0;
   const inStockExpenses = inStockDeals.reduce((sum, deal) => sum + getDealExpensesSum(deal), 0);
   const marginPercent = totalRevenue > 0 ? (realizedProfit / totalRevenue) * 100 : 0;
@@ -375,23 +389,31 @@ function App() {
           <button onClick={() => { setTempBudget(budget); setShowBudgetModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>Изменить ✏️</button>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-            {formatMoney(freeCash)}
+        {budget > 0 ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                {formatMoney(freeCash)}
+              </div>
+              <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>свободно</div>
+            </div>
+            <div style={{ width: '100%', height: 8, backgroundColor: 'var(--bg-color)', borderRadius: 4, marginTop: 12, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(percentInvested, 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4 }}></div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+              <span>В товаре: {formatMoney(totalInvestedInStock)}</span>
+              <span>Всего: {formatMoney(budget)}</span>
+            </div>
+          </>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>Бюджет не задан</div>
+            <button className="btn-primary" style={{ padding: '10px', fontSize: 14 }} onClick={() => { setTempBudget(''); setShowBudgetModal(true); haptic(); }}>Указать бюджет</button>
           </div>
-          <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>свободно</div>
-        </div>
-
-        <div style={{ width: '100%', height: 8, backgroundColor: 'var(--bg-color)', borderRadius: 4, marginTop: 12, overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min(percentInvested, 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4 }}></div>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-          <span>В товаре: {formatMoney(totalInvestedInStock)}</span>
-          <span>Всего: {formatMoney(budget)}</span>
-        </div>
+        )}
       </div>
 
-      {/* ОБНОВЛЕННЫЙ БЛОК ПРИБЫЛИ */}
+      {/* БЛОК ПРИБЫЛИ */}
       <div className="main-profit-card">
         <h3>Реализованная прибыль</h3>
         <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38 }}>{formatMoney(realizedProfit)}</div>
@@ -401,12 +423,12 @@ function App() {
           <div className="stat-row"><span>Средняя прибыль (с 1 шт):</span> <span>{formatMoney(avgProfit)}</span></div>
           <div className="stat-row"><span>Рентабельность:</span> <span>{marginPercent.toFixed(1)}%</span></div>
           <div className="stat-row"><span>Расходы на складе:</span> <span>{formatMoney(inStockExpenses)}</span></div>
-          
-          {totalGenExp > 0 && (
-            <div className="stat-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.15)', color: '#ffb3b3' }}>
-              <span>Доп. расходы (общие):</span> <span>{formatMoney(totalGenExp)}</span>
-            </div>
-          )}
+          <div className="stat-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+            <span>Доп. расходы:</span> <span>{formatMoney(totalGenExp)}</span>
+          </div>
+          <div className="stat-row" style={{ color: '#ffb3b3' }}>
+            <span>Общие расходы:</span> <span>{formatMoney(inStockExpenses + totalGenExp)}</span>
+          </div>
         </div>
       </div>
 
@@ -415,6 +437,11 @@ function App() {
         <button className="btn-success" onClick={handleExportClick} style={{ padding: '12px 16px' }}>📥 Экспорт</button>
       </div>
       
+      {/* КНОПКА ОЧИСТКИ СТАТИСТИКИ */}
+      <button onClick={clearAllData} disabled={loading} style={{ width: '100%', padding: '12px', marginBottom: '16px', backgroundColor: 'var(--card-bg)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+        🗑️ Очистить статистику
+      </button>
+
       {showChart && chartData.length > 0 && (
         <div className="card">
           <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Прибыль по месяцам</h3>
@@ -548,61 +575,91 @@ function App() {
   const renderDeals = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Сделки</h2>
-      {soldDeals.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ position: 'relative', flex: 1 }}>
-              <input className="input-field" type="text" placeholder="Поиск по IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
-              <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
-            </div>
-            <button className="input-field" style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }} onClick={() => { setPickerMode('deals'); setShowModelPicker(true); haptic(); }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModels.length > 0 ? 'var(--text-main)' : 'var(--text-muted)' }}>{filterModels.length > 0 ? `Выбрано: ${filterModels.length}` : 'Все модели'}</span>
-              <span style={{ opacity: 0.5 }}>▼</span>
-            </button>
-          </div>
-          {filterModels.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-              {filterModels.map(m => (
-                <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: 'var(--accent)', color: 'white', padding: '4px 8px', borderRadius: 12, fontSize: 12, fontWeight: 'bold' }}>
-                  {m}
-                  <button onClick={() => removeFilterModel(m)} style={{ background: 'none', border: 'none', color: 'white', padding: 0, fontSize: 14, cursor: 'pointer', display: 'flex' }}>✕</button>
-                </span>
-              ))}
-            </div>
-          )}
+      
+      {/* ЗАГЛУШКА ЕСЛИ НЕТ СДЕЛОК */}
+      {soldDeals.length === 0 ? (
+        <div style={{ textAlign: 'center', marginTop: 60, color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 60, marginBottom: 15 }}>📭</div>
+          <h3 style={{ margin: 0, fontSize: 20, color: 'var(--text-main)' }}>У вас пока нет сделок</h3>
+          <p style={{ fontSize: 14, marginTop: 8 }}>Купите устройство на вкладке «Покупка» и продайте его, чтобы увидеть здесь историю.</p>
         </div>
-      )}
-      {filteredSold.map((deal) => {
-        const margin = (Number(deal.sell_price) || 0) - (Number(deal.buy_price) || 0) - getDealExpensesSum(deal); 
-        return (
-          <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--success)' }}>
-            <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model || 'Без названия'}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
-            {renderSpecs(deal)}
-            <div style={{ marginBottom: 10 }}>{getWarrantyBadge(deal)}</div>
-            
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
-              {deal.seller && <div>👤 Купил у: {deal.seller.name} {deal.seller.phone && (
-                <button onClick={() => handlePhoneCall(deal.seller.phone)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>({deal.seller.phone})</button>
-              )}</div>}
-              {deal.buyer && <div style={{ marginTop: 2 }}>👤 Продал: {deal.buyer.name} {deal.buyer.phone && (
-                <button onClick={() => handlePhoneCall(deal.buyer.phone)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>({deal.buyer.phone})</button>
-              )}</div>}
+      ) : (
+        <>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <input className="input-field" type="text" placeholder="Поиск по IMEI..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }}/>
+                <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
+              </div>
+              <button className="input-field" style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }} onClick={() => { setPickerMode('deals'); setShowModelPicker(true); haptic(); }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModels.length > 0 ? 'var(--text-main)' : 'var(--text-muted)' }}>{filterModels.length > 0 ? `Выбрано: ${filterModels.length}` : 'Все модели'}</span>
+                <span style={{ opacity: 0.5 }}>▼</span>
+              </button>
             </div>
-
-            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500 }}>Закуп: {formatMoney(deal.buy_price)} | Продажа: {formatMoney(deal.sell_price)}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Куплен: {new Date(deal.created_at || Date.now()).toLocaleDateString('ru-RU')} • Продан: {deal.sold_at ? new Date(deal.sold_at).toLocaleDateString('ru-RU') : '-'}</div>
-            {deal.expenses && deal.expenses.length > 0 && <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6 }}>{deal.expenses.map(e => `${e.category}: ${formatMoney(e.amount)}`).join(' • ')}</div>}
-            <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10 }}>Чистая прибыль: {formatMoney(margin)}</div>
+            {filterModels.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                {filterModels.map(m => (
+                  <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: 'var(--accent)', color: 'white', padding: '4px 8px', borderRadius: 12, fontSize: 12, fontWeight: 'bold' }}>
+                    {m}
+                    <button onClick={() => removeFilterModel(m)} style={{ background: 'none', border: 'none', color: 'white', padding: 0, fontSize: 14, cursor: 'pointer', display: 'flex' }}>✕</button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-        )
-      })}
+          {filteredSold.map((deal) => {
+            const margin = (Number(deal.sell_price) || 0) - (Number(deal.buy_price) || 0) - getDealExpensesSum(deal); 
+            return (
+              <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--success)' }}>
+                <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model || 'Без названия'}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
+                {renderSpecs(deal)}
+                <div style={{ marginBottom: 10 }}>{getWarrantyBadge(deal)}</div>
+                
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  {deal.seller && <div>👤 Купил у: {deal.seller.name} {deal.seller.phone && (
+                    <button onClick={() => handlePhoneCall(deal.seller.phone)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>({deal.seller.phone})</button>
+                  )}</div>}
+                  {deal.buyer && <div style={{ marginTop: 2 }}>👤 Продал: {deal.buyer.name} {deal.buyer.phone && (
+                    <button onClick={() => handlePhoneCall(deal.buyer.phone)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>({deal.buyer.phone})</button>
+                  )}</div>}
+                </div>
+
+                <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500 }}>Закуп: {formatMoney(deal.buy_price)} | Продажа: {formatMoney(deal.sell_price)}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Куплен: {new Date(deal.created_at || Date.now()).toLocaleDateString('ru-RU')} • Продан: {deal.sold_at ? new Date(deal.sold_at).toLocaleDateString('ru-RU') : '-'}</div>
+                {deal.expenses && deal.expenses.length > 0 && <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6 }}>{deal.expenses.map(e => `${e.category}: ${formatMoney(e.amount)}`).join(' • ')}</div>}
+                <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10 }}>Чистая прибыль: {formatMoney(margin)}</div>
+              </div>
+            )
+          })}
+        </>
+      )}
     </div>
   )
 
   const renderFinance = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Доп. расходы</h2>
-      <div className="card"><form onSubmit={addGeneralExpense}><input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={genExpAmount} onChange={(e) => setGenExpAmount(e.target.value.replace(/[^\d]/g, ''))}/><select className="input-field" value={genExpCategory} onChange={(e) => setGenExpCategory(e.target.value)}><option value="Реклама/Авито">Реклама/Авито</option><option value="Аренда">Аренда</option><option value="Прочее">Прочее</option></select><button className="btn-primary" type="submit" style={{backgroundColor: 'var(--danger)'}}>Добавить</button></form></div>
+      <div className="card">
+        <form onSubmit={addGeneralExpense}>
+          <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={genExpAmount} onChange={(e) => setGenExpAmount(e.target.value.replace(/[^\d]/g, ''))}/>
+          
+          <select className="input-field" value={genExpCategory} onChange={(e) => setGenExpCategory(e.target.value)}>
+            <option value="Авито">Авито</option>
+            <option value="Реклама">Реклама</option>
+            <option value="Аренда">Аренда</option>
+            <option value="Такси">Такси</option>
+            <option value="Бензин">Бензин</option>
+            <option value="Еда">Еда</option>
+            <option value="Свой вариант">Свой вариант</option>
+          </select>
+
+          {genExpCategory === 'Свой вариант' && (
+            <input className="input-field" type="text" placeholder="Название расхода" value={customGenExpCategory} onChange={(e) => setCustomGenExpCategory(e.target.value)}/>
+          )}
+
+          <button className="btn-primary" type="submit" style={{backgroundColor: 'var(--danger)', marginTop: 10}}>Добавить</button>
+        </form>
+      </div>
       {generalExpenses.map(exp => (<div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8 }}><div><div style={{ fontWeight: 600 }}>{exp.category}</div></div><div style={{ fontWeight: 700, color: 'var(--danger)' }}>-{formatMoney(exp.amount)}</div></div>))}
     </div>
   )

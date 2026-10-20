@@ -30,7 +30,7 @@ function App() {
   
   const [isInitialLoading, setIsInitialLoading] = useState(true) 
   const [isActionLoading, setIsActionLoading] = useState(false)
-  
+    const [viewingDeal, setViewingDeal] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -916,42 +916,41 @@ function App() {
           </div>
         </div>
       )}
-      {filteredStock.map((deal) => {
+            {filteredStock.map((deal) => {
         const daysOnStock = getDaysOnStock(deal);
         const isDeadStock = daysOnStock >= 21;
         return (
-          <div key={deal.id} className="card" style={{ borderLeft: `4px solid ${isDeadStock ? 'var(--danger)' : 'var(--warning)'}` }}>
+          <div 
+            key={deal.id} 
+            className="card" 
+            onClick={() => { setViewingDeal(deal); haptic(); }}
+            style={{ borderLeft: `4px solid ${isDeadStock ? 'var(--danger)' : 'var(--warning)'}`, cursor: 'pointer' }}
+          >
             <div className="card-header">
               <div style={{ fontWeight: 700, fontSize: 17 }}>
                 {deal.model || 'Без названия'} 
                 {isDeadStock && <span style={{marginLeft: 8, fontSize: 16}} title="Залежавшийся товар!">⚠️</span>}
               </div>
-              <div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || ''); setEditLocation(deal.location || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 18 }}>›</div>
             </div>
             {renderSpecs(deal)}
             
             {deal.photos && deal.photos.length > 0 && (
               <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10 }}>
                 {deal.photos.map((url, idx) => (
-                  <img key={idx} src={url} onClick={() => window.open(url, '_blank')} style={{ height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
+                  <img key={idx} src={url} style={{ height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)' }} />
                 ))}
               </div>
             )}
 
             {deal.seller && (
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
-                👤 Продавец: {deal.seller.name} {deal.seller.phone && (
-                  <button onClick={() => handlePhoneCall(deal.seller.phone)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>
-                    ({deal.seller.phone})
-                  </button>
-                )}
+                👤 Продавец: {deal.seller.name}
               </div>
             )}
 
-            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>Закуп: {formatMoney(deal.buy_price)} {getDealExpensesSum(deal) > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {formatMoney(getDealExpensesSum(deal))}</span>}</div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-              <button className="btn-cancel" style={{ padding: '12px' }} onClick={() => {setExpenseDeal(deal); setExpenseAmount('');}}>+ Расход</button>
-              <button className="btn-success" style={{ flex: 1, padding: '12px' }} onClick={() => {setSellingDeal(deal); setSellPrice(''); setSellWarranty('0');}}>Продать</button>
+            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>
+              Закуп: {formatMoney(deal.buy_price)} {getDealExpensesSum(deal) > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {formatMoney(getDealExpensesSum(deal))}</span>}
             </div>
           </div>
         )
@@ -1265,7 +1264,90 @@ function App() {
       )}
 
       {showScanner && (<Scanner key={Date.now()} onScan={(text) => { setImei(text); setShowScanner(false); }} onClose={() => setShowScanner(false)} />)}
+      {/* ОКНО ПОДРОБНОЙ ИНФОРМАЦИИ О ТЕЛЕФОНЕ */}
+      {viewingDeal && (
+        <div className="modal-overlay" style={{ zIndex: 4000 }}>
+          <div className="modal-content" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+            
+            {/* Шапка с кнопками */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--card-bg)', zIndex: 10 }}>
+              <h3 style={{ margin: 0, fontSize: 20 }}>{viewingDeal.model}</h3>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="icon-btn" onClick={() => { setViewingDeal(null); setEditingDeal(viewingDeal); setEditModel(viewingDeal.model || ''); setEditBuyPrice(viewingDeal.buy_price || ''); setEditLocation(viewingDeal.location || ''); }}>✏️</button>
+                <button className="icon-btn" onClick={() => { setViewingDeal(null); deleteDeal(viewingDeal.id); }}>🗑️</button>
+                <button className="icon-btn" onClick={() => setViewingDeal(null)} style={{ fontSize: 24 }}>✕</button>
+              </div>
+            </div>
 
+            <div style={{ padding: 20, overflowY: 'auto' }}>
+              {/* Галерея фото */}
+              {viewingDeal.photos && viewingDeal.photos.length > 0 ? (
+                <div style={{ display: 'flex', gap: 10, overflowX: 'auto', marginBottom: 20, paddingBottom: 5 }}>
+                  {viewingDeal.photos.map((url, idx) => (
+                    <img 
+                      key={idx} 
+                      src={url} 
+                      onClick={() => window.open(url, '_blank')} 
+                      style={{ height: 200, borderRadius: 12, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }} 
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div style={{ height: 100, backgroundColor: 'var(--bg-color)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', marginBottom: 20 }}>
+                  Нет фотографий
+                </div>
+              )}
+
+              {/* Характеристики */}
+              <div className="card" style={{ padding: 15, marginBottom: 15 }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: 14, color: 'var(--text-muted)' }}>Характеристики</h4>
+                {renderSpecs(viewingDeal)}
+                <div className="stat-row" style={{ marginTop: 10 }}><span>Дата закупа:</span> <span>{new Date(viewingDeal.created_at || Date.now()).toLocaleDateString('ru-RU')}</span></div>
+                {viewingDeal.seller && (
+                  <div className="stat-row">
+                    <span>Продавец:</span> 
+                    <span>
+                      {viewingDeal.seller.name} 
+                      {viewingDeal.seller.phone && (
+                        <button onClick={() => handlePhoneCall(viewingDeal.seller.phone)} style={{ background: 'none', border: 'none', color: 'var(--accent)', textDecoration: 'underline', padding: 0, marginLeft: 5, cursor: 'pointer' }}>
+                          ({viewingDeal.seller.phone})
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Финансы */}
+              <div className="card" style={{ padding: 15, marginBottom: 20 }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: 14, color: 'var(--text-muted)' }}>Финансы</h4>
+                <div className="stat-row"><span>Цена закупа:</span> <span>{formatMoney(viewingDeal.buy_price)}</span></div>
+                {viewingDeal.expenses && viewingDeal.expenses.length > 0 && (
+                  <div style={{ marginTop: 10, padding: 10, backgroundColor: 'rgba(255, 59, 48, 0.05)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 'bold', marginBottom: 5 }}>Доп. расходы:</div>
+                    {viewingDeal.expenses.map(e => (
+                      <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--danger)', marginBottom: 3 }}>
+                        <span>{e.category}</span>
+                        <span>{formatMoney(e.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="stat-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', fontWeight: 'bold', fontSize: 16 }}>
+                  <span>Итого вложено:</span> 
+                  <span>{formatMoney(Number(viewingDeal.buy_price) + getDealExpensesSum(viewingDeal))}</span>
+                </div>
+              </div>
+
+              {/* Кнопки действий */}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn-cancel" style={{ flex: 1, padding: '16px', backgroundColor: '#fff3cd', color: '#b28900' }} onClick={() => { setViewingDeal(null); setExpenseDeal(viewingDeal); setExpenseAmount(''); }}>+ Расход</button>
+                <button className="btn-success" style={{ flex: 1, padding: '16px' }} onClick={() => { setViewingDeal(null); setSellingDeal(viewingDeal); setSellPrice(''); setSellWarranty('0'); }}>Продать</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="tab-bar">
         <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon">📊</span> Главная</button>
         <button className={`tab-button ${activeTab === 'purchase' ? 'active' : ''}`} onClick={() => { setActiveTab('purchase'); haptic(); }}><span className="tab-icon">🛒</span> Покупка</button>

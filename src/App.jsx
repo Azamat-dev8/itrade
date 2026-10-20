@@ -916,7 +916,7 @@ function App() {
           </div>
         </div>
       )}
-            {filteredStock.map((deal) => {
+                  {filteredStock.map((deal) => {
         const daysOnStock = getDaysOnStock(deal);
         const isDeadStock = daysOnStock >= 21;
         return (
@@ -949,8 +949,35 @@ function App() {
               </div>
             )}
 
-            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>
+            <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10, marginBottom: 14 }}>
               Закуп: {formatMoney(deal.buy_price)} {getDealExpensesSum(deal) > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {formatMoney(getDealExpensesSum(deal))}</span>}
+            </div>
+
+            {/* ВОЗВРАЩАЕМ КНОПКИ */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button 
+                className="btn-cancel" 
+                style={{ padding: '12px' }} 
+                onClick={(e) => { 
+                  e.stopPropagation(); // Останавливаем клик, чтобы не открылась карточка
+                  setExpenseDeal(deal); 
+                  setExpenseAmount(''); 
+                }}
+              >
+                + Расход
+              </button>
+              <button 
+                className="btn-success" 
+                style={{ flex: 1, padding: '12px' }} 
+                onClick={(e) => { 
+                  e.stopPropagation(); // Останавливаем клик, чтобы не открылась карточка
+                  setSellingDeal(deal); 
+                  setSellPrice(''); 
+                  setSellWarranty('0'); 
+                }}
+              >
+                Продать
+              </button>
             </div>
           </div>
         )

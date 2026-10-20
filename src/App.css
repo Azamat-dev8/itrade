@@ -1,4 +1,3 @@
-/* --- СВЕТЛАЯ ТЕМА (ПО УМОЛЧАНИЮ) --- */
 :root {
   --bg-color: #f2f2f7;
   --card-bg: #ffffff;
@@ -11,7 +10,6 @@
   --border: #e5e5ea;
 }
 
-/* --- ТЕМНАЯ ТЕМА --- */
 body.dark-theme {
   --bg-color: #000000;
   --card-bg: #1c1c1e;
@@ -37,7 +35,6 @@ body, html {
   box-sizing: border-box;
 }
 
-/* --- КАРТОЧКИ --- */
 .card {
   background-color: var(--card-bg);
   padding: 16px;
@@ -55,21 +52,30 @@ body, html {
   margin-bottom: 8px;
 }
 
-/* --- ГЛАВНАЯ КАРТОЧКА ПРИБЫЛИ (она всегда синяя) --- */
+/* --- ГРАДИЕНТЫ И ТАБЛИЧНЫЕ ЦИФРЫ --- */
 .main-profit-card {
-  background: linear-gradient(135deg, #2481cc, #1a5c94);
+  /* Мягкий изумрудный градиент для прибыли */
+  background: linear-gradient(135deg, #34c759, #28a745);
   color: white;
   border-radius: 20px;
   padding: 24px 20px;
   margin-bottom: 16px;
-  box-shadow: 0 8px 24px rgba(36, 129, 204, 0.3);
+  box-shadow: 0 8px 24px rgba(52, 199, 89, 0.3);
 }
 
-.main-profit-card h3 { margin: 0; font-size: 15px; font-weight: 500; opacity: 0.9; }
-.main-profit-value { font-size: 38px; font-weight: 700; margin: 8px 0 20px 0; letter-spacing: -1px; }
-.stat-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; opacity: 0.9; }
+.debt-card {
+  /* Мягкий янтарный градиент для расходов/долгов */
+  background: linear-gradient(135deg, #ff9500, #ff3b30);
+  color: white;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(255, 149, 0, 0.25);
+}
 
-/* --- ФОРМЫ И ИНПУТЫ --- */
+.main-profit-card h3, .debt-card h3 { margin: 0; font-size: 15px; font-weight: 500; opacity: 0.9; }
+.main-profit-value { font-size: 38px; font-weight: 700; margin: 8px 0 20px 0; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.stat-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; opacity: 0.9; font-variant-numeric: tabular-nums; }
+
 .input-field {
   width: 100%;
   padding: 14px 16px;
@@ -80,13 +86,13 @@ body, html {
   font-size: 16px;
   margin-bottom: 12px;
   color: var(--text-main);
-   caret-color: var(--accent);
+  caret-color: var(--accent);
   transition: border-color 0.2s, background-color 0.3s, color 0.3s;
   outline: none;
+  font-variant-numeric: tabular-nums;
 }
 .input-field:focus { border-color: var(--accent); background-color: var(--card-bg); }
 
-/* --- КНОПКИ --- */
 button { cursor: pointer; font-family: inherit; transition: opacity 0.2s, transform 0.1s; }
 button:active { transform: scale(0.97); opacity: 0.8; }
 
@@ -94,14 +100,28 @@ button:active { transform: scale(0.97); opacity: 0.8; }
 .btn-success { padding: 10px 16px; background-color: var(--success); color: white; border: none; border-radius: 10px; font-weight: 600; font-size: 14px; }
 .icon-btn { background: none; border: none; font-size: 18px; padding: 8px; opacity: 0.7; }
 
-/* --- БЕЙДЖИ --- */
 .badge { padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
 .badge-gray { background: var(--bg-color); color: var(--text-muted); }
 .badge-green { background: rgba(52, 199, 89, 0.15); color: var(--success); }
 .badge-yellow { background: rgba(255, 149, 0, 0.15); color: var(--warning); }
 .badge-red { background: rgba(255, 59, 48, 0.15); color: var(--danger); }
 
-/* --- НИЖНЕЕ МЕНЮ --- */
+/* --- СКЕЛЕТОНЫ --- */
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+.skeleton {
+  background-color: var(--border);
+  border-radius: 8px;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+.skeleton-title { width: 60%; height: 20px; margin-bottom: 10px; }
+.skeleton-text { width: 40%; height: 16px; margin-bottom: 8px; }
+.skeleton-card { height: 120px; width: 100%; margin-bottom: 12px; border-radius: 16px; animation: pulse 1.5s infinite ease-in-out; background-color: var(--border); }
+
+/* --- МЕНЮ --- */
 .tab-bar {
   position: fixed; bottom: 0; left: 0; right: 0; height: 70px;
   background-color: var(--card-bg);
@@ -110,25 +130,10 @@ button:active { transform: scale(0.97); opacity: 0.8; }
   padding-bottom: env(safe-area-inset-bottom);
   transition: background-color 0.3s, border-color 0.3s;
 }
-.tab-button {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  color: var(--text-muted);
-  font-size: 9px; /* <-- Уменьшили с 10px */
-  font-weight: 500;
-  gap: 2px;
-}
+.tab-button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: none; background: none; color: var(--text-muted); font-size: 10px; font-weight: 500; gap: 4px; }
 .tab-button.active { color: var(--accent); }
-.tab-icon {
-  font-size: 20px; /* <-- Уменьшили с 22px */
-}
+.tab-icon { font-size: 22px; }
 
-/* --- МОДАЛЬНЫЕ ОКНА --- */
 .modal-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0, 0, 0, 0.6);
@@ -151,139 +156,35 @@ button:active { transform: scale(0.97); opacity: 0.8; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 ::-webkit-scrollbar { width: 0px; background: transparent; }
-/* --- БОКОВОЕ МЕНЮ --- */
+
 .hamburger-btn {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 1000;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  width: 44px;
-  height: 44px;
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  color: var(--text-main);
-  transition: all 0.2s;
+  position: fixed; top: 16px; left: 16px; z-index: 1000;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
+  width: 44px; height: 44px; font-size: 20px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: var(--text-main); transition: all 0.2s;
 }
+.hamburger-btn:active { transform: scale(0.95); }
 
-.hamburger-btn:active {
-  transform: scale(0.95);
-}
+.sidebar-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1001; opacity: 0; visibility: hidden; transition: opacity 0.3s; }
+.sidebar-overlay.open { opacity: 1; visibility: visible; }
+.sidebar { position: fixed; top: 0; left: 0; width: 280px; height: 100%; background: var(--card-bg); z-index: 1002; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: 4px 0 20px rgba(0,0,0,0.1); border-right: 1px solid var(--border); }
+.sidebar.open { transform: translateX(0); }
+.profile-section { padding: 30px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; }
+.profile-avatar { width: 50px; height: 50px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; }
+.profile-name { font-size: 18px; font-weight: 600; color: var(--text-main); }
+.profile-status { font-size: 13px; color: var(--text-muted); }
+.sidebar-links { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 15px; }
+.sidebar-link { color: var(--text-main); text-decoration: none; font-size: 15px; font-weight: 500; display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; transition: background 0.2s; }
+.sidebar-link:active { background: var(--bg-color); }
+.sidebar-footer { padding: 20px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+.footer-link { color: var(--text-muted); text-decoration: none; font-size: 12px; transition: color 0.2s; }
 
-.sidebar-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1001;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s;
-}
-
-.sidebar-overlay.open {
-  opacity: 1;
-  visibility: visible;
-}
-
-.sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 280px;
-  height: 100%;
-  background: var(--card-bg);
-  z-index: 1002;
-  transform: translateX(-100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  flex-direction: column;
-  box-shadow: 4px 0 20px rgba(0,0,0,0.1);
-  border-right: 1px solid var(--border);
-   overflow: hidden;
-}
-
-.sidebar.open {
-  transform: translateX(0);
-}
-
-/* Профиль в меню */
-.profile-section {
-  padding: 30px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.profile-avatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.profile-name {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.profile-status {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-/* Ссылки в меню */
-.sidebar-links {
-  padding: 20px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.sidebar-link {
-  color: var(--text-main);
-  text-decoration: none;
-  font-size: 15px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 8px;
-  transition: background 0.2s;
-}
-
-.sidebar-link:active {
-  background: var(--bg-color);
-}
-
-/* Нижняя часть меню */
-.sidebar-footer {
-  padding: 20px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-bottom: max(20px, env(safe-area-inset-bottom));
-}
-
-.footer-link {
-  color: var(--text-muted);
-  text-decoration: none;
-  font-size: 12px;
-  transition: color 0.2s;
-}
+.pricing-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+.pricing-card { border: 2px solid var(--border); border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s; background: var(--bg-color); }
+.pricing-card:hover { border-color: var(--accent); background: var(--card-bg); }
+.pricing-card.best-value { border-color: #ff9500; position: relative; background: #fff8e6; }
+body.dark-theme .pricing-card.best-value { background: rgba(255, 149, 0, 0.1); }
+.best-value-badge { position: absolute; top: -10px; right: 15px; background: #ff9500; color: white; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 10px; }
+.pro-features { list-style: none; padding: 0; margin: 15px 0; display: flex; flex-direction: column; gap: 10px; }
+.pro-features li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text-main); }
+.pro-features li span { font-size: 16px; }

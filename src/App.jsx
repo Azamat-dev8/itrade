@@ -12,26 +12,13 @@ const DEVICE_CATALOG = {
     "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max", "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max",
     "iPhone 17", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 18", "iPhone 18 Pro", "iPhone 18 Pro Max", "iPhone Duo"
   ],
-  'iPad': [
-    "iPad 9", "iPad 10", "iPad Air 4", "iPad Air 5", "iPad Air 6", "iPad Pro 11 (2021)", "iPad Pro 12.9 (2021)", "iPad Pro 11 (2022)", "iPad Pro 12.9 (2022)", "iPad Pro M4"
-  ],
-  'MacBook': [
-    "MacBook Air M1", "MacBook Air M2", "MacBook Air M3", "MacBook Pro 13 M1", "MacBook Pro 14 M1", "MacBook Pro 16 M1", "MacBook Pro 14 M3", "MacBook Pro 16 M3"
-  ],
-  'Apple Watch': [
-    "Apple Watch Series 4", "Apple Watch Series 5", "Apple Watch Series 6", "Apple Watch SE (2020)", 
-    "Apple Watch Series 7", "Apple Watch Series 8", "Apple Watch SE (2022)", "Apple Watch Ultra", 
-    "Apple Watch Series 9", "Apple Watch Ultra 2", "Apple Watch Series 10", "Apple Watch Series 11", 
-    "Apple Watch Series 12", "Apple Watch Ultra 3"
-  ],
-  'AirPods': [
-    "AirPods 2", "AirPods 3", "AirPods 4", "AirPods 5", 
-    "AirPods Pro", "AirPods Pro 2", "AirPods Pro 3", 
-    "AirPods Max"
-  ]
+  'iPad': ["iPad 9", "iPad 10", "iPad Air 4", "iPad Air 5", "iPad Air 6", "iPad Pro 11 (2021)", "iPad Pro 12.9 (2021)", "iPad Pro 11 (2022)", "iPad Pro 12.9 (2022)", "iPad Pro M4"],
+  'MacBook': ["MacBook Air M1", "MacBook Air M2", "MacBook Air M3", "MacBook Pro 13 M1", "MacBook Pro 14 M1", "MacBook Pro 16 M1", "MacBook Pro 14 M3", "MacBook Pro 16 M3"],
+  'Apple Watch': ["Apple Watch Series 4", "Apple Watch Series 5", "Apple Watch Series 6", "Apple Watch SE (2020)", "Apple Watch Series 7", "Apple Watch Series 8", "Apple Watch SE (2022)", "Apple Watch Ultra", "Apple Watch Series 9", "Apple Watch Ultra 2", "Apple Watch Series 10", "Apple Watch Series 11", "Apple Watch Series 12", "Apple Watch Ultra 3"],
+  'AirPods': ["AirPods 2", "AirPods 3", "AirPods 4", "AirPods 5", "AirPods Pro", "AirPods Pro 2", "AirPods Pro 3", "AirPods Max"]
 };
 
-const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут"
+const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут" // <-- ЗАМЕНИ НА СВОЙ КАНАЛ
 
 function App() {
   const [user, setUser] = useState(null)
@@ -39,16 +26,18 @@ function App() {
   const [contacts, setContacts] = useState([])
   const [generalExpenses, setGeneralExpenses] = useState([])
   const [leaderboard, setLeaderboard] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [isDataLoading, setIsDataLoading] = useState(true) // ДЛЯ СКЕЛЕТОНОВ
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
   
+  // Состояния выбора моделей
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
   const [modelCategory, setModelCategory] = useState('iPhone')
   const [pickerMode, setPickerMode] = useState('purchase')
   const [filterModels, setFilterModels] = useState([])
 
+  // Модалки и меню
   const [showExportModal, setShowExportModal] = useState(false)
   const [csvData, setCsvData] = useState('')
   const [showScanner, setShowScanner] = useState(false)
@@ -59,16 +48,24 @@ function App() {
   const [isDarkTheme, setIsDarkTheme] = useState(false)
   const [showSuccessMsg, setShowSuccessMsg] = useState(false)
 
+  // Профиль и настройки
   const [profileData, setProfileData] = useState(null)
   const [displayName, setDisplayName] = useState('')
   const [hideAmounts, setHideAmounts] = useState(false)
   const [showChart, setShowChart] = useState(true)
   const [dailySummary, setDailySummary] = useState(false)
-  
   const [budget, setBudget] = useState(0)
   const [showBudgetModal, setShowBudgetModal] = useState(false)
   const [tempBudget, setTempBudget] = useState('')
+  
+  // Долги
+  const [showDebtModal, setShowDebtModal] = useState(false)
+  const [debtOwe, setDebtOwe] = useState(0)
+  const [debtTheyOwe, setDebtTheyOwe] = useState(0)
+  const [tempDebtOwe, setTempDebtOwe] = useState('')
+  const [tempDebtTheyOwe, setTempDebtTheyOwe] = useState('')
 
+  // Поля сделки
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [storage, setStorage] = useState('')
@@ -77,7 +74,11 @@ function App() {
   const [sellerId, setSellerId] = useState('')
   const [newDealExpCat, setNewDealExpCat] = useState('Ремонт')
   const [newDealExpAmount, setNewDealExpAmount] = useState('')
+  const [dealLocation, setDealLocation] = useState('')
+  const [dealPhotos, setDealPhotos] = useState([]) // Для загрузки
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
+  // Контакты
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactNote, setContactNote] = useState('')
@@ -86,22 +87,27 @@ function App() {
   const [editContactPhone, setEditContactPhone] = useState('')
   const [editContactNote, setEditContactNote] = useState('')
 
+  // Общие расходы
   const [genExpAmount, setGenExpAmount] = useState('')
   const [genExpCategory, setGenExpCategory] = useState('Авито')
   const [customGenExpCategory, setCustomGenExpCategory] = useState('')
-  const [genExpNote, setGenExpNote] = useState('')
+  
+  // Расход по сделке
   const [expenseDeal, setExpenseDeal] = useState(null)
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('Ремонт')
 
+  // Продажа
   const [sellingDeal, setSellingDeal] = useState(null)
   const [sellPrice, setSellPrice] = useState('')
   const [buyerId, setBuyerId] = useState('')
   const [sellWarranty, setSellWarranty] = useState('0')
   
+  // Редактирование сделки
   const [editingDeal, setEditingDeal] = useState(null)
   const [editModel, setEditModel] = useState('')
   const [editBuyPrice, setEditBuyPrice] = useState('')
+  const [editLocation, setEditLocation] = useState('')
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
@@ -119,7 +125,6 @@ function App() {
   }, [])
 
   useEffect(() => { if (user) fetchData() }, [user])
-  useEffect(() => { setSearchQuery(''); setFilterModels([]); }, [activeTab])
 
   const haptic = (type = 'light') => {
     const tg = window.Telegram?.WebApp
@@ -147,6 +152,7 @@ function App() {
 
   const fetchData = async () => {
     if (!user) return;
+    setIsDataLoading(true);
     
     const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name, phone), buyer:buyer_id(name, phone)').eq('user_id', user.id).order('created_at', { ascending: false })
     if (dealsData) setDeals(dealsData)
@@ -164,7 +170,9 @@ function App() {
       setHideAmounts(profileInfo.hide_amounts || false)
       setShowChart(profileInfo.show_chart !== false)
       setDailySummary(profileInfo.daily_summary || false)
-      setBudget(Number(profileInfo.resale_budget) || 0) // Если 0, значит не задан
+      setBudget(Number(profileInfo.resale_budget) || 0)
+      setDebtOwe(Number(profileInfo.debt_i_owe) || 0)
+      setDebtTheyOwe(Number(profileInfo.debt_they_owe) || 0)
     } else {
       const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 }
       await supabase.from('user_profiles').insert([newProf])
@@ -174,8 +182,11 @@ function App() {
 
     const { data: lbData } = await supabase.from('public_leaderboard').select('*').order('gross_profit', { ascending: false }).limit(10)
     if (lbData) setLeaderboard(lbData)
+    
+    setIsDataLoading(false);
   }
 
+  // --- СОХРАНЕНИЕ НАСТРОЕК ---
   const updateSetting = async (key, value) => {
     haptic('medium');
     if (!user) return;
@@ -203,48 +214,69 @@ function App() {
   const saveBudget = async () => {
     if (!tempBudget || !user) return;
     haptic('medium');
-    setBudget(Number(tempBudget));
-    await supabase.from('user_profiles').update({ resale_budget: Number(tempBudget) }).eq('telegram_id', user.id);
-    setShowBudgetModal(false);
+    const newBudget = Number(tempBudget);
+    setBudget(newBudget); 
+    const { error } = await supabase.from('user_profiles').update({ resale_budget: newBudget }).eq('telegram_id', user.id);
+    if (error) alert('Ошибка: ' + error.message);
+    else setShowBudgetModal(false);
+  }
+
+  const saveDebts = async () => {
+    if (!user) return;
+    haptic('medium');
+    const owe = Number(tempDebtOwe) || 0;
+    const theyOwe = Number(tempDebtTheyOwe) || 0;
+    setDebtOwe(owe);
+    setDebtTheyOwe(theyOwe);
+    await supabase.from('user_profiles').update({ debt_i_owe: owe, debt_they_owe: theyOwe }).eq('telegram_id', user.id);
+    setShowDebtModal(false);
   }
 
   const clearAllData = async () => {
     if (!window.confirm('ВНИМАНИЕ! Это удалит ВСЕ ваши сделки, контакты и расходы. Продолжить?')) return;
-    setLoading(true);
+    setIsDataLoading(true);
     try {
       await supabase.from('deals').delete().eq('user_id', user.id);
       await supabase.from('expenses').delete().eq('user_id', user.id);
       await supabase.from('contacts').delete().eq('user_id', user.id);
       fetchData(); haptic('heavy');
     } catch (error) { alert('Ошибка: ' + error.message); } 
-    finally { setLoading(false); }
+    finally { setIsDataLoading(false); }
   };
 
-  const handleResetAccount = async () => {
-    if (!window.confirm('ВНИМАНИЕ! Это удалит ВСЕ ваши данные И профиль. Вы уверены?')) return;
-    if (!window.confirm('Точно уверены? Это действие нельзя отменить.')) return;
-    setLoading(true);
-    try {
-      await supabase.from('deals').delete().eq('user_id', user.id);
-      await supabase.from('expenses').delete().eq('user_id', user.id);
-      await supabase.from('contacts').delete().eq('user_id', user.id);
-      await supabase.from('user_profiles').delete().eq('telegram_id', user.id);
-      alert('Аккаунт полностью сброшен. Приложение будет перезагружено.');
-      window.location.reload();
-    } catch (error) { alert('Ошибка: ' + error.message); } 
-    finally { setLoading(false); }
-  };
+  // --- ФОТОГРАФИИ (SUPABASE STORAGE) ---
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !user) return;
+    
+    setUploadingPhoto(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+    
+    const { data, error } = await supabase.storage.from('deal-photos').upload(fileName, file);
+    
+    if (error) {
+      alert('Ошибка загрузки фото: ' + error.message);
+    } else {
+      const { data: { publicUrl } } = supabase.storage.from('deal-photos').getPublicUrl(fileName);
+      setDealPhotos(prev => [...prev, publicUrl]);
+    }
+    setUploadingPhoto(false);
+  }
 
+  // --- ДОБАВЛЕНИЕ СДЕЛКИ ---
   const addDeal = async (e) => {
     e.preventDefault()
     if (!model || !buyPrice || !user) return alert('Заполните модель и цену')
-    setLoading(true)
+    setIsDataLoading(true)
     
     const { data: newDeals, error } = await supabase.from('deals').insert([{ 
         model, buy_price: Number(buyPrice), status: 'in_stock',
         storage_gb: storage ? Number(storage) : null, battery_health: battery ? Number(battery) : null,
         imei: imei || null, seller_id: sellerId ? Number(sellerId) : null,
-        user_id: user.id, user_name: displayName || 'Аноним'
+        user_id: user.id, user_name: displayName || 'Аноним',
+        location: dealLocation || null,
+        photos: dealPhotos.length > 0 ? dealPhotos : null
       }]).select()
 
     if (!error && newDeals) {
@@ -253,14 +285,15 @@ function App() {
         await supabase.from('expenses').insert([{ deal_id: newDealId, amount: Number(newDealExpAmount), category: newDealExpCat, user_id: user.id }])
       }
       setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId(''); 
-      setNewDealExpAmount(''); setNewDealExpCat('Ремонт');
+      setNewDealExpAmount(''); setNewDealExpCat('Ремонт'); setDealLocation(''); setDealPhotos([]);
       fetchData(); haptic('medium'); setShowSuccessMsg(true); setTimeout(() => setShowSuccessMsg(false), 3000);
     } else { alert('Ошибка: ' + (error?.message || 'Неизвестная ошибка')) }
-    setLoading(false)
+    setIsDataLoading(false)
   }
 
   const confirmSell = async () => {
     if (!sellPrice) return alert('Введите цену')
+    setIsDataLoading(true)
     await supabase.from('deals').update({ 
       sell_price: Number(sellPrice), status: 'sold', 
       buyer_id: buyerId ? Number(buyerId) : null, 
@@ -268,18 +301,6 @@ function App() {
       warranty_months: Number(sellWarranty)
     }).eq('id', sellingDeal.id)
     setSellingDeal(null); fetchData();
-  }
-
-  const handleExportClick = () => {
-    haptic();
-    if (deals.length === 0) return alert('Нет данных для экспорта');
-    const headers = ['Модель', 'Закупка', 'Продажа', 'Прибыль', 'Дата покупки', 'Дата продажи'];
-    const rows = deals.map(d => { 
-      const exp = getDealExpensesSum(d); 
-      const m = d.sell_price ? (Number(d.sell_price) - Number(d.buy_price) - exp) : ''; 
-      return [`"${d.model}"`, d.buy_price, d.sell_price || '', m, new Date(d.created_at).toLocaleDateString('ru-RU'), d.sold_at ? new Date(d.sold_at).toLocaleDateString('ru-RU') : ''].join(';'); 
-    });
-    setCsvData([headers.join(';'), ...rows].join('\n')); setShowExportModal(true);
   }
 
   const addGeneralExpense = async (e) => {
@@ -296,7 +317,7 @@ function App() {
   const confirmExpense = async () => { if (!expenseAmount || !user) return; await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount: Number(expenseAmount), category: expenseCategory, user_id: user.id }]); setExpenseDeal(null); fetchData(); }
   const saveEditContact = async () => { if (!editContactName) return; await supabase.from('contacts').update({ name: editContactName, phone: editContactPhone, note: editContactNote }).eq('id', editingContact.id); setEditingContact(null); fetchData(); }
   const deleteContact = async (id) => { if (!window.confirm('Удалить контакт?')) return; await supabase.from('contacts').delete().eq('id', id); fetchData(); }
-  const saveEdit = async () => { if (!editModel || !editBuyPrice) return; await supabase.from('deals').update({ model: editModel, buy_price: Number(editBuyPrice) }).eq('id', editingDeal.id); setEditingDeal(null); fetchData(); }
+  const saveEdit = async () => { if (!editModel || !editBuyPrice) return; await supabase.from('deals').update({ model: editModel, buy_price: Number(editBuyPrice), location: editLocation }).eq('id', editingDeal.id); setEditingDeal(null); fetchData(); }
 
   const handleModelSelect = (modelName) => {
     haptic();
@@ -323,13 +344,24 @@ function App() {
   const totalRevenue = soldDeals.reduce((sum, deal) => sum + (Number(deal.sell_price) || 0), 0)
   const totalBuySold = soldDeals.reduce((sum, deal) => sum + (Number(deal.buy_price) || 0), 0)
   const totalExpSold = soldDeals.reduce((sum, deal) => sum + getDealExpensesSum(deal), 0)
-  
   const realizedProfit = totalRevenue - totalBuySold - totalExpSold;
 
   const avgProfit = soldDeals.length > 0 ? realizedProfit / soldDeals.length : 0;
   const inStockExpenses = inStockDeals.reduce((sum, deal) => sum + getDealExpensesSum(deal), 0);
   const marginPercent = totalRevenue > 0 ? (realizedProfit / totalRevenue) * 100 : 0;
   const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+
+  // ЮНИТ-ЭКОНОМИКА (Топ моделей по марже)
+  const modelStats = soldDeals.reduce((acc, deal) => {
+    if (!acc[deal.model]) acc[deal.model] = { count: 0, profit: 0 };
+    acc[deal.model].count += 1;
+    acc[deal.model].profit += (Number(deal.sell_price) || 0) - (Number(deal.buy_price) || 0) - getDealExpensesSum(deal);
+    return acc;
+  }, {});
+  const topModels = Object.entries(modelStats)
+    .map(([name, stats]) => ({ name, avg: stats.profit / stats.count, count: stats.count }))
+    .sort((a, b) => b.avg - a.avg)
+    .slice(0, 3);
 
   const monthlyProfits = soldDeals.reduce((acc, deal) => {
     const date = new Date(deal.sold_at || deal.created_at || Date.now());
@@ -371,6 +403,18 @@ function App() {
       {deal.storage_gb && <span className="badge badge-gray">{deal.storage_gb >= 1024 ? `${deal.storage_gb / 1024} TB` : `${deal.storage_gb} GB`}</span>}
       {deal.battery_health && <span className="badge badge-gray">🔋 {deal.battery_health}%</span>}
       {deal.imei && <span className="badge badge-gray">IMEI: ...{String(deal.imei).slice(-4)}</span>}
+      {deal.location && <span className="badge badge-yellow">📍 {deal.location}</span>}
+    </div>
+  )
+
+  // --- СКЕЛЕТОНЫ ---
+  const renderSkeleton = () => (
+    <div style={{ padding: 16, paddingTop: 60 }}>
+      <div className="skeleton skeleton-card" style={{ height: 80 }}></div>
+      <div className="skeleton skeleton-card" style={{ height: 200 }}></div>
+      <div className="skeleton skeleton-card" style={{ height: 100 }}></div>
+      <div className="skeleton skeleton-card"></div>
+      <div className="skeleton skeleton-card"></div>
     </div>
   )
 
@@ -392,7 +436,7 @@ function App() {
         {budget > 0 ? (
           <>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>
                 {formatMoney(freeCash)}
               </div>
               <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>свободно</div>
@@ -413,7 +457,7 @@ function App() {
         )}
       </div>
 
-      {/* БЛОК ПРИБЫЛИ */}
+      {/* БЛОК ПРИБЫЛИ (ГРАДИЕНТ) */}
       <div className="main-profit-card">
         <h3>Реализованная прибыль</h3>
         <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38 }}>{formatMoney(realizedProfit)}</div>
@@ -432,13 +476,50 @@ function App() {
         </div>
       </div>
 
+      {/* БЛОК ДОЛГОВ (ГРАДИЕНТ) */}
+      <div className="debt-card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <h3>Долги и задатки</h3>
+          <button onClick={() => { setTempDebtOwe(debtOwe); setTempDebtTheyOwe(debtTheyOwe); setShowDebtModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'white', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}>Изменить</button>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 600 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ opacity: 0.8, fontSize: 13 }}>Мне должны:</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatMoney(debtTheyOwe)}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'right' }}>
+            <span style={{ opacity: 0.8, fontSize: 13 }}>Я должен:</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatMoney(debtOwe)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ЮНИТ-ЭКОНОМИКА */}
+      {topModels.length > 0 && (
+        <div className="card">
+          <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Топ моделей по марже</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {topModels.map((m, idx) => (
+              <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: idx !== topModels.length - 1 ? '1px solid var(--border)' : 'none', paddingBottom: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 'bold', fontSize: 14 }}>{m.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Продано: {m.count} шт.</div>
+                </div>
+                <div style={{ fontWeight: 'bold', color: 'var(--success)', fontVariantNumeric: 'tabular-nums' }}>
+                  +{formatMoney(m.avg)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div><h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3><div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.length} шт.</div></div>
-        <button className="btn-success" onClick={handleExportClick} style={{ padding: '12px 16px' }}>📥 Экспорт</button>
+        <button className="btn-success" onClick={() => { setCsvData(''); setShowExportModal(true); }} style={{ padding: '12px 16px' }}>📥 Экспорт</button>
       </div>
       
-      {/* КНОПКА ОЧИСТКИ СТАТИСТИКИ */}
-      <button onClick={clearAllData} disabled={loading} style={{ width: '100%', padding: '12px', marginBottom: '16px', backgroundColor: 'var(--card-bg)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+      <button onClick={clearAllData} disabled={isDataLoading} style={{ width: '100%', padding: '12px', marginBottom: '16px', backgroundColor: 'var(--card-bg)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
         🗑️ Очистить статистику
       </button>
 
@@ -477,12 +558,14 @@ function App() {
           
           <div style={{ display: 'flex', gap: 10 }}>
             <select className="input-field" value={storage} onChange={(e) => setStorage(e.target.value)}>
-              <option value="">Память (ГБ)</option>
+              <option value="">Память</option>
               <option value="64">64 GB</option><option value="128">128 GB</option><option value="256">256 GB</option>
               <option value="512">512 GB</option><option value="1024">1 TB</option><option value="2048">2 TB</option>
             </select>
             <input className="input-field" type="text" inputMode="numeric" placeholder="АКБ (%)" min="0" max="100" value={battery} onChange={(e) => { let val = Number(e.target.value.replace(/[^\d]/g, '')); if (val > 100) val = 100; setBattery(val || ''); }}/>
           </div>
+
+          <input className="input-field" type="text" placeholder="Место хранения (Полка 2, ячейка А)" value={dealLocation} onChange={(e) => setDealLocation(e.target.value)} />
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div style={{ flex: 1, position: 'relative' }}>
@@ -497,26 +580,38 @@ function App() {
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
           </select>
 
+          {/* ФОТОФИКСАЦИЯ */}
+          <div style={{ marginBottom: 15, marginTop: 5 }}>
+            <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото дефектов / коробки (до 3 шт):</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {dealPhotos.map((url, idx) => (
+                <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
+                  <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button type="button" onClick={() => setDealPhotos(prev => prev.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}>✕</button>
+                </div>
+              ))}
+              {dealPhotos.length < 3 && (
+                <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)' }}>
+                  {uploadingPhoto ? '...' : '+'}
+                  <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
+                </label>
+              )}
+            </div>
+          </div>
+
           <div style={{ marginTop: 10, marginBottom: 5, fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)' }}>
             Расходы при покупке 📉
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 0 }}>
             <select className="input-field" value={newDealExpCat} onChange={(e) => setNewDealExpCat(e.target.value)}>
-              <option value="Ремонт">Ремонт</option>
-              <option value="Запчасти">Запчасти</option>
-              <option value="Такси/Доставка">Такси/Доставка</option>
-              <option value="Реклама/Авито">Реклама/Авито</option>
-              <option value="Бензин">Бензин</option>
-              <option value="Другое">Другое</option>
+              <option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси/Доставка">Такси/Доставка</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option><option value="Другое">Другое</option>
             </select>
             <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма расхода" value={newDealExpAmount} onChange={(e) => setNewDealExpAmount(e.target.value.replace(/[^\d]/g, ''))}/>
           </div>
           
-          <button className="btn-primary" type="submit" disabled={loading}>{loading ? 'Сохранение...' : 'Сохранить на склад'}</button>
+          <button className="btn-primary" type="submit" disabled={isDataLoading}>{isDataLoading ? 'Сохранение...' : 'Сохранить на склад'}</button>
           
           {showSuccessMsg && <div style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(52, 199, 89, 0.15)', color: '#34c759', textAlign: 'center', borderRadius: 12, fontSize: 14, fontWeight: 'bold' }}>✅ Устройство успешно сохранено!</div>}
-          
-          <button type="button" onClick={() => { setActiveTab('stock'); haptic(); }} style={{ marginTop: 12, width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: 12, fontWeight: 'bold', fontSize: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>📦 Перейти на склад</button>
         </form>
       </div>
     </div>
@@ -537,23 +632,31 @@ function App() {
               <span style={{ opacity: 0.5 }}>▼</span>
             </button>
           </div>
-          {filterModels.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-              {filterModels.map(m => (
-                <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: 'var(--accent)', color: 'white', padding: '4px 8px', borderRadius: 12, fontSize: 12, fontWeight: 'bold' }}>
-                  {m}
-                  <button onClick={() => removeFilterModel(m)} style={{ background: 'none', border: 'none', color: 'white', padding: 0, fontSize: 14, cursor: 'pointer', display: 'flex' }}>✕</button>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       )}
-      {filteredStock.map((deal) => (
-          <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
-            <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model || 'Без названия'}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
+      {filteredStock.map((deal) => {
+        const daysOnStock = getDaysOnStock(deal);
+        const isDeadStock = daysOnStock >= 21;
+        return (
+          <div key={deal.id} className="card" style={{ borderLeft: `4px solid ${isDeadStock ? 'var(--danger)' : 'var(--warning)'}` }}>
+            <div className="card-header">
+              <div style={{ fontWeight: 700, fontSize: 17 }}>
+                {deal.model || 'Без названия'} 
+                {isDeadStock && <span style={{marginLeft: 8, fontSize: 16}} title="Залежавшийся товар!">⚠️</span>}
+              </div>
+              <div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || ''); setEditLocation(deal.location || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div>
+            </div>
             {renderSpecs(deal)}
             
+            {/* ГАЛЕРЕЯ ФОТО */}
+            {deal.photos && deal.photos.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10 }}>
+                {deal.photos.map((url, idx) => (
+                  <img key={idx} src={url} onClick={() => window.open(url, '_blank')} style={{ height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
+                ))}
+              </div>
+            )}
+
             {deal.seller && (
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
                 👤 Продавец: {deal.seller.name} {deal.seller.phone && (
@@ -565,10 +668,13 @@ function App() {
             )}
 
             <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10 }}>Закуп: {formatMoney(deal.buy_price)} {getDealExpensesSum(deal) > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {formatMoney(getDealExpensesSum(deal))}</span>}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Дата закупа: {new Date(deal.created_at || Date.now()).toLocaleDateString('ru-RU')}</div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 14 }}><button className="btn-cancel" style={{ padding: '12px' }} onClick={() => {setExpenseDeal(deal); setExpenseAmount('');}}>+ Расход</button><button className="btn-success" style={{ flex: 1, padding: '12px' }} onClick={() => {setSellingDeal(deal); setSellPrice(''); setSellWarranty('0');}}>Продать</button></div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+              <button className="btn-cancel" style={{ padding: '12px' }} onClick={() => {setExpenseDeal(deal); setExpenseAmount('');}}>+ Расход</button>
+              <button className="btn-success" style={{ flex: 1, padding: '12px' }} onClick={() => {setSellingDeal(deal); setSellPrice(''); setSellWarranty('0');}}>Продать</button>
+            </div>
           </div>
-      ))}
+        )
+      })}
     </div>
   )
 
@@ -576,7 +682,6 @@ function App() {
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Сделки</h2>
       
-      {/* ЗАГЛУШКА ЕСЛИ НЕТ СДЕЛОК */}
       {soldDeals.length === 0 ? (
         <div style={{ textAlign: 'center', marginTop: 60, color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 60, marginBottom: 15 }}>📭</div>
@@ -596,16 +701,6 @@ function App() {
                 <span style={{ opacity: 0.5 }}>▼</span>
               </button>
             </div>
-            {filterModels.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                {filterModels.map(m => (
-                  <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: 'var(--accent)', color: 'white', padding: '4px 8px', borderRadius: 12, fontSize: 12, fontWeight: 'bold' }}>
-                    {m}
-                    <button onClick={() => removeFilterModel(m)} style={{ background: 'none', border: 'none', color: 'white', padding: 0, fontSize: 14, cursor: 'pointer', display: 'flex' }}>✕</button>
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
           {filteredSold.map((deal) => {
             const margin = (Number(deal.sell_price) || 0) - (Number(deal.buy_price) || 0) - getDealExpensesSum(deal); 
@@ -613,6 +708,15 @@ function App() {
               <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--success)' }}>
                 <div className="card-header"><div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model || 'Без названия'}</div><div><button className="icon-btn" onClick={() => {setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button></div></div>
                 {renderSpecs(deal)}
+                
+                {deal.photos && deal.photos.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10 }}>
+                    {deal.photos.map((url, idx) => (
+                      <img key={idx} src={url} onClick={() => window.open(url, '_blank')} style={{ height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
+                    ))}
+                  </div>
+                )}
+
                 <div style={{ marginBottom: 10 }}>{getWarrantyBadge(deal)}</div>
                 
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
@@ -627,7 +731,7 @@ function App() {
                 <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500 }}>Закуп: {formatMoney(deal.buy_price)} | Продажа: {formatMoney(deal.sell_price)}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Куплен: {new Date(deal.created_at || Date.now()).toLocaleDateString('ru-RU')} • Продан: {deal.sold_at ? new Date(deal.sold_at).toLocaleDateString('ru-RU') : '-'}</div>
                 {deal.expenses && deal.expenses.length > 0 && <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6 }}>{deal.expenses.map(e => `${e.category}: ${formatMoney(e.amount)}`).join(' • ')}</div>}
-                <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10 }}>Чистая прибыль: {formatMoney(margin)}</div>
+                <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10, fontVariantNumeric: 'tabular-nums' }}>Чистая прибыль: {formatMoney(margin)}</div>
               </div>
             )
           })}
@@ -660,7 +764,7 @@ function App() {
           <button className="btn-primary" type="submit" style={{backgroundColor: 'var(--danger)', marginTop: 10}}>Добавить</button>
         </form>
       </div>
-      {generalExpenses.map(exp => (<div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8 }}><div><div style={{ fontWeight: 600 }}>{exp.category}</div></div><div style={{ fontWeight: 700, color: 'var(--danger)' }}>-{formatMoney(exp.amount)}</div></div>))}
+      {generalExpenses.map(exp => (<div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8 }}><div><div style={{ fontWeight: 600 }}>{exp.category}</div></div><div style={{ fontWeight: 700, color: 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>-{formatMoney(exp.amount)}</div></div>))}
     </div>
   )
 
@@ -741,14 +845,8 @@ function App() {
         </div>
       </div>
 
-      <div className="card" style={{ border: '1px solid var(--danger)', backgroundColor: 'rgba(255, 59, 48, 0.05)' }}>
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--danger)' }}>Опасная зона</h3>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Удаление аккаунта безвозвратно удалит все ваши сделки, расходы и контакты.</p>
-        <button onClick={handleResetAccount} style={{ width: '100%', padding: '12px', backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 12, fontWeight: 'bold' }}>Сбросить аккаунт</button>
-      </div>
-
       <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>
-        PrimeTrade v1.0.0 • Сделано для владельцев магазина техники Apple и перекупов
+        PrimeTrade v1.1.0 • Сделано для перекупов
       </div>
     </div>
   )
@@ -759,13 +857,17 @@ function App() {
         <button className="hamburger-btn" onClick={() => { setIsMenuOpen(true); haptic(); }} style={{ position: 'absolute', top: 16, left: 16 }}>☰</button>
       )}
 
-      {activeTab === 'home' && renderHome()}
-      {activeTab === 'purchase' && renderPurchase()}
-      {activeTab === 'stock' && renderStock()}
-      {activeTab === 'deals' && renderDeals()}
-      {activeTab === 'finance' && renderFinance()}
-      {activeTab === 'contacts' && renderContacts()}
-      {activeTab === 'settings' && renderSettings()}
+      {isDataLoading ? renderSkeleton() : (
+        <>
+          {activeTab === 'home' && renderHome()}
+          {activeTab === 'purchase' && renderPurchase()}
+          {activeTab === 'stock' && renderStock()}
+          {activeTab === 'deals' && renderDeals()}
+          {activeTab === 'finance' && renderFinance()}
+          {activeTab === 'contacts' && renderContacts()}
+          {activeTab === 'settings' && renderSettings()}
+        </>
+      )}
 
       <div className={`sidebar-overlay ${isMenuOpen ? 'open' : ''}`} onClick={() => setIsMenuOpen(false)}></div>
       <div className={`sidebar ${isMenuOpen ? 'open' : ''}`} style={{ overflow: 'hidden' }}>
@@ -785,6 +887,7 @@ function App() {
         </div>
       </div>
 
+      {/* МОДАЛКИ */}
       {showBudgetModal && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content">
@@ -794,6 +897,22 @@ function App() {
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowBudgetModal(false)}>Отмена</button>
               <button className="btn-confirm" style={{ backgroundColor: 'var(--success)' }} onClick={saveBudget}>Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDebtModal && (
+        <div className="modal-overlay" style={{ zIndex: 3000 }}>
+          <div className="modal-content">
+            <h3>Долги и задатки</h3>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Мне должны (₽)</label>
+            <input className="input-field" type="text" inputMode="numeric" placeholder="0" value={tempDebtTheyOwe} onChange={(e) => setTempDebtTheyOwe(e.target.value.replace(/[^\d]/g, ''))} />
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Я должен (₽)</label>
+            <input className="input-field" type="text" inputMode="numeric" placeholder="0" value={tempDebtOwe} onChange={(e) => setTempDebtOwe(e.target.value.replace(/[^\d]/g, ''))} />
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowDebtModal(false)}>Отмена</button>
+              <button className="btn-confirm" style={{ backgroundColor: 'var(--warning)' }} onClick={saveDebts}>Сохранить</button>
             </div>
           </div>
         </div>
@@ -836,12 +955,12 @@ function App() {
       )}
       
       {showGuideModal && (
-        <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}><button onClick={() => setShowGuideModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: '#00000088', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 16 }}>✕</button><h3 style={{ paddingRight: 30 }}>📚 Как пользоваться</h3><div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>1. Покупка устройства</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Перейдите во вкладку «Покупка». Выберите модель, цену, память и АКБ. Здесь же можно добавить расходы (ремонт, такси).</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>2. Управление складом</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>На вкладке «Склад» отображаются все устройства в наличии. Используйте умные фильтры для поиска.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>3. Продажа и гарантии</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Нажмите «Продать». Укажите цену, покупателя и срок гарантии. В истории появится бейдж гарантии.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>4. Настройки и приватность</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>В разделе «Настройки» (боковое меню) можно скрыть суммы, изменить имя и настроить уведомления.</div></div></div><div style={{ marginTop: 25 }}><button className="btn-primary" style={{ backgroundColor: 'var(--accent)', width: '100%', padding: '16px' }} onClick={() => setShowGuideModal(false)}>Понятно</button></div></div></div>
+        <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}><button onClick={() => setShowGuideModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: '#00000088', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 16 }}>✕</button><h3 style={{ paddingRight: 30 }}>📚 Как пользоваться</h3><div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>1. Покупка устройства</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Перейдите во вкладку «Покупка». Выберите модель, цену, память и АКБ. Здесь же можно добавить расходы (ремонт, такси), фото дефектов и место хранения.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>2. Управление складом</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>На вкладке «Склад» отображаются все устройства в наличии. Если телефон лежит больше 21 дня, появится значок ⚠️.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>3. Продажа и гарантии</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Нажмите «Продать». Укажите цену, покупателя и срок гарантии. В истории появится бейдж гарантии.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>4. Долги и задатки</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>На главном экране есть блок долгов. Нажмите «Изменить», чтобы записать, кто кому сколько должен.</div></div></div><div style={{ marginTop: 25 }}><button className="btn-primary" style={{ backgroundColor: 'var(--accent)', width: '100%', padding: '16px' }} onClick={() => setShowGuideModal(false)}>Понятно</button></div></div></div>
       )}
 
       {expenseDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Расход: {expenseDeal.model || 'Устройство'}</h3><input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value.replace(/[^\d]/g, ''))} autoFocus/><select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmExpense}>Добавить</button></div></div></div>)}
       
-      {editingDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать</h3><input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/><input className="input-field" type="text" inputMode="numeric" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value.replace(/[^\d]/g, ''))}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={saveEdit}>Сохранить</button></div></div></div>)}
+      {editingDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать</h3><input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/><input className="input-field" type="text" inputMode="numeric" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value.replace(/[^\d]/g, ''))}/><input className="input-field" type="text" placeholder="Место хранения" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={saveEdit}>Сохранить</button></div></div></div>)}
       
       {editingContact && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать контакт</h3><input className="input-field" type="text" value={editContactName} onChange={(e) => setEditContactName(e.target.value)}/><input className="input-field" type="text" value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)}/><input className="input-field" type="text" value={editContactNote} onChange={(e) => setEditContactNote(e.target.value)}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingContact(null)}>Отмена</button><button className="btn-confirm" onClick={saveEditContact}>Сохранить</button></div></div></div>)}
 

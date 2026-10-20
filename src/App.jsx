@@ -412,21 +412,26 @@ function App() {
 
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
+  // --- МАТЕМАТИКА ---
   const soldDeals = deals.filter(d => d.status === 'sold')
   const inStockDeals = deals.filter(d => d.status === 'in_stock')
   
   const totalInvestedInStock = inStockDeals.reduce((sum, deal) => sum + (Number(deal.buy_price) || 0) + getDealExpensesSum(deal), 0)
-  const freeCash = budget - totalInvestedInStock
 
   const totalRevenue = soldDeals.reduce((sum, deal) => sum + (Number(deal.sell_price) || 0), 0)
   const totalBuySold = soldDeals.reduce((sum, deal) => sum + (Number(deal.buy_price) || 0), 0)
   const totalExpSold = soldDeals.reduce((sum, deal) => sum + getDealExpensesSum(deal), 0)
   const realizedProfit = totalRevenue - totalBuySold - totalExpSold;
 
+  const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+
+  // НОВАЯ ФОРМУЛА БЮДЖЕТА:
+  // Стартовый бюджет + Прибыль со всех сделок - Общие расходы - Деньги, замороженные на складе
+  const freeCash = budget + realizedProfit - totalGenExp - totalInvestedInStock;
+
   const avgProfit = soldDeals.length > 0 ? realizedProfit / soldDeals.length : 0;
   const inStockExpenses = inStockDeals.reduce((sum, deal) => sum + getDealExpensesSum(deal), 0);
   const marginPercent = totalRevenue > 0 ? (realizedProfit / totalRevenue) * 100 : 0;
-  const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
   const totalTheyOwe = debts.filter(d => d.type === 'they_owe').reduce((sum, d) => sum + Number(d.amount), 0);
   const totalIOwe = debts.filter(d => d.type === 'i_owe').reduce((sum, d) => sum + Number(d.amount), 0);
@@ -497,7 +502,7 @@ function App() {
   )
 
   const renderHome = () => {
-    const percentInvested = budget > 0 ? (totalInvestedInStock / budget) * 100 : 0;
+    const percentInvested = budget > 0 ? (totalInvestedInStock / (budget + realizedProfit)) * 100 : 0;
     
     return (
     <div>
@@ -518,11 +523,11 @@ function App() {
               <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>свободно</div>
             </div>
             <div style={{ width: '100%', height: 8, backgroundColor: 'var(--bg-color)', borderRadius: 4, marginTop: 12, overflow: 'hidden' }}>
-              <div style={{ width: `${Math.min(percentInvested, 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4 }}></div>
+              <div style={{ width: `${Math.min(Math.max(percentInvested, 0), 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4 }}></div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
               <span>В товаре: {formatMoney(totalInvestedInStock)}</span>
-              <span>Всего: {formatMoney(budget)}</span>
+              <span>Всего: {formatMoney(budget + realizedProfit)}</span>
             </div>
           </>
         ) : (

@@ -25,7 +25,7 @@ function App() {
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
   const [generalExpenses, setGeneralExpenses] = useState([])
-  const [debts, setDebts] = useState([]) // МАССИВ ДОЛГОВ
+  const [debts, setDebts] = useState([]) 
   const [leaderboard, setLeaderboard] = useState([])
   const [isDataLoading, setIsDataLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('home')
@@ -56,13 +56,11 @@ function App() {
   const [showBudgetModal, setShowBudgetModal] = useState(false)
   const [tempBudget, setTempBudget] = useState('')
   
-  // СОСТОЯНИЯ ДЛЯ ДОЛГОВ
   const [showDebtModal, setShowDebtModal] = useState(false)
   const [debtContactId, setDebtContactId] = useState('')
   const [debtAmount, setDebtAmount] = useState('')
-  const [debtType, setDebtType] = useState('they_owe') // 'they_owe' или 'i_owe'
+  const [debtType, setDebtType] = useState('they_owe')
 
-  // Поля сделки
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [storage, setStorage] = useState('')
@@ -75,7 +73,6 @@ function App() {
   const [dealPhotos, setDealPhotos] = useState([]) 
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
-  // Контакты
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactNote, setContactNote] = useState('')
@@ -84,7 +81,6 @@ function App() {
   const [editContactPhone, setEditContactPhone] = useState('')
   const [editContactNote, setEditContactNote] = useState('')
 
-  // Общие расходы
   const [genExpAmount, setGenExpAmount] = useState('')
   const [genExpCategory, setGenExpCategory] = useState('Авито')
   const [customGenExpCategory, setCustomGenExpCategory] = useState('')
@@ -157,7 +153,6 @@ function App() {
     const { data: genExpData } = await supabase.from('expenses').select('*').eq('user_id', user.id).is('deal_id', null).order('created_at', { ascending: false })
     if (genExpData) setGeneralExpenses(genExpData)
 
-    // ЗАГРУЖАЕМ ДОЛГИ (с именами контактов)
     const { data: debtsData } = await supabase.from('debts').select('*, contact:contact_id(name)').eq('user_id', user.id).order('created_at', { ascending: false })
     if (debtsData) setDebts(debtsData)
 
@@ -216,7 +211,6 @@ function App() {
     else setShowBudgetModal(false);
   }
 
-  // --- ДОБАВЛЕНИЕ ДОЛГА ---
   const saveDebt = async () => {
     if (!user) return;
     if (!debtContactId) return alert('Пожалуйста, выберите контакт!');
@@ -258,22 +252,67 @@ function App() {
     finally { setIsDataLoading(false); }
   };
 
+  // ФУНКЦИЯ СЖАТИЯ ФОТО (МАГИЯ)
+  const compressImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let { width, height } = img;
+          const MAX_SIZE = 800; // Максимальная ширина/высота
+          
+          if (width > height && width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          } else if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Сжимаем в JPEG с качеством 0.7
+          canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7);
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // ЗАГРУЗКА НЕСКОЛЬКИХ ФОТО СРАЗУ
   const handlePhotoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file || !user) return;
-    
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    if (dealPhotos.length + files.length > 3) return alert('Максимум 3 фото!');
+
     setUploadingPhoto(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-    
-    const { data, error } = await supabase.storage.from('deal-photos').upload(fileName, file);
-    
-    if (error) {
-      alert('Ошибка загрузки фото: ' + error.message + '\nУбедитесь, что в Supabase отключен RLS для Storage (Шаг 1).');
-    } else {
-      const { data: { publicUrl } } = supabase.storage.from('deal-photos').getPublicUrl(fileName);
-      setDealPhotos(prev => [...prev, publicUrl]);
+    const newUrls = [];
+
+    for (const file of files) {
+      try {
+        const compressedBlob = await compressImage(file);
+        const fileName = `${user.id}-${Date.now()}-${Math.random()}.jpg`;
+        
+        const { error } = await supabase.storage.from('deal-photos').upload(fileName, compressedBlob, { contentType: 'image/jpeg' });
+        
+        if (error) throw error;
+        
+        const { data: { publicUrl } } = supabase.storage.from('deal-photos').getPublicUrl(fileName);
+        newUrls.push(publicUrl);
+      } catch (err) {
+        alert('Ошибка загрузки: ' + err.message);
+      }
     }
+    
+    setDealPhotos(prev => [...prev, ...newUrls]);
     setUploadingPhoto(false);
   }
 
@@ -346,7 +385,6 @@ function App() {
 
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-  // --- МАТЕМАТИКА ---
   const soldDeals = deals.filter(d => d.status === 'sold')
   const inStockDeals = deals.filter(d => d.status === 'in_stock')
   
@@ -363,7 +401,6 @@ function App() {
   const marginPercent = totalRevenue > 0 ? (realizedProfit / totalRevenue) * 100 : 0;
   const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
-  // СУММЫ ДОЛГОВ
   const totalTheyOwe = debts.filter(d => d.type === 'they_owe').reduce((sum, d) => sum + Number(d.amount), 0);
   const totalIOwe = debts.filter(d => d.type === 'i_owe').reduce((sum, d) => sum + Number(d.amount), 0);
 
@@ -469,7 +506,6 @@ function App() {
         )}
       </div>
 
-      {/* ЦВЕТ ТИФФАНИ */}
       <div className="main-profit-card">
         <h3>Реализованная прибыль</h3>
         <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38 }}>{formatMoney(realizedProfit)}</div>
@@ -488,7 +524,6 @@ function App() {
         </div>
       </div>
 
-      {/* ДОЛГИ */}
       <div className="debt-card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <h3>Долги и задатки</h3>
@@ -504,7 +539,6 @@ function App() {
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatMoney(totalIOwe)}</span>
           </div>
         </div>
-        {/* Список долгов */}
         {debts.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {debts.map(d => (
@@ -620,7 +654,7 @@ function App() {
               {dealPhotos.length < 3 && (
                 <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)' }}>
                   {uploadingPhoto ? '...' : '+'}
-                  <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
+                  <input type="file" accept="image/*" multiple onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
                 </label>
               )}
             </div>
@@ -913,7 +947,6 @@ function App() {
         </div>
       </div>
 
-      {/* МОДАЛКИ */}
       {showBudgetModal && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content">
@@ -928,7 +961,6 @@ function App() {
         </div>
       )}
 
-      {/* МОДАЛКА ДОБАВЛЕНИЯ ДОЛГА */}
       {showDebtModal && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content">

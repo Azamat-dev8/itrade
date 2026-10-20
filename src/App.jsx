@@ -28,7 +28,6 @@ function App() {
   const [debts, setDebts] = useState([]) 
   const [leaderboard, setLeaderboard] = useState([])
   
-  // РАЗДЕЛЯЕМ ЗАГРУЗКУ: Скелетон только при старте, Кнопки - при действиях
   const [isInitialLoading, setIsInitialLoading] = useState(true) 
   const [isActionLoading, setIsActionLoading] = useState(false)
   
@@ -146,7 +145,6 @@ function App() {
 
   const fetchData = async () => {
     if (!user) return;
-    // Убрали setIsInitialLoading(true), чтобы скелетон не мигал при каждом обновлении данных
     
     const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name, phone), buyer:buyer_id(name, phone)').eq('user_id', user.id).order('created_at', { ascending: false })
     if (dealsData) setDeals(dealsData)
@@ -178,7 +176,6 @@ function App() {
     const { data: lbData } = await supabase.from('public_leaderboard').select('*').order('gross_profit', { ascending: false }).limit(10)
     if (lbData) setLeaderboard(lbData)
     
-    // Отключаем скелетон ТОЛЬКО когда данные загрузились в первый раз
     setIsInitialLoading(false);
   }
 
@@ -256,6 +253,23 @@ function App() {
     } catch (error) { alert('Ошибка: ' + error.message); } 
     finally { setIsActionLoading(false); }
   };
+
+  const handleExportClick = () => {
+    haptic();
+    if (deals.length === 0) return alert('Нет данных для экспорта');
+    const headers = ['Модель', 'Закупка', 'Продажа', 'Прибыль', 'Дата покупки', 'Дата продажи'];
+    const rows = deals.map(d => { 
+      const exp = getDealExpensesSum(d); 
+      const m = d.sell_price ? (Number(d.sell_price) - Number(d.buy_price) - exp) : ''; 
+      return [
+        `"${d.model}"`, d.buy_price, d.sell_price || '', m, 
+        new Date(d.created_at).toLocaleDateString('ru-RU'), 
+        d.sold_at ? new Date(d.sold_at).toLocaleDateString('ru-RU') : ''
+      ].join(';'); 
+    });
+    setCsvData([headers.join(';'), ...rows].join('\n')); 
+    setShowExportModal(true);
+  }
 
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
@@ -357,26 +371,16 @@ function App() {
     setIsActionLoading(false)
   }
 
-  const handleExportClick = () => {
-    haptic();
-    if (deals.length === 0) return alert('Нет данных для экспорта');
-    const headers = ['Модель', 'Закупка', 'Продажа', 'Прибыль', 'Дата покупки', 'Дата продажи'];
-    const rows = deals.map(d => { 
-      const exp = getDealExpensesSum(d); 
-      const m = d.sell_price ? (Number(d.sell_price) - Number(d.buy_price) - exp) : ''; 
-      return [
-        `"${d.model}"`, 
-        d.buy_price, 
-        d.sell_price || '', 
-        m, 
-        new Date(d.created_at).toLocaleDateString('ru-RU'), 
-        d.sold_at ? new Date(d.sold_at).toLocaleDateString('ru-RU') : ''
-      ].join(';'); 
-    });
-    setCsvData([headers.join(';'), ...rows].join('\n')); 
-    setShowExportModal(true);
+  const addGeneralExpense = async (e) => {
+    e.preventDefault();
+    if (!genExpAmount || !user) return;
+    setIsActionLoading(true);
+    const finalCategory = genExpCategory === 'Свой вариант' ? (customGenExpCategory || 'Другое') : genExpCategory;
+    await supabase.from('expenses').insert([{ amount: Number(genExpAmount), category: finalCategory, user_id: user.id }]);
+    setGenExpAmount(''); setCustomGenExpCategory(''); setGenExpCategory('Авито');
+    fetchData(); haptic('medium');
+    setIsActionLoading(false);
   }
-
 
   const addContact = async (e) => { 
     e.preventDefault(); 
@@ -599,7 +603,7 @@ function App() {
         </div>
       )}
 
-       <div className="card">
+      <div className="card">
         <div style={{ marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3>
           <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.length} шт.</div>
@@ -607,15 +611,7 @@ function App() {
         <button 
           className="btn-success" 
           onClick={handleExportClick} 
-          style={{ 
-            width: '100%', 
-            padding: '14px', 
-            fontSize: 16, 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            gap: 8 
-          }}
+          style={{ width: '100%', padding: '14px', fontSize: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}
         >
           📥 Экспорт в Excel
         </button>
@@ -957,7 +953,6 @@ function App() {
         <button className="hamburger-btn" onClick={() => { setIsMenuOpen(true); haptic(); }} style={{ position: 'absolute', top: 16, left: 16 }}>☰</button>
       )}
 
-      {/* ЗДЕСЬ СКЕЛЕТОН ПОКАЗЫВАЕТСЯ ТОЛЬКО ПРИ ПЕРВИЧНОЙ ЗАГРУЗКЕ */}
       {isInitialLoading ? renderSkeleton() : (
         <>
           {activeTab === 'home' && renderHome()}

@@ -30,8 +30,16 @@ function App() {
   
   const [isInitialLoading, setIsInitialLoading] = useState(true) 
   const [isActionLoading, setIsActionLoading] = useState(false)
-    const [viewingDeal, setViewingDeal] = useState(null)
-      const [viewingPhoto, setViewingPhoto] = useState(null)
+  
+  const [viewingDeal, setViewingDeal] = useState(null)
+  const [viewingPhoto, setViewingPhoto] = useState(null)
+
+  // ОНБОРДИНГ
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [onboardingStep, setOnboardingStep] = useState(1)
+  const [onboardingBudget, setOnboardingBudget] = useState('')
+  const [photoLimitWarning, setPhotoLimitWarning] = useState(false)
+
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -177,17 +185,126 @@ function App() {
       setShowChart(profileInfo.show_chart !== false)
       setDailySummary(profileInfo.daily_summary || false)
       setBudget(Number(profileInfo.resale_budget) || 0)
+      
+      // Если бюджета нет и сделок нет — включаем онбординг
+      if (Number(profileInfo.resale_budget) === 0 && (!dealsData || dealsData.length === 0)) {
+        setShowOnboarding(true)
+      }
     } else {
       const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 }
       await supabase.from('user_profiles').insert([newProf])
       setProfileData(newProf)
       setDisplayName(newProf.display_name)
+      setShowOnboarding(true)
     }
 
     const { data: lbData } = await supabase.from('public_leaderboard').select('*').order('gross_profit', { ascending: false }).limit(10)
     if (lbData) setLeaderboard(lbData)
     
     setIsInitialLoading(false);
+  }
+
+  // --- БЭКАП И ВОССТАНОВЛЕНИЕ ---
+  const downloadBackup = () => {
+    haptic('medium');
+    const backup = {
+      deals: deals.map(d => ({ ...d, seller: undefined, buyer: undefined })),
+      dealExpenses: deals.flatMap(d => (d.expenses || []).map(e => ({ ...e, deal_id: d.id }))),
+      generalExpenses: generalExpenses,
+      contacts: contacts,
+      debts: debts,
+      profile: { resale_budget: budget }
+    };
+    
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `primetrade_backup_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  }
+
+  const restoreBackup = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !user) return;
+    
+    if (!window.confirm('ВНИМАНИЕ! Текущие данные будут удалены и заменены данными из бэкапа. Продолжить?')) return;
+    setIsActionLoading(true);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        
+        await supabase.from('deals').delete().eq('user_id', user.id);
+        await supabase.from('expenses').delete().eq('user_id', user.id);
+        await supabase.from('contacts').delete().eq('user_id', user.id);
+        await supabase.from('debts').delete().eq('user_id', user.id);
+
+        const contactMap = {};
+        if (data.contacts) {
+          for (const c of data.contacts) {
+            const { id, ...rest } = c;
+            const { data: newContact } = await supabase.from('contacts').insert([{ ...rest, user_id: user.id }]).select().single();
+            if (newContact) contactMap[id] = newContact.id;
+          }
+        }
+
+        const dealMap = {};
+        if (data.deals) {
+          for (const d of data.deals) {
+            const { id, expenses, ...rest } = d;
+            const newDeal = {
+              ...rest,
+              user_id: user.id,
+              seller_id: d.seller_id ? contactMap[d.seller_id] : null,
+              buyer_id: d.buyer_id ? contactMap[d.buyer_id] : null
+            };
+            const { data: insertedDeal } = await supabase.from('deals').insert([newDeal]).select().single();
+            if (insertedDeal) dealMap[id] = insertedDeal.id;
+          }
+        }
+
+        if (data.dealExpenses) {
+          for (const exp of data.dealExpenses) {
+            const { id, deal_id, ...rest } = exp;
+            if (dealMap[deal_id]) {
+              await supabase.from('expenses').insert([{ ...rest, user_id: user.id, deal_id: dealMap[deal_id] }]);
+            }
+          }
+        }
+
+        if (data.generalExpenses) {
+          for (const exp of data.generalExpenses) {
+            const { id, ...rest } = exp;
+            await supabase.from('expenses').insert([{ ...rest, user_id: user.id, deal_id: null }]);
+          }
+        }
+
+        if (data.debts) {
+          for (const debt of data.debts) {
+            const { id, contact, contact_id, ...rest } = debt;
+            if (contactMap[contact_id]) {
+              await supabase.from('debts').insert([{ ...rest, user_id: user.id, contact_id: contactMap[contact_id] }]);
+            }
+          }
+        }
+
+        if (data.profile && data.profile.resale_budget) {
+          await supabase.from('user_profiles').update({ resale_budget: data.profile.resale_budget }).eq('telegram_id', user.id);
+        }
+
+        alert('✅ Данные успешно восстановлены!');
+        fetchData();
+      } catch (err) {
+        alert('Ошибка при восстановлении: ' + err.message);
+      } finally {
+        setIsActionLoading(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
   }
 
   const updateSetting = async (key, value) => {
@@ -318,7 +435,12 @@ function App() {
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
-    if (dealPhotos.length + files.length > 3) return alert('Максимум 3 фото!');
+    
+    if (dealPhotos.length + files.length > 3) {
+      setPhotoLimitWarning(true);
+      setTimeout(() => setPhotoLimitWarning(false), 3000);
+      return;
+    }
 
     setUploadingPhoto(true);
     const newUrls = [];
@@ -419,7 +541,6 @@ function App() {
       setShowModelPicker(false);
       setModelSearch('');
       
-      // Автоподстановка истории
       const history = deals.filter(d => d.model === modelName);
       if (history.length > 0) {
         const avgBuy = history.reduce((sum, d) => sum + Number(d.buy_price), 0) / history.length;
@@ -695,7 +816,6 @@ function App() {
     const isEnoughMoney = newFreeCash >= 0;
     const roi = totalCosts > 0 ? (plannedProfit / totalCosts) * 100 : 0;
 
-    // История для справки
     const modelHistory = calcModel ? deals.filter(d => d.model === calcModel) : [];
     const soldHistory = modelHistory.filter(d => d.sell_price);
     const avgMarketBuy = modelHistory.length > 0 ? modelHistory.reduce((sum, d) => sum + Number(d.buy_price), 0) / modelHistory.length : 0;
@@ -719,7 +839,7 @@ function App() {
         <div className="card">
           <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Параметры сделки</h3>
           
-                    <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Модель (для справки)</label>
+          <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Модель (для справки)</label>
           <div className="input-field" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 0 }}>
             <div 
               onClick={() => { setPickerMode('calculator'); setShowModelPicker(true); haptic(); }} 
@@ -880,6 +1000,11 @@ function App() {
                 </label>
               )}
             </div>
+            {photoLimitWarning && (
+              <div style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(255, 59, 48, 0.1)', color: 'var(--danger)', borderRadius: 12, fontSize: 13, textAlign: 'center', fontWeight: 'bold', animation: 'fadeIn 0.3s ease-out' }}>
+                Максимум 3 фото на одно устройство
+              </div>
+            )}
           </div>
 
           <div style={{ marginTop: 10, marginBottom: 5, fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)' }}>
@@ -917,7 +1042,7 @@ function App() {
           </div>
         </div>
       )}
-                  {filteredStock.map((deal) => {
+      {filteredStock.map((deal) => {
         const daysOnStock = getDaysOnStock(deal);
         const isDeadStock = daysOnStock >= 21;
         return (
@@ -927,7 +1052,7 @@ function App() {
             onClick={() => { setViewingDeal(deal); haptic(); }}
             style={{ borderLeft: `4px solid ${isDeadStock ? 'var(--danger)' : 'var(--warning)'}`, cursor: 'pointer' }}
           >
-                        <div className="card-header">
+            <div className="card-header">
               <div style={{ fontWeight: 700, fontSize: 17 }}>
                 {deal.model || 'Без названия'} 
                 {isDeadStock && <span style={{marginLeft: 8, fontSize: 16}} title="Залежавшийся товар!">⚠️</span>}
@@ -977,13 +1102,12 @@ function App() {
               Закуп: {formatMoney(deal.buy_price)} {getDealExpensesSum(deal) > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {formatMoney(getDealExpensesSum(deal))}</span>}
             </div>
 
-            {/* ВОЗВРАЩАЕМ КНОПКИ */}
             <div style={{ display: 'flex', gap: 10 }}>
               <button 
                 className="btn-cancel" 
                 style={{ padding: '12px' }} 
                 onClick={(e) => { 
-                  e.stopPropagation(); // Останавливаем клик, чтобы не открылась карточка
+                  e.stopPropagation(); 
                   setExpenseDeal(deal); 
                   setExpenseAmount(''); 
                 }}
@@ -994,7 +1118,7 @@ function App() {
                 className="btn-success" 
                 style={{ flex: 1, padding: '12px' }} 
                 onClick={(e) => { 
-                  e.stopPropagation(); // Останавливаем клик, чтобы не открылась карточка
+                  e.stopPropagation(); 
                   setSellingDeal(deal); 
                   setSellPrice(''); 
                   setSellWarranty('0'); 
@@ -1164,6 +1288,17 @@ function App() {
       </div>
 
       <div className="card">
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Данные</h3>
+        <button onClick={downloadBackup} className="btn-cancel" style={{ width: '100%', marginBottom: 10, backgroundColor: 'var(--bg-color)', border: '1px solid var(--border)' }}>
+          💾 Скачать резервную копию
+        </button>
+        <label className="btn-cancel" style={{ width: '100%', backgroundColor: 'var(--bg-color)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '14px', borderRadius: '12px', fontWeight: '600', fontSize: '16px', color: 'var(--text-main)' }}>
+          📂 Загрузить копию
+          <input type="file" accept=".json" onChange={restoreBackup} style={{ display: 'none' }} />
+        </label>
+      </div>
+
+      <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Поддержка</h3>
         <div onClick={() => openExternalLink('https://telegra.ph/Polzovatelskoe-soglashenie-10-19-40')} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}>
           <span>📄 Пользовательское соглашение</span> <span style={{ color: '#888' }}>›</span>
@@ -1177,7 +1312,7 @@ function App() {
       </div>
 
       <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>
-        PrimeTrade v1.1.0 • Сделано для перекупов
+        PrimeTrade v1.2.0 • Сделано для перекупов
       </div>
     </div>
   )
@@ -1315,12 +1450,11 @@ function App() {
       )}
 
       {showScanner && (<Scanner key={Date.now()} onScan={(text) => { setImei(text); setShowScanner(false); }} onClose={() => setShowScanner(false)} />)}
-      {/* ОКНО ПОДРОБНОЙ ИНФОРМАЦИИ О ТЕЛЕФОНЕ */}
+      
       {viewingDeal && (
         <div className="modal-overlay" style={{ zIndex: 4000 }}>
           <div className="modal-content" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
             
-            {/* Шапка с кнопками */}
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--card-bg)', zIndex: 10 }}>
               <h3 style={{ margin: 0, fontSize: 20 }}>{viewingDeal.model}</h3>
               <div style={{ display: 'flex', gap: 10 }}>
@@ -1331,7 +1465,6 @@ function App() {
             </div>
 
             <div style={{ padding: 20, overflowY: 'auto' }}>
-              {/* Галерея фото */}
               {viewingDeal.photos && viewingDeal.photos.length > 0 ? (
                 <div style={{ display: 'flex', gap: 10, overflowX: 'auto', marginBottom: 20, paddingBottom: 5 }}>
                   {viewingDeal.photos.map((url, idx) => (
@@ -1349,7 +1482,6 @@ function App() {
                 </div>
               )}
 
-              {/* Характеристики */}
               <div className="card" style={{ padding: 15, marginBottom: 15 }}>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: 14, color: 'var(--text-muted)' }}>Характеристики</h4>
                 {renderSpecs(viewingDeal)}
@@ -1369,7 +1501,6 @@ function App() {
                 )}
               </div>
 
-              {/* Финансы */}
               <div className="card" style={{ padding: 15, marginBottom: 20 }}>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: 14, color: 'var(--text-muted)' }}>Финансы</h4>
                 <div className="stat-row"><span>Цена закупа:</span> <span>{formatMoney(viewingDeal.buy_price)}</span></div>
@@ -1390,7 +1521,6 @@ function App() {
                 </div>
               </div>
 
-              {/* Кнопки действий */}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="btn-cancel" style={{ flex: 1, padding: '16px', backgroundColor: '#fff3cd', color: '#b28900' }} onClick={() => { setViewingDeal(null); setExpenseDeal(viewingDeal); setExpenseAmount(''); }}>+ Расход</button>
                 <button className="btn-success" style={{ flex: 1, padding: '16px' }} onClick={() => { setViewingDeal(null); setSellingDeal(viewingDeal); setSellPrice(''); setSellWarranty('0'); }}>Продать</button>
@@ -1399,7 +1529,7 @@ function App() {
           </div>
         </div>
       )}
-            {/* ВСТРОЕННЫЙ ПРОСМОТРЩИК ФОТО */}
+            
       {viewingPhoto && (
         <div 
           style={{ 
@@ -1426,10 +1556,49 @@ function App() {
           <img 
             src={viewingPhoto} 
             style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
-            onClick={(e) => e.stopPropagation()} // Чтобы клик по самому фото не закрывал его
+            onClick={(e) => e.stopPropagation()}
           />
         </div>
       )}
+
+      {showOnboarding && (
+        <div className="modal-overlay" style={{ zIndex: 10000, alignItems: 'center' }}>
+          <div className="modal-content" style={{ borderRadius: 24, padding: 30, textAlign: 'center' }}>
+            {onboardingStep === 1 && (
+              <>
+                <div style={{ fontSize: 60, marginBottom: 15 }}>👋</div>
+                <h2>Добро пожаловать в PrimeTrade!</h2>
+                <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>Твой личный помощник для учета техники Apple и контроля прибыли.</p>
+                <button className="btn-primary" onClick={() => setOnboardingStep(2)}>Начать</button>
+              </>
+            )}
+            {onboardingStep === 2 && (
+              <>
+                <div style={{ fontSize: 60, marginBottom: 15 }}>💰</div>
+                <h2>Укажите бюджет</h2>
+                <p style={{ color: 'var(--text-muted)', marginBottom: 15 }}>Сколько денег вы готовы вложить в закупку?</p>
+                <input className="input-field" type="text" inputMode="numeric" placeholder="Бюджет (₽)" value={onboardingBudget} onChange={(e) => setOnboardingBudget(e.target.value.replace(/[^\d]/g, ''))} autoFocus />
+                <button className="btn-primary" onClick={async () => {
+                  if (!onboardingBudget) return;
+                  haptic('medium');
+                  setBudget(Number(onboardingBudget));
+                  await supabase.from('user_profiles').update({ resale_budget: Number(onboardingBudget) }).eq('telegram_id', user.id);
+                  setOnboardingStep(3);
+                }}>Сохранить и продолжить</button>
+              </>
+            )}
+            {onboardingStep === 3 && (
+              <>
+                <div style={{ fontSize: 60, marginBottom: 15 }}>📦</div>
+                <h2>Добавьте первый телефон</h2>
+                <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>Перейдите во вкладку «Покупка», чтобы добавить устройство.</p>
+                <button className="btn-primary" onClick={() => { setShowOnboarding(false); setActiveTab('purchase'); }}>Перейти к покупке</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="tab-bar">
         <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon">📊</span> Главная</button>
         <button className={`tab-button ${activeTab === 'purchase' ? 'active' : ''}`} onClick={() => { setActiveTab('purchase'); haptic(); }}><span className="tab-icon">🛒</span> Покупка</button>

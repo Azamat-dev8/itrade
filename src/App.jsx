@@ -1231,114 +1231,121 @@ function App() {
     </div>
   )
 
-    const renderSettings = () => (
+      const renderSettings = () => (
     <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
         <button onClick={() => { setActiveTab('home'); haptic(); }} style={{ background: 'none', border: 'none', fontSize: 24, padding: '0 10px 0 0', cursor: 'pointer', color: 'var(--accent)' }}>←</button>
         <h2 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Настройки</h2>
       </div>
 
+      {/* ПРОФИЛЬ */}
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Профиль</h3>
-        <label style={{ fontSize: 12, color: '#888' }}>Имя профиля</label>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <input className="input-field" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ flex: 1, marginBottom: 0 }} placeholder="Введите имя..." />
-          <button onClick={saveDisplayName} style={{ padding: '0 16px', backgroundColor: 'var(--accent)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold' }}>ОК</button>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 15 }}>Профиль</h3>
+        <div style={{ textAlign: 'left' }}>
+          <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Имя профиля</label>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input className="input-field" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ flex: 1, marginBottom: 0, textAlign: 'left' }} placeholder="Введите имя..." />
+            <button onClick={saveDisplayName} style={{ padding: '0 16px', backgroundColor: 'var(--accent)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold' }}>ОК</button>
+          </div>
         </div>
       </div>
 
+      {/* ПРИВАТНОСТЬ */}
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Приватность</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 15 }}>Приватность</h3>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: 15 }}>Скрыть суммы</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, textAlign: 'left' }}>
+          <div style={{ flex: 1, paddingRight: 10 }}>
+            <div style={{ fontWeight: 'bold', fontSize: 15, color: 'var(--text-main)' }}>Скрыть суммы</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Скрыть цифры на экране</div>
           </div>
           <button 
             onClick={() => updateSetting('hide_amounts', !hideAmounts)} 
-            style={{ padding: '8px 16px', borderRadius: 20, background: hideAmounts ? '#34c759' : '#e5e5ea', color: hideAmounts ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}
+            style={{ padding: '8px 16px', borderRadius: 20, background: hideAmounts ? '#34c759' : '#e5e5ea', color: hideAmounts ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65, flexShrink: 0 }}
           >
             {hideAmounts ? 'ВКЛ' : 'ВЫКЛ'}
           </button>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: 15 }}>Рейтинг перекупов</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+          <div style={{ flex: 1, paddingRight: 10 }}>
+            <div style={{ fontWeight: 'bold', fontSize: 15, color: 'var(--text-main)' }}>Рейтинг перекупов</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Показывать мою прибыль</div>
           </div>
           <button 
             onClick={() => updateSetting('show_in_leaderboard', !profileData?.show_in_leaderboard)} 
-            style={{ padding: '8px 16px', borderRadius: 20, background: profileData?.show_in_leaderboard ? '#34c759' : '#e5e5ea', color: profileData?.show_in_leaderboard ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}
+            style={{ padding: '8px 16px', borderRadius: 20, background: profileData?.show_in_leaderboard ? '#34c759' : '#e5e5ea', color: profileData?.show_in_leaderboard ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65, flexShrink: 0 }}
           >
             {profileData?.show_in_leaderboard ? 'ВКЛ' : 'ВЫКЛ'}
           </button>
         </div>
       </div>
 
+      {/* ВНЕШНИЙ ВИД */}
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Внешний вид</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 15 }}>Внешний вид</h3>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: 15 }}>Тёмная тема</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, textAlign: 'left' }}>
+          <div style={{ flex: 1, paddingRight: 10 }}>
+            <div style={{ fontWeight: 'bold', fontSize: 15, color: 'var(--text-main)' }}>Тёмная тема</div>
           </div>
           <button 
             onClick={toggleTheme} 
-            style={{ padding: '8px 16px', borderRadius: 20, background: isDarkTheme ? '#34c759' : '#e5e5ea', color: isDarkTheme ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}
+            style={{ padding: '8px 16px', borderRadius: 20, background: isDarkTheme ? '#34c759' : '#e5e5ea', color: isDarkTheme ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65, flexShrink: 0 }}
           >
             {isDarkTheme ? 'ВКЛ' : 'ВЫКЛ'}
           </button>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: 15 }}>Показывать график</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+          <div style={{ flex: 1, paddingRight: 10 }}>
+            <div style={{ fontWeight: 'bold', fontSize: 15, color: 'var(--text-main)' }}>Показывать график</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>График прибыли по месяцам</div>
           </div>
           <button 
             onClick={() => updateSetting('show_chart', !showChart)} 
-            style={{ padding: '8px 16px', borderRadius: 20, background: showChart ? '#34c759' : '#e5e5ea', color: showChart ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}
+            style={{ padding: '8px 16px', borderRadius: 20, background: showChart ? '#34c759' : '#e5e5ea', color: showChart ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65, flexShrink: 0 }}
           >
             {showChart ? 'ВКЛ' : 'ВЫКЛ'}
           </button>
         </div>
       </div>
 
+      {/* ПОДПИСКА */}
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Подписка</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 15 }}>Подписка</h3>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: 15 }}>PrimeTrade PRO</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, textAlign: 'left' }}>
+          <div style={{ flex: 1, paddingRight: 10 }}>
+            <div style={{ fontWeight: 'bold', fontSize: 15, color: 'var(--text-main)' }}>PrimeTrade PRO</div>
             <div style={{ fontSize: 12, color: 'var(--success)' }}>Активна (пробный период)</div>
           </div>
-          <button onClick={() => setShowSubModal(true)} style={{ padding: '8px 16px', borderRadius: 20, background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', minWidth: 65 }}>Продлить</button>
+          <button onClick={() => setShowSubModal(true)} style={{ padding: '8px 16px', borderRadius: 20, background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', minWidth: 65, flexShrink: 0 }}>Продлить</button>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: 15 }}>Ежедневная сводка</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}>
+          <div style={{ flex: 1, paddingRight: 10 }}>
+            <div style={{ fontWeight: 'bold', fontSize: 15, color: 'var(--text-main)' }}>Ежедневная сводка</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Уведомления о продажах в боте</div>
           </div>
           <button 
             onClick={() => updateSetting('daily_summary', !dailySummary)} 
-            style={{ padding: '8px 16px', borderRadius: 20, background: dailySummary ? '#34c759' : '#e5e5ea', color: dailySummary ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}
+            style={{ padding: '8px 16px', borderRadius: 20, background: dailySummary ? '#34c759' : '#e5e5ea', color: dailySummary ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65, flexShrink: 0 }}
           >
             {dailySummary ? 'ВКЛ' : 'ВЫКЛ'}
           </button>
         </div>
       </div>
 
+      {/* ДАННЫЕ */}
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, textAlign: 'left' }}>
           <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Данные</h3>
           <button onClick={() => setShowBackupInfo(!showBackupInfo)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, cursor: 'pointer' }}>❓ Для чего это?</button>
         </div>
 
         {showBackupInfo && (
-          <div style={{ backgroundColor: 'var(--bg-color)', padding: 10, borderRadius: 8, fontSize: 13, color: 'var(--text-muted)', marginBottom: 15 }}>
+          <div style={{ backgroundColor: 'var(--bg-color)', padding: 10, borderRadius: 8, fontSize: 13, color: 'var(--text-muted)', marginBottom: 15, textAlign: 'left' }}>
             Резервная копия позволяет сохранить все ваши сделки, контакты и расходы в виде текста. Если вы смените телефон или удалите приложение, вы сможете восстановить все данные, вставив этот текст обратно.
           </div>
         )}
@@ -1352,15 +1359,16 @@ function App() {
         </button>
       </div>
 
+      {/* ПОДДЕРЖКА */}
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Поддержка</h3>
-        <div onClick={() => openExternalLink('https://telegra.ph/Polzovatelskoe-soglashenie-10-19-40')} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 15 }}>Поддержка</h3>
+        <div onClick={() => openExternalLink('https://telegra.ph/Polzovatelskoe-soglashenie-10-19-40')} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left' }}>
           <span>📄 Пользовательское соглашение</span> <span style={{ color: '#888' }}>›</span>
         </div>
-        <div onClick={() => openExternalLink('https://telegra.ph/Politika-konfidencialnosti-10-19-87')} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}>
+        <div onClick={() => openExternalLink('https://telegra.ph/Politika-konfidencialnosti-10-19-87')} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left' }}>
           <span>🔒 Политика конфиденциальности</span> <span style={{ color: '#888' }}>›</span>
         </div>
-        <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}>
+        <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left' }}>
           <span>💬 Служба поддержки</span> <span style={{ color: 'var(--accent)' }}>@primestore8</span>
         </div>
       </div>
@@ -1370,7 +1378,6 @@ function App() {
       </div>
     </div>
   )
-
   return (
     <div className="app-container">
       {activeTab !== 'settings' && activeTab !== 'calculator' && (

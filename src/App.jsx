@@ -36,6 +36,8 @@ function App() {
 
   // БЭКАП
   const [showBackupModal, setShowBackupModal] = useState(false)
+    const [showRestoreModal, setShowRestoreModal] = useState(false)
+  const [restoreJson, setRestoreJson] = useState('')
   const [backupJson, setBackupJson] = useState('')
   const [showBackupInfo, setShowBackupInfo] = useState(false)
 
@@ -216,88 +218,91 @@ function App() {
     setShowBackupModal(true);
   }
 
-  const restoreBackup = async (e) => {
-    const file = e.target.files[0];
-    if (!file || !user) return;
+    const processRestore = async (jsonString) => {
+    if (!user) return;
+    if (!jsonString || !jsonString.trim()) return alert('Вставьте текст резервной копии');
     
     if (!window.confirm('ВНИМАНИЕ! Текущие данные будут удалены и заменены данными из бэкапа. Продолжить?')) return;
     setIsActionLoading(true);
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = JSON.parse(event.target.result);
-        
-        await supabase.from('deals').delete().eq('user_id', user.id);
-        await supabase.from('expenses').delete().eq('user_id', user.id);
-        await supabase.from('contacts').delete().eq('user_id', user.id);
-        await supabase.from('debts').delete().eq('user_id', user.id);
+    try {
+      const data = JSON.parse(jsonString);
+      
+      // Очистка текущих данных
+      await supabase.from('deals').delete().eq('user_id', user.id);
+      await supabase.from('expenses').delete().eq('user_id', user.id);
+      await supabase.from('contacts').delete().eq('user_id', user.id);
+      await supabase.from('debts').delete().eq('user_id', user.id);
 
-        const contactMap = {};
-        if (data.contacts) {
-          for (const c of data.contacts) {
-            const { id, ...rest } = c;
-            const { data: newContact } = await supabase.from('contacts').insert([{ ...rest, user_id: user.id }]).select().single();
-            if (newContact) contactMap[id] = newContact.id;
-          }
+      // Восстановление контактов и сбор новых ID
+      const contactMap = {};
+      if (data.contacts) {
+        for (const c of data.contacts) {
+          const { id, ...rest } = c;
+          const { data: newContact } = await supabase.from('contacts').insert([{ ...rest, user_id: user.id }]).select().single();
+          if (newContact) contactMap[id] = newContact.id;
         }
-
-        const dealMap = {};
-        if (data.deals) {
-          for (const d of data.deals) {
-            const { id, expenses, ...rest } = d;
-            const newDeal = {
-              ...rest,
-              user_id: user.id,
-              seller_id: d.seller_id ? contactMap[d.seller_id] : null,
-              buyer_id: d.buyer_id ? contactMap[d.buyer_id] : null
-            };
-            const { data: insertedDeal } = await supabase.from('deals').insert([newDeal]).select().single();
-            if (insertedDeal) dealMap[id] = insertedDeal.id;
-          }
-        }
-
-        if (data.dealExpenses) {
-          for (const exp of data.dealExpenses) {
-            const { id, deal_id, ...rest } = exp;
-            if (dealMap[deal_id]) {
-              await supabase.from('expenses').insert([{ ...rest, user_id: user.id, deal_id: dealMap[deal_id] }]);
-            }
-          }
-        }
-
-        if (data.generalExpenses) {
-          for (const exp of data.generalExpenses) {
-            const { id, ...rest } = exp;
-            await supabase.from('expenses').insert([{ ...rest, user_id: user.id, deal_id: null }]);
-          }
-        }
-
-        if (data.debts) {
-          for (const debt of data.debts) {
-            const { id, contact, contact_id, ...rest } = debt;
-            if (contactMap[contact_id]) {
-              await supabase.from('debts').insert([{ ...rest, user_id: user.id, contact_id: contactMap[contact_id] }]);
-            }
-          }
-        }
-
-        if (data.profile && data.profile.resale_budget) {
-          await supabase.from('user_profiles').update({ resale_budget: data.profile.resale_budget }).eq('telegram_id', user.id);
-        }
-
-        alert('✅ Данные успешно восстановлены!');
-        fetchData();
-      } catch (err) {
-        alert('Ошибка при восстановлении: ' + err.message);
-      } finally {
-        setIsActionLoading(false);
-        e.target.value = '';
       }
-    };
-    reader.readAsText(file);
-  }
 
+      // Восстановление сделок и сбор новых ID
+      const dealMap = {};
+      if (data.deals) {
+        for (const d of data.deals) {
+          const { id, expenses, ...rest } = d;
+          const newDeal = {
+            ...rest,
+            user_id: user.id,
+            seller_id: d.seller_id ? contactMap[d.seller_id] : null,
+            buyer_id: d.buyer_id ? contactMap[d.buyer_id] : null
+          };
+          const { data: insertedDeal } = await supabase.from('deals').insert([newDeal]).select().single();
+          if (insertedDeal) dealMap[id] = insertedDeal.id;
+        }
+      }
+
+      // Восстановление расходов по сделкам
+      if (data.dealExpenses) {
+        for (const exp of data.dealExpenses) {
+          const { id, deal_id, ...rest } = exp;
+          if (dealMap[deal_id]) {
+            await supabase.from('expenses').insert([{ ...rest, user_id: user.id, deal_id: dealMap[deal_id] }]);
+          }
+        }
+      }
+
+      // Восстановление общих расходов
+      if (data.generalExpenses) {
+        for (const exp of data.generalExpenses) {
+          const { id, ...rest } = exp;
+          await supabase.from('expenses').insert([{ ...rest, user_id: user.id, deal_id: null }]);
+        }
+      }
+
+      // Восстановление долгов
+      if (data.debts) {
+        for (const debt of data.debts) {
+          const { id, contact, contact_id, ...rest } = debt;
+          if (contactMap[contact_id]) {
+            await supabase.from('debts').insert([{ ...rest, user_id: user.id, contact_id: contactMap[contact_id] }]);
+          }
+        }
+      }
+
+      // Восстановление бюджета
+      if (data.profile && data.profile.resale_budget) {
+        await supabase.from('user_profiles').update({ resale_budget: data.profile.resale_budget }).eq('telegram_id', user.id);
+      }
+
+      alert('✅ Данные успешно восстановлены!');
+      setShowRestoreModal(false);
+      setRestoreJson('');
+      fetchData();
+    } catch (err) {
+      alert('Ошибка формата данных. Убедитесь, что вы скопировали текст полностью.\\n' + err.message);
+    } finally {
+      setIsActionLoading(false);
+    }
+  }
   const updateSetting = async (key, value) => {
     haptic('medium');
     if (!user) return;
@@ -1226,7 +1231,7 @@ function App() {
     </div>
   )
 
-  const renderSettings = () => (
+    const renderSettings = () => (
     <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
         <button onClick={() => { setActiveTab('home'); haptic(); }} style={{ background: 'none', border: 'none', fontSize: 24, padding: '0 10px 0 0', cursor: 'pointer', color: 'var(--accent)' }}>←</button>
@@ -1237,44 +1242,92 @@ function App() {
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Профиль</h3>
         <label style={{ fontSize: 12, color: '#888' }}>Имя профиля</label>
         <div style={{ display: 'flex', gap: 10 }}>
-          <input className="input-field" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ flex: 1, marginBottom: 0 }} />
+          <input className="input-field" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ flex: 1, marginBottom: 0 }} placeholder="Введите имя..." />
           <button onClick={saveDisplayName} style={{ padding: '0 16px', backgroundColor: 'var(--accent)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 'bold' }}>ОК</button>
         </div>
       </div>
 
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Приватность</h3>
+        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-          <div><div style={{ fontWeight: 'bold' }}>Скрыть суммы</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Скрыть цифры на экране</div></div>
-          <button onClick={() => updateSetting('hide_amounts', !hideAmounts)} style={{ padding: '8px 16px', borderRadius: 20, background: hideAmounts ? '#34c759' : '#e5e5ea', color: hideAmounts ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}>{hideAmounts ? 'ВКЛ' : 'ВЫКЛ'}</button>
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: 15 }}>Скрыть суммы</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Скрыть цифры на экране</div>
+          </div>
+          <button 
+            onClick={() => updateSetting('hide_amounts', !hideAmounts)} 
+            style={{ padding: '8px 16px', borderRadius: 20, background: hideAmounts ? '#34c759' : '#e5e5ea', color: hideAmounts ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}
+          >
+            {hideAmounts ? 'ВКЛ' : 'ВЫКЛ'}
+          </button>
         </div>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div><div style={{ fontWeight: 'bold' }}>Рейтинг перекупов</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Показывать мою прибыль</div></div>
-          <button onClick={() => updateSetting('show_in_leaderboard', !profileData?.show_in_leaderboard)} style={{ padding: '8px 16px', borderRadius: 20, background: profileData?.show_in_leaderboard ? '#34c759' : '#e5e5ea', color: profileData?.show_in_leaderboard ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}>{profileData?.show_in_leaderboard ? 'ВКЛ' : 'ВЫКЛ'}</button>
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: 15 }}>Рейтинг перекупов</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Показывать мою прибыль</div>
+          </div>
+          <button 
+            onClick={() => updateSetting('show_in_leaderboard', !profileData?.show_in_leaderboard)} 
+            style={{ padding: '8px 16px', borderRadius: 20, background: profileData?.show_in_leaderboard ? '#34c759' : '#e5e5ea', color: profileData?.show_in_leaderboard ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}
+          >
+            {profileData?.show_in_leaderboard ? 'ВКЛ' : 'ВЫКЛ'}
+          </button>
         </div>
       </div>
 
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Внешний вид</h3>
+        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-          <div><div style={{ fontWeight: 'bold' }}>Тёмная тема</div></div>
-          <button onClick={toggleTheme} style={{ padding: '8px 16px', borderRadius: 20, background: isDarkTheme ? '#34c759' : '#e5e5ea', color: isDarkTheme ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}>{isDarkTheme ? 'ВКЛ' : 'ВЫКЛ'}</button>
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: 15 }}>Тёмная тема</div>
+          </div>
+          <button 
+            onClick={toggleTheme} 
+            style={{ padding: '8px 16px', borderRadius: 20, background: isDarkTheme ? '#34c759' : '#e5e5ea', color: isDarkTheme ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}
+          >
+            {isDarkTheme ? 'ВКЛ' : 'ВЫКЛ'}
+          </button>
         </div>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div><div style={{ fontWeight: 'bold' }}>Показывать график</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>График прибыли по месяцам</div></div>
-          <button onClick={() => updateSetting('show_chart', !showChart)} style={{ padding: '8px 16px', borderRadius: 20, background: showChart ? '#34c759' : '#e5e5ea', color: showChart ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}>{showChart ? 'ВКЛ' : 'ВЫКЛ'}</button>
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: 15 }}>Показывать график</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>График прибыли по месяцам</div>
+          </div>
+          <button 
+            onClick={() => updateSetting('show_chart', !showChart)} 
+            style={{ padding: '8px 16px', borderRadius: 20, background: showChart ? '#34c759' : '#e5e5ea', color: showChart ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}
+          >
+            {showChart ? 'ВКЛ' : 'ВЫКЛ'}
+          </button>
         </div>
       </div>
 
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Подписка</h3>
+        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-          <div><div style={{ fontWeight: 'bold' }}>PrimeTrade PRO</div><div style={{ fontSize: 12, color: 'var(--success)' }}>Активна (пробный период)</div></div>
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: 15 }}>PrimeTrade PRO</div>
+            <div style={{ fontSize: 12, color: 'var(--success)' }}>Активна (пробный период)</div>
+          </div>
           <button onClick={() => setShowSubModal(true)} style={{ padding: '8px 16px', borderRadius: 20, background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', minWidth: 65 }}>Продлить</button>
         </div>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div><div style={{ fontWeight: 'bold' }}>Ежедневная сводка</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Уведомления о продажах в боте</div></div>
-          <button onClick={() => updateSetting('daily_summary', !dailySummary)} style={{ padding: '8px 16px', borderRadius: 20, background: dailySummary ? '#34c759' : '#e5e5ea', color: dailySummary ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}>{dailySummary ? 'ВКЛ' : 'ВЫКЛ'}</button>
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: 15 }}>Ежедневная сводка</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Уведомления о продажах в боте</div>
+          </div>
+          <button 
+            onClick={() => updateSetting('daily_summary', !dailySummary)} 
+            style={{ padding: '8px 16px', borderRadius: 20, background: dailySummary ? '#34c759' : '#e5e5ea', color: dailySummary ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}
+          >
+            {dailySummary ? 'ВКЛ' : 'ВЫКЛ'}
+          </button>
         </div>
       </div>
 
@@ -1286,7 +1339,7 @@ function App() {
 
         {showBackupInfo && (
           <div style={{ backgroundColor: 'var(--bg-color)', padding: 10, borderRadius: 8, fontSize: 13, color: 'var(--text-muted)', marginBottom: 15 }}>
-            Резервная копия позволяет сохранить все ваши сделки, контакты и расходы в файл. Если вы смените телефон или удалите приложение, вы сможете восстановить все данные из этого файла.
+            Резервная копия позволяет сохранить все ваши сделки, контакты и расходы в виде текста. Если вы смените телефон или удалите приложение, вы сможете восстановить все данные, вставив этот текст обратно.
           </div>
         )}
 
@@ -1294,10 +1347,9 @@ function App() {
           💾 Скачать резервную копию
         </button>
         
-        <label style={{ width: '100%', backgroundColor: 'var(--bg-color)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '14px', borderRadius: '12px', fontWeight: '600', fontSize: '16px', color: 'var(--text-main)', boxSizing: 'border-box' }}>
-          📂 Загрузить копию
-          <input type="file" accept=".json" onChange={restoreBackup} style={{ display: 'none' }} />
-        </label>
+        <button onClick={() => { setShowRestoreModal(true); setRestoreJson(''); }} className="btn-cancel" style={{ width: '100%', backgroundColor: 'var(--bg-color)', border: '1px solid var(--border)', boxSizing: 'border-box' }}>
+          📂 Восстановить из текста
+        </button>
       </div>
 
       <div className="card">
@@ -1585,6 +1637,27 @@ function App() {
                   const t = document.createElement("textarea"); t.value = backupJson; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); alert('✅ Скопировано!'); setShowBackupModal(false);
                 });
               }}>Копировать</button>
+            </div>
+          </div>
+        </div>
+      )}
+            {/* МОДАЛКА ВОССТАНОВЛЕНИЯ */}
+      {showRestoreModal && (
+        <div className="modal-overlay" style={{ zIndex: 4000 }}>
+          <div className="modal-content" style={{ display: 'flex', flexDirection: 'column' }}>
+            <h3>Восстановление</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Вставьте сюда текст резервной копии, который вы сохраняли.</p>
+            <textarea 
+              value={restoreJson} 
+              onChange={(e) => setRestoreJson(e.target.value)}
+              placeholder="Вставьте текст сюда..."
+              style={{ flex: 1, minHeight: '150px', padding: 10, borderRadius: 12, border: '1px solid #ccc', fontSize: 10, fontFamily: 'monospace', marginBottom: 15 }} 
+            />
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowRestoreModal(false)}>Отмена</button>
+              <button className="btn-confirm" style={{ backgroundColor: 'var(--danger)' }} onClick={() => processRestore(restoreJson)} disabled={isActionLoading}>
+                {isActionLoading ? 'Восстановление...' : 'Восстановить'}
+              </button>
             </div>
           </div>
         </div>

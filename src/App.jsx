@@ -31,7 +31,7 @@ const DEVICE_CATALOG = {
   ]
 };
 
-const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут"
+const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут" // <-- ЗАМЕНИ НА СВОЙ КАНАЛ
 
 function App() {
   const [user, setUser] = useState(null)
@@ -291,7 +291,7 @@ function App() {
     return (Number(amount) || 0).toLocaleString('ru-RU') + ' ₽';
   }
 
-  // ВАЖНО: Эта функция перенесена наверх, чтобы избежать ошибки ReferenceError
+  // ВАЖНО: Функция объявлена до использования
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   // --- МАТЕМАТИКА ---
@@ -304,13 +304,18 @@ function App() {
   // 2. Свободные деньги (Бюджет минус замороженные)
   const freeCash = budget - totalInvestedInStock
 
-  // 3. Реализованная прибыль (только с проданных)
+  // 3. РЕАЛИЗОВАННАЯ ПРИБЫЛЬ (только с продаж, без общих расходов)
   const totalRevenue = soldDeals.reduce((sum, deal) => sum + (Number(deal.sell_price) || 0), 0)
   const totalBuySold = soldDeals.reduce((sum, deal) => sum + (Number(deal.buy_price) || 0), 0)
   const totalExpSold = soldDeals.reduce((sum, deal) => sum + getDealExpensesSum(deal), 0)
-  const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0)
   
-  const realizedProfit = totalRevenue - totalBuySold - totalExpSold - totalGenExp;
+  const realizedProfit = totalRevenue - totalBuySold - totalExpSold;
+
+  // 4. НОВАЯ СТАТИСТИКА ДЛЯ КАРТОЧКИ
+  const avgProfit = soldDeals.length > 0 ? realizedProfit / soldDeals.length : 0;
+  const inStockExpenses = inStockDeals.reduce((sum, deal) => sum + getDealExpensesSum(deal), 0);
+  const marginPercent = totalRevenue > 0 ? (realizedProfit / totalRevenue) * 100 : 0;
+  const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
   const monthlyProfits = soldDeals.reduce((acc, deal) => {
     const date = new Date(deal.sold_at || deal.created_at || Date.now());
@@ -377,7 +382,6 @@ function App() {
           <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>свободно</div>
         </div>
 
-        {/* Полоска прогресса */}
         <div style={{ width: '100%', height: 8, backgroundColor: 'var(--bg-color)', borderRadius: 4, marginTop: 12, overflow: 'hidden' }}>
           <div style={{ width: `${Math.min(percentInvested, 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4 }}></div>
         </div>
@@ -387,13 +391,22 @@ function App() {
         </div>
       </div>
 
-      {/* БЛОК ПРИБЫЛИ (Только с проданных) */}
+      {/* ОБНОВЛЕННЫЙ БЛОК ПРИБЫЛИ */}
       <div className="main-profit-card">
         <h3>Реализованная прибыль</h3>
         <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38 }}>{formatMoney(realizedProfit)}</div>
+        
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>
           <div className="stat-row"><span>Выручка с продаж:</span> <span>{formatMoney(totalRevenue)}</span></div>
-          <div className="stat-row" style={{ marginBottom: 0 }}><span>Расходы:</span> <span>{formatMoney(totalExpSold + totalGenExp)}</span></div>
+          <div className="stat-row"><span>Средняя прибыль (с 1 шт):</span> <span>{formatMoney(avgProfit)}</span></div>
+          <div className="stat-row"><span>Рентабельность:</span> <span>{marginPercent.toFixed(1)}%</span></div>
+          <div className="stat-row"><span>Расходы на складе:</span> <span>{formatMoney(inStockExpenses)}</span></div>
+          
+          {totalGenExp > 0 && (
+            <div className="stat-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.15)', color: '#ffb3b3' }}>
+              <span>Доп. расходы (общие):</span> <span>{formatMoney(totalGenExp)}</span>
+            </div>
+          )}
         </div>
       </div>
 

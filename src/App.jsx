@@ -18,26 +18,25 @@ const DEVICE_CATALOG = {
   'AirPods': ["AirPods 2", "AirPods 3", "AirPods 4", "AirPods 5", "AirPods Pro", "AirPods Pro 2", "AirPods Pro 3", "AirPods Max"]
 };
 
-const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут" // <-- ЗАМЕНИ НА СВОЙ КАНАЛ
+const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут" 
 
 function App() {
   const [user, setUser] = useState(null)
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
   const [generalExpenses, setGeneralExpenses] = useState([])
+  const [debts, setDebts] = useState([]) // МАССИВ ДОЛГОВ
   const [leaderboard, setLeaderboard] = useState([])
-  const [isDataLoading, setIsDataLoading] = useState(true) // ДЛЯ СКЕЛЕТОНОВ
+  const [isDataLoading, setIsDataLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
   
-  // Состояния выбора моделей
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [modelSearch, setModelSearch] = useState('')
   const [modelCategory, setModelCategory] = useState('iPhone')
   const [pickerMode, setPickerMode] = useState('purchase')
   const [filterModels, setFilterModels] = useState([])
 
-  // Модалки и меню
   const [showExportModal, setShowExportModal] = useState(false)
   const [csvData, setCsvData] = useState('')
   const [showScanner, setShowScanner] = useState(false)
@@ -48,7 +47,6 @@ function App() {
   const [isDarkTheme, setIsDarkTheme] = useState(false)
   const [showSuccessMsg, setShowSuccessMsg] = useState(false)
 
-  // Профиль и настройки
   const [profileData, setProfileData] = useState(null)
   const [displayName, setDisplayName] = useState('')
   const [hideAmounts, setHideAmounts] = useState(false)
@@ -58,12 +56,11 @@ function App() {
   const [showBudgetModal, setShowBudgetModal] = useState(false)
   const [tempBudget, setTempBudget] = useState('')
   
-  // Долги
+  // СОСТОЯНИЯ ДЛЯ ДОЛГОВ
   const [showDebtModal, setShowDebtModal] = useState(false)
-  const [debtOwe, setDebtOwe] = useState(0)
-  const [debtTheyOwe, setDebtTheyOwe] = useState(0)
-  const [tempDebtOwe, setTempDebtOwe] = useState('')
-  const [tempDebtTheyOwe, setTempDebtTheyOwe] = useState('')
+  const [debtContactId, setDebtContactId] = useState('')
+  const [debtAmount, setDebtAmount] = useState('')
+  const [debtType, setDebtType] = useState('they_owe') // 'they_owe' или 'i_owe'
 
   // Поля сделки
   const [model, setModel] = useState('')
@@ -75,7 +72,7 @@ function App() {
   const [newDealExpCat, setNewDealExpCat] = useState('Ремонт')
   const [newDealExpAmount, setNewDealExpAmount] = useState('')
   const [dealLocation, setDealLocation] = useState('')
-  const [dealPhotos, setDealPhotos] = useState([]) // Для загрузки
+  const [dealPhotos, setDealPhotos] = useState([]) 
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   // Контакты
@@ -92,18 +89,15 @@ function App() {
   const [genExpCategory, setGenExpCategory] = useState('Авито')
   const [customGenExpCategory, setCustomGenExpCategory] = useState('')
   
-  // Расход по сделке
   const [expenseDeal, setExpenseDeal] = useState(null)
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCategory, setExpenseCategory] = useState('Ремонт')
 
-  // Продажа
   const [sellingDeal, setSellingDeal] = useState(null)
   const [sellPrice, setSellPrice] = useState('')
   const [buyerId, setBuyerId] = useState('')
   const [sellWarranty, setSellWarranty] = useState('0')
   
-  // Редактирование сделки
   const [editingDeal, setEditingDeal] = useState(null)
   const [editModel, setEditModel] = useState('')
   const [editBuyPrice, setEditBuyPrice] = useState('')
@@ -163,6 +157,10 @@ function App() {
     const { data: genExpData } = await supabase.from('expenses').select('*').eq('user_id', user.id).is('deal_id', null).order('created_at', { ascending: false })
     if (genExpData) setGeneralExpenses(genExpData)
 
+    // ЗАГРУЖАЕМ ДОЛГИ (с именами контактов)
+    const { data: debtsData } = await supabase.from('debts').select('*, contact:contact_id(name)').eq('user_id', user.id).order('created_at', { ascending: false })
+    if (debtsData) setDebts(debtsData)
+
     const { data: profileInfo } = await supabase.from('user_profiles').select('*').eq('telegram_id', user.id).single()
     if (profileInfo) {
       setProfileData(profileInfo)
@@ -171,8 +169,6 @@ function App() {
       setShowChart(profileInfo.show_chart !== false)
       setDailySummary(profileInfo.daily_summary || false)
       setBudget(Number(profileInfo.resale_budget) || 0)
-      setDebtOwe(Number(profileInfo.debt_i_owe) || 0)
-      setDebtTheyOwe(Number(profileInfo.debt_they_owe) || 0)
     } else {
       const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 }
       await supabase.from('user_profiles').insert([newProf])
@@ -186,7 +182,6 @@ function App() {
     setIsDataLoading(false);
   }
 
-  // --- СОХРАНЕНИЕ НАСТРОЕК ---
   const updateSetting = async (key, value) => {
     haptic('medium');
     if (!user) return;
@@ -221,15 +216,33 @@ function App() {
     else setShowBudgetModal(false);
   }
 
-  const saveDebts = async () => {
+  // --- ДОБАВЛЕНИЕ ДОЛГА ---
+  const saveDebt = async () => {
     if (!user) return;
+    if (!debtContactId) return alert('Пожалуйста, выберите контакт!');
+    if (!debtAmount || Number(debtAmount) <= 0) return alert('Введите корректную сумму!');
+
     haptic('medium');
-    const owe = Number(tempDebtOwe) || 0;
-    const theyOwe = Number(tempDebtTheyOwe) || 0;
-    setDebtOwe(owe);
-    setDebtTheyOwe(theyOwe);
-    await supabase.from('user_profiles').update({ debt_i_owe: owe, debt_they_owe: theyOwe }).eq('telegram_id', user.id);
-    setShowDebtModal(false);
+    const { error } = await supabase.from('debts').insert([{ 
+      user_id: user.id, 
+      contact_id: Number(debtContactId), 
+      amount: Number(debtAmount), 
+      type: debtType 
+    }]);
+
+    if (error) {
+      alert('Ошибка при сохранении: ' + error.message);
+    } else {
+      setDebtContactId(''); setDebtAmount(''); setDebtType('they_owe');
+      setShowDebtModal(false);
+      fetchData();
+    }
+  }
+
+  const deleteDebt = async (id) => {
+    if (!window.confirm('Удалить эту запись о долге?')) return;
+    await supabase.from('debts').delete().eq('id', id);
+    fetchData();
   }
 
   const clearAllData = async () => {
@@ -239,12 +252,12 @@ function App() {
       await supabase.from('deals').delete().eq('user_id', user.id);
       await supabase.from('expenses').delete().eq('user_id', user.id);
       await supabase.from('contacts').delete().eq('user_id', user.id);
+      await supabase.from('debts').delete().eq('user_id', user.id);
       fetchData(); haptic('heavy');
     } catch (error) { alert('Ошибка: ' + error.message); } 
     finally { setIsDataLoading(false); }
   };
 
-  // --- ФОТОГРАФИИ (SUPABASE STORAGE) ---
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !user) return;
@@ -256,7 +269,7 @@ function App() {
     const { data, error } = await supabase.storage.from('deal-photos').upload(fileName, file);
     
     if (error) {
-      alert('Ошибка загрузки фото: ' + error.message);
+      alert('Ошибка загрузки фото: ' + error.message + '\nУбедитесь, что в Supabase отключен RLS для Storage (Шаг 1).');
     } else {
       const { data: { publicUrl } } = supabase.storage.from('deal-photos').getPublicUrl(fileName);
       setDealPhotos(prev => [...prev, publicUrl]);
@@ -264,7 +277,6 @@ function App() {
     setUploadingPhoto(false);
   }
 
-  // --- ДОБАВЛЕНИЕ СДЕЛКИ ---
   const addDeal = async (e) => {
     e.preventDefault()
     if (!model || !buyPrice || !user) return alert('Заполните модель и цену')
@@ -351,7 +363,10 @@ function App() {
   const marginPercent = totalRevenue > 0 ? (realizedProfit / totalRevenue) * 100 : 0;
   const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
-  // ЮНИТ-ЭКОНОМИКА (Топ моделей по марже)
+  // СУММЫ ДОЛГОВ
+  const totalTheyOwe = debts.filter(d => d.type === 'they_owe').reduce((sum, d) => sum + Number(d.amount), 0);
+  const totalIOwe = debts.filter(d => d.type === 'i_owe').reduce((sum, d) => sum + Number(d.amount), 0);
+
   const modelStats = soldDeals.reduce((acc, deal) => {
     if (!acc[deal.model]) acc[deal.model] = { count: 0, profit: 0 };
     acc[deal.model].count += 1;
@@ -407,7 +422,6 @@ function App() {
     </div>
   )
 
-  // --- СКЕЛЕТОНЫ ---
   const renderSkeleton = () => (
     <div style={{ padding: 16, paddingTop: 60 }}>
       <div className="skeleton skeleton-card" style={{ height: 80 }}></div>
@@ -418,7 +432,6 @@ function App() {
     </div>
   )
 
-  // --- ГЛАВНЫЙ ЭКРАН ---
   const renderHome = () => {
     const percentInvested = budget > 0 ? (totalInvestedInStock / budget) * 100 : 0;
     
@@ -426,7 +439,6 @@ function App() {
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
       
-      {/* БЛОК БЮДЖЕТА */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 'bold' }}>Бюджет</div>
@@ -457,7 +469,7 @@ function App() {
         )}
       </div>
 
-      {/* БЛОК ПРИБЫЛИ (ГРАДИЕНТ) */}
+      {/* ЦВЕТ ТИФФАНИ */}
       <div className="main-profit-card">
         <h3>Реализованная прибыль</h3>
         <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38 }}>{formatMoney(realizedProfit)}</div>
@@ -470,31 +482,47 @@ function App() {
           <div className="stat-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.15)' }}>
             <span>Доп. расходы:</span> <span>{formatMoney(totalGenExp)}</span>
           </div>
-          <div className="stat-row" style={{ color: '#ffb3b3' }}>
+          <div className="stat-row" style={{ color: '#e0ffff' }}>
             <span>Общие расходы:</span> <span>{formatMoney(inStockExpenses + totalGenExp)}</span>
           </div>
         </div>
       </div>
 
-      {/* БЛОК ДОЛГОВ (ГРАДИЕНТ) */}
+      {/* ДОЛГИ */}
       <div className="debt-card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <h3>Долги и задатки</h3>
-          <button onClick={() => { setTempDebtOwe(debtOwe); setTempDebtTheyOwe(debtTheyOwe); setShowDebtModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'white', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}>Изменить</button>
+          <button onClick={() => { setDebtContactId(''); setDebtAmount(''); setShowDebtModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'white', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}>+ Добавить</button>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 600 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 600, marginBottom: 15 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ opacity: 0.8, fontSize: 13 }}>Мне должны:</span>
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatMoney(debtTheyOwe)}</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatMoney(totalTheyOwe)}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'right' }}>
             <span style={{ opacity: 0.8, fontSize: 13 }}>Я должен:</span>
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatMoney(debtOwe)}</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatMoney(totalIOwe)}</span>
           </div>
         </div>
+        {/* Список долгов */}
+        {debts.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {debts.map(d => (
+              <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.15)', padding: '8px 12px', borderRadius: 8 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 'bold' }}>{d.contact?.name || 'Без имени'}</div>
+                  <div style={{ fontSize: 11, opacity: 0.8 }}>{d.type === 'they_owe' ? 'Мне должен' : 'Я должен'}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(d.amount)}</span>
+                  <button onClick={() => deleteDebt(d.id)} style={{ background: 'none', border: 'none', color: 'white', opacity: 0.6, cursor: 'pointer', fontSize: 16 }}>✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ЮНИТ-ЭКОНОМИКА */}
       {topModels.length > 0 && (
         <div className="card">
           <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Топ моделей по марже</h3>
@@ -580,7 +608,6 @@ function App() {
             {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
           </select>
 
-          {/* ФОТОФИКСАЦИЯ */}
           <div style={{ marginBottom: 15, marginTop: 5 }}>
             <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото дефектов / коробки (до 3 шт):</div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -648,7 +675,6 @@ function App() {
             </div>
             {renderSpecs(deal)}
             
-            {/* ГАЛЕРЕЯ ФОТО */}
             {deal.photos && deal.photos.length > 0 && (
               <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10 }}>
                 {deal.photos.map((url, idx) => (
@@ -902,17 +928,30 @@ function App() {
         </div>
       )}
 
+      {/* МОДАЛКА ДОБАВЛЕНИЯ ДОЛГА */}
       {showDebtModal && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content">
-            <h3>Долги и задатки</h3>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Мне должны (₽)</label>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="0" value={tempDebtTheyOwe} onChange={(e) => setTempDebtTheyOwe(e.target.value.replace(/[^\d]/g, ''))} />
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Я должен (₽)</label>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="0" value={tempDebtOwe} onChange={(e) => setTempDebtOwe(e.target.value.replace(/[^\d]/g, ''))} />
+            <h3>Добавить долг</h3>
+            
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Контакт</label>
+            <select className="input-field" value={debtContactId} onChange={(e) => setDebtContactId(e.target.value)}>
+              <option value="">Выберите контакт...</option>
+              {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Сумма (₽)</label>
+            <input className="input-field" type="text" inputMode="numeric" placeholder="0" value={debtAmount} onChange={(e) => setDebtAmount(e.target.value.replace(/[^\d]/g, ''))} />
+
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Тип</label>
+            <select className="input-field" value={debtType} onChange={(e) => setDebtType(e.target.value)}>
+              <option value="they_owe">Мне должны</option>
+              <option value="i_owe">Я должен</option>
+            </select>
+
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowDebtModal(false)}>Отмена</button>
-              <button className="btn-confirm" style={{ backgroundColor: 'var(--warning)' }} onClick={saveDebts}>Сохранить</button>
+              <button className="btn-confirm" style={{ backgroundColor: 'var(--warning)' }} onClick={saveDebt}>Сохранить</button>
             </div>
           </div>
         </div>
@@ -955,7 +994,7 @@ function App() {
       )}
       
       {showGuideModal && (
-        <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}><button onClick={() => setShowGuideModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: '#00000088', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 16 }}>✕</button><h3 style={{ paddingRight: 30 }}>📚 Как пользоваться</h3><div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>1. Покупка устройства</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Перейдите во вкладку «Покупка». Выберите модель, цену, память и АКБ. Здесь же можно добавить расходы (ремонт, такси), фото дефектов и место хранения.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>2. Управление складом</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>На вкладке «Склад» отображаются все устройства в наличии. Если телефон лежит больше 21 дня, появится значок ⚠️.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>3. Продажа и гарантии</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Нажмите «Продать». Укажите цену, покупателя и срок гарантии. В истории появится бейдж гарантии.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>4. Долги и задатки</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>На главном экране есть блок долгов. Нажмите «Изменить», чтобы записать, кто кому сколько должен.</div></div></div><div style={{ marginTop: 25 }}><button className="btn-primary" style={{ backgroundColor: 'var(--accent)', width: '100%', padding: '16px' }} onClick={() => setShowGuideModal(false)}>Понятно</button></div></div></div>
+        <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}><button onClick={() => setShowGuideModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: '#00000088', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 16 }}>✕</button><h3 style={{ paddingRight: 30 }}>📚 Как пользоваться</h3><div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>1. Покупка устройства</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Перейдите во вкладку «Покупка». Выберите модель, цену, память и АКБ. Здесь же можно добавить расходы, фото дефектов и место хранения.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>2. Управление складом</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>На вкладке «Склад» отображаются все устройства в наличии. Если телефон лежит больше 21 дня, появится значок ⚠️.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>3. Продажа и гарантии</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Нажмите «Продать». Укажите цену, покупателя и срок гарантии. В истории появится бейдж гарантии.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>4. Долги и задатки</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>На главном экране есть блок долгов. Нажмите «+ Добавить», чтобы записать, кто кому и сколько должен.</div></div></div><div style={{ marginTop: 25 }}><button className="btn-primary" style={{ backgroundColor: 'var(--accent)', width: '100%', padding: '16px' }} onClick={() => setShowGuideModal(false)}>Понятно</button></div></div></div>
       )}
 
       {expenseDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Расход: {expenseDeal.model || 'Устройство'}</h3><input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value.replace(/[^\d]/g, ''))} autoFocus/><select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmExpense}>Добавить</button></div></div></div>)}

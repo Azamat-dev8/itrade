@@ -54,13 +54,13 @@ body, html {
 
 /* --- ГРАДИЕНТЫ И ТАБЛИЧНЫЕ ЦИФРЫ --- */
 .main-profit-card {
-  /* Мягкий изумрудный градиент для прибыли */
-  background: linear-gradient(135deg, #34c759, #28a745);
+  /* Цвет Тиффани (нежный бирюзовый градиент) */
+  background: linear-gradient(135deg, #0ABAB5, #007A7A); 
   color: white;
   border-radius: 20px;
   padding: 24px 20px;
   margin-bottom: 16px;
-  box-shadow: 0 8px 24px rgba(52, 199, 89, 0.3);
+  box-shadow: 0 8px 24px rgba(10, 186, 181, 0.3);
 }
 
 .debt-card {

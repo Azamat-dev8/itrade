@@ -57,6 +57,8 @@ function App() {
   const [showScanner, setShowScanner] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showSubModal, setShowSubModal] = useState(false)
+    const [selectedPlan, setSelectedPlan] = useState('12') // По умолчанию выбран 12 месяцев
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false)
   const [showGuideModal, setShowGuideModal] = useState(false)
   const [isDarkTheme, setIsDarkTheme] = useState(false)
@@ -1492,8 +1494,110 @@ function App() {
         <div className="modal-overlay"><div className="modal-content"><h3>🏆 Топ перекупов</h3>{leaderboard.map((lb, idx) => (<div key={lb.user_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><span style={{ fontSize: 18 }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx+1}.`}</span><span style={{ fontWeight: 600 }}>{lb.user_name} {lb.user_id === user?.id ? '(Вы)' : ''}</span></div><span style={{ fontWeight: 'bold', color: 'var(--success)' }}>{formatMoney(lb.gross_profit)}</span></div>))}<div className="modal-actions"><button className="btn-cancel" onClick={() => setShowLeaderboardModal(false)}>Закрыть</button></div></div></div>
       )}
       
+            {/* МОДАЛКА ПОДПИСКИ (PAYWALL) */}
       {showSubModal && (
-        <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content"><h3 style={{ textAlign: 'center' }}>PrimeTrade PRO</h3><p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Пробный период: <strong style={{ color: '#34c759' }}>14 дней</strong></p><div className="pricing-grid"><div className="pricing-card" onClick={() => alert('Оплата 390 ₽...')}><div><div style={{ fontWeight: 'bold' }}>1 месяц</div><div style={{ fontSize: 12 }}>390 ₽</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div><div className="pricing-card" onClick={() => alert('Оплата 1990 ₽...')}><div><div style={{ fontWeight: 'bold' }}>6 месяцев</div><div style={{ fontSize: 12 }}>1990 ₽</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div><div className="pricing-card best-value" onClick={() => alert('Оплата 3590 ₽...')}><div className="best-value-badge">ВЫГОДНО</div><div><div style={{ fontWeight: 'bold' }}>12 месяцев</div><div style={{ fontSize: 12 }}>3590 ₽</div></div><div style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Выбрать</div></div></div><div className="modal-actions" style={{ marginTop: 20 }}><button className="btn-cancel" onClick={() => setShowSubModal(false)}>Закрыть</button></div></div></div>
+        <div className="modal-overlay" style={{ zIndex: 2000 }}>
+          <div className="modal-content" style={{ padding: 0, overflow: 'hidden', borderRadius: 24 }}>
+            
+            {/* Шапка с градиентом */}
+            <div style={{ background: 'linear-gradient(135deg, #2481cc, #1a5c94)', padding: '30px 20px', textAlign: 'center', color: 'white' }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>👑</div>
+              <h2 style={{ margin: 0, fontSize: 24, fontWeight: 'bold' }}>PrimeTrade PRO</h2>
+              <p style={{ margin: '5px 0 0 0', opacity: 0.9, fontSize: 14 }}>
+                {profileData?.subscription_ends_at 
+                  ? `Подписка активна до ${new Date(profileData.subscription_ends_at).toLocaleDateString('ru-RU')}`
+                  : profileData?.trial_ends_at 
+                    ? `Пробный период до ${new Date(profileData.trial_ends_at).toLocaleDateString('ru-RU')}`
+                    : 'Полный доступ ко всем функциям'}
+              </p>
+            </div>
+
+            <div style={{ padding: 20 }}>
+              <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center' }}>Выберите тариф</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                
+                {/* Тариф 1 месяц */}
+                <div 
+                  onClick={() => { setSelectedPlan('1'); haptic(); }}
+                  style={{ 
+                    border: `2px solid ${selectedPlan === '1' ? 'var(--accent)' : 'var(--border)'}`, 
+                    borderRadius: 16, padding: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
+                    backgroundColor: selectedPlan === '1' ? 'rgba(36, 129, 204, 0.05)' : 'var(--bg-color)'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: 16 }}>1 месяц</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>390 ₽ / мес</div>
+                  </div>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', border: `2px solid ${selectedPlan === '1' ? 'var(--accent)' : '#ccc'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {selectedPlan === '1' && <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: 'var(--accent)' }}></div>}
+                  </div>
+                </div>
+
+                {/* Тариф 6 месяцев */}
+                <div 
+                  onClick={() => { setSelectedPlan('6'); haptic(); }}
+                  style={{ 
+                    border: `2px solid ${selectedPlan === '6' ? 'var(--accent)' : 'var(--border)'}`, 
+                    borderRadius: 16, padding: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
+                    backgroundColor: selectedPlan === '6' ? 'rgba(36, 129, 204, 0.05)' : 'var(--bg-color)'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: 16 }}>6 месяцев</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>1990 ₽ (332 ₽/мес)</div>
+                  </div>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', border: `2px solid ${selectedPlan === '6' ? 'var(--accent)' : '#ccc'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {selectedPlan === '6' && <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: 'var(--accent)' }}></div>}
+                  </div>
+                </div>
+
+                {/* Тариф 12 месяцев */}
+                <div 
+                  onClick={() => { setSelectedPlan('12'); haptic(); }}
+                  style={{ 
+                    border: `2px solid ${selectedPlan === '12' ? 'var(--accent)' : 'var(--border)'}`, 
+                    borderRadius: 16, padding: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
+                    backgroundColor: selectedPlan === '12' ? 'rgba(36, 129, 204, 0.05)' : 'var(--bg-color)',
+                    position: 'relative'
+                  }}
+                >
+                  <div style={{ position: 'absolute', top: -10, right: 15, backgroundColor: '#ff9500', color: 'white', fontSize: 10, fontWeight: 'bold', padding: '2px 8px', borderRadius: 10 }}>ВЫГОДНО</div>
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: 16 }}>12 месяцев</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>3590 ₽ (299 ₽/мес)</div>
+                  </div>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', border: `2px solid ${selectedPlan === '12' ? 'var(--accent)' : '#ccc'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {selectedPlan === '12' && <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: 'var(--accent)' }}></div>}
+                  </div>
+                </div>
+
+              </div>
+
+              <button 
+                className="btn-primary" 
+                disabled={isProcessingPayment}
+                onClick={() => {
+                  haptic('heavy');
+                  setIsProcessingPayment(true);
+                  // ЗДЕСЬ БУДЕТ ВЫЗОВ PLATEGA
+                  setTimeout(() => {
+                    setIsProcessingPayment(false);
+                    alert('Тут будет переход на оплату Platega для тарифа: ' + selectedPlan + ' мес.');
+                  }, 1500);
+                }}
+                style={{ backgroundColor: 'var(--accent)', padding: '16px', fontSize: 16, opacity: isProcessingPayment ? 0.7 : 1 }}
+              >
+                {isProcessingPayment ? 'Создание платежа...' : 'Оплатить через СБП'}
+              </button>
+
+              <button className="btn-cancel" onClick={() => setShowSubModal(false)} style={{ width: '100%', marginTop: 10 }}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       
       {showGuideModal && (

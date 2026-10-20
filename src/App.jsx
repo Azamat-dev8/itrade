@@ -31,6 +31,7 @@ function App() {
   const [isInitialLoading, setIsInitialLoading] = useState(true) 
   const [isActionLoading, setIsActionLoading] = useState(false)
     const [viewingDeal, setViewingDeal] = useState(null)
+      const [viewingPhoto, setViewingPhoto] = useState(null)
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -938,7 +939,7 @@ function App() {
             {deal.photos && deal.photos.length > 0 && (
               <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10 }}>
                 {deal.photos.map((url, idx) => (
-                  <img key={idx} src={url} style={{ height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)' }} />
+                  <img key={idx} src={url} onClick={(e) => { e.stopPropagation(); setViewingPhoto(url); haptic(); }} style={{ height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
                 ))}
               </div>
             )}
@@ -1019,7 +1020,7 @@ function App() {
                 {deal.photos && deal.photos.length > 0 && (
                   <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10 }}>
                     {deal.photos.map((url, idx) => (
-                      <img key={idx} src={url} onClick={() => window.open(url, '_blank')} style={{ height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
+                      <img key={idx} src={url} onClick={() => { setViewingPhoto(url); haptic(); }} style={{ height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
                     ))}
                   </div>
                 )}
@@ -1314,7 +1315,7 @@ function App() {
                     <img 
                       key={idx} 
                       src={url} 
-                      onClick={() => window.open(url, '_blank')} 
+                      onClick={() => { setViewingPhoto(url); haptic(); }}
                       style={{ height: 200, borderRadius: 12, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0 }} 
                     />
                   ))}
@@ -1373,6 +1374,37 @@ function App() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+            {/* ВСТРОЕННЫЙ ПРОСМОТРЩИК ФОТО */}
+      {viewingPhoto && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            backgroundColor: 'rgba(0, 0, 0, 0.95)', 
+            zIndex: 9999, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center' 
+          }} 
+          onClick={() => setViewingPhoto(null)}
+        >
+          <button 
+            style={{ 
+              position: 'absolute', top: 20, right: 20, 
+              background: 'rgba(255,255,255,0.2)', border: 'none', 
+              borderRadius: '50%', width: 40, height: 40, 
+              color: 'white', fontSize: 20, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+          >
+            ✕
+          </button>
+          <img 
+            src={viewingPhoto} 
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+            onClick={(e) => e.stopPropagation()} // Чтобы клик по самому фото не закрывал его
+          />
         </div>
       )}
       <div className="tab-bar">

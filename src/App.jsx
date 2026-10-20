@@ -1578,30 +1578,53 @@ function App() {
                             <button 
                 className="btn-primary" 
                 disabled={isProcessingPayment}
-                                   onClick={async () => {
-                  alert('Кнопка нажата!'); // <--- ДОБАВЬ ЭТО
+                                                   onClick={async () => {
                   haptic('heavy');
                   setIsProcessingPayment(true);
-                  // ... дальше остальной код
                   
+                  // 1. Открываем пустую вкладку СРАЗУ (чтобы браузер не блокировал)
+                  const newWindow = window.open('', '_blank');
+
                   try {
-                    // Вызываем нашу Edge Function
-                    const { data, error } = await supabase.functions.invoke('create-platega-subscription', {
-                      body: { telegram_id: user?.id, plan_id: selectedPlan }
+                    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+                    
+                    const response = await fetch(`${supabaseUrl}/functions/v1/create-platega-subscription`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'apikey': supabaseKey
+                      },
+                      body: JSON.stringify({ 
+                        telegram_id: user?.id, 
+                        plan_id: selectedPlan 
+                      })
                     });
 
-                    if (error) throw error;
+                    if (!response.ok) {
+                      const errText = await response.text();
+                      throw new Error(`HTTP ${response.status}: ${errText}`);
+                    }
 
-                    // Если получили ссылку - открываем её в Telegram
+                    const data = await response.json();
+                    
                     if (data?.redirect) {
-                      if (window.Telegram?.WebApp?.openLink) {
+                      // 2. Перенаправляем нашу открытую вкладку на ссылку оплаты
+                      if (newWindow) {
+                        newWindow.location.href = data.redirect;
+                      } else if (window.Telegram?.WebApp?.openLink) {
                         window.Telegram.WebApp.openLink(data.redirect);
                       } else {
-                        window.open(data.redirect, '_blank');
+                        alert('Не удалось открыть окно. Ссылка: ' + data.redirect);
                       }
+                    } else {
+                      if (newWindow) newWindow.close();
+                      alert('Сервер не вернул ссылку на оплату');
                     }
                   } catch (err) {
-                    alert('Ошибка создания платежа: ' + err.message);
+                    if (newWindow) newWindow.close();
+                    alert('Ошибка: ' + err.message);
                   } finally {
                     setIsProcessingPayment(false);
                   }

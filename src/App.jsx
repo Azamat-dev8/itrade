@@ -357,16 +357,26 @@ function App() {
     setIsActionLoading(false)
   }
 
-  const addGeneralExpense = async (e) => {
-    e.preventDefault();
-    if (!genExpAmount || !user) return;
-    setIsActionLoading(true);
-    const finalCategory = genExpCategory === 'Свой вариант' ? (customGenExpCategory || 'Другое') : genExpCategory;
-    await supabase.from('expenses').insert([{ amount: Number(genExpAmount), category: finalCategory, note: genExpNote || null, user_id: user.id }]);
-    setGenExpAmount(''); setGenExpNote(''); setCustomGenExpCategory(''); setGenExpCategory('Авито');
-    fetchData(); haptic('medium');
-    setIsActionLoading(false);
+  const handleExportClick = () => {
+    haptic();
+    if (deals.length === 0) return alert('Нет данных для экспорта');
+    const headers = ['Модель', 'Закупка', 'Продажа', 'Прибыль', 'Дата покупки', 'Дата продажи'];
+    const rows = deals.map(d => { 
+      const exp = getDealExpensesSum(d); 
+      const m = d.sell_price ? (Number(d.sell_price) - Number(d.buy_price) - exp) : ''; 
+      return [
+        `"${d.model}"`, 
+        d.buy_price, 
+        d.sell_price || '', 
+        m, 
+        new Date(d.created_at).toLocaleDateString('ru-RU'), 
+        d.sold_at ? new Date(d.sold_at).toLocaleDateString('ru-RU') : ''
+      ].join(';'); 
+    });
+    setCsvData([headers.join(';'), ...rows].join('\n')); 
+    setShowExportModal(true);
   }
+
 
   const addContact = async (e) => { 
     e.preventDefault(); 
@@ -589,9 +599,26 @@ function App() {
         </div>
       )}
 
-      <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div><h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3><div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.length} шт.</div></div>
-        <button className="btn-success" onClick={() => { setCsvData(''); setShowExportModal(true); }} style={{ padding: '12px 16px' }}>📥 Экспорт</button>
+       <div className="card">
+        <div style={{ marginBottom: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3>
+          <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.length} шт.</div>
+        </div>
+        <button 
+          className="btn-success" 
+          onClick={handleExportClick} 
+          style={{ 
+            width: '100%', 
+            padding: '14px', 
+            fontSize: 16, 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            gap: 8 
+          }}
+        >
+          📥 Экспорт в Excel
+        </button>
       </div>
       
       <button onClick={clearAllData} disabled={isActionLoading} style={{ width: '100%', padding: '12px', marginBottom: '16px', backgroundColor: 'var(--card-bg)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>

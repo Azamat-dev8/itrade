@@ -59,21 +59,22 @@ function App() {
   const [isDarkTheme, setIsDarkTheme] = useState(false)
   const [showSuccessMsg, setShowSuccessMsg] = useState(false)
 
-  // НОВЫЕ НАСТРОЙКИ ПРОФИЛЯ
   const [profileData, setProfileData] = useState(null)
   const [displayName, setDisplayName] = useState('')
   const [hideAmounts, setHideAmounts] = useState(false)
   const [showChart, setShowChart] = useState(true)
   const [dailySummary, setDailySummary] = useState(false)
+  
+  const [budget, setBudget] = useState(100000)
+  const [showBudgetModal, setShowBudgetModal] = useState(false)
+  const [tempBudget, setTempBudget] = useState('')
 
-  // Поля для сделки
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [storage, setStorage] = useState('')
   const [battery, setBattery] = useState('')
   const [imei, setImei] = useState('')
   const [sellerId, setSellerId] = useState('')
-  
   const [newDealExpCat, setNewDealExpCat] = useState('Ремонт')
   const [newDealExpAmount, setNewDealExpAmount] = useState('')
 
@@ -136,7 +137,6 @@ function App() {
     if (tg?.openLink) tg.openLink(url); else window.open(url, '_blank');
   }
 
-  // ИСПРАВЛЕННАЯ ФУНКЦИЯ ЗВОНКА (универсальная)
   const handlePhoneCall = (phone) => {
     if (!phone) return;
     const cleanPhone = phone.replace(/[^\d+]/g, '');
@@ -163,8 +163,9 @@ function App() {
       setHideAmounts(profileInfo.hide_amounts || false)
       setShowChart(profileInfo.show_chart !== false)
       setDailySummary(profileInfo.daily_summary || false)
+      setBudget(Number(profileInfo.resale_budget) || 100000)
     } else {
-      const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false }
+      const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 100000 }
       await supabase.from('user_profiles').insert([newProf])
       setProfileData(newProf)
       setDisplayName(newProf.display_name)
@@ -198,6 +199,14 @@ function App() {
     alert('✅ Имя профиля обновлено!')
   }
 
+  const saveBudget = async () => {
+    if (!tempBudget || !user) return;
+    haptic('medium');
+    setBudget(Number(tempBudget));
+    await supabase.from('user_profiles').update({ resale_budget: Number(tempBudget) }).eq('telegram_id', user.id);
+    setShowBudgetModal(false);
+  }
+
   const handleResetAccount = async () => {
     if (!window.confirm('ВНИМАНИЕ! Это удалит ВСЕ ваши сделки, контакты, расходы и настройки. Вы уверены?')) return;
     if (!window.confirm('Точно уверены? Это действие нельзя отменить.')) return;
@@ -208,7 +217,6 @@ function App() {
       await supabase.from('expenses').delete().eq('user_id', user.id);
       await supabase.from('contacts').delete().eq('user_id', user.id);
       await supabase.from('user_profiles').delete().eq('telegram_id', user.id);
-      
       alert('Аккаунт полностью сброшен. Приложение будет перезагружено.');
       window.location.reload();
     } catch (error) { alert('Ошибка: ' + error.message); } 
@@ -283,13 +291,24 @@ function App() {
     return (Number(amount) || 0).toLocaleString('ru-RU') + ' ₽';
   }
 
+  // --- МАТЕМАТИКА ---
   const soldDeals = deals.filter(d => d.status === 'sold')
   const inStockDeals = deals.filter(d => d.status === 'in_stock')
-  const totalBuy = deals.reduce((sum, deal) => sum + (Number(deal.buy_price) || 0), 0)
-  const totalDealExp = deals.reduce((sum, deal) => sum + (deal.expenses || []).reduce((s, e) => s + (Number(e.amount) || 0), 0), 0)
-  const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0)
+  
+  // 1. Замороженные средства (вложено в товар на складе)
+  const totalInvestedInStock = inStockDeals.reduce((sum, deal) => sum + (Number(deal.buy_price) || 0) + getDealExpensesSum(deal), 0)
+  
+  // 2. Свободные деньги (Бюджет минус замороженные)
+  const freeCash = budget - totalInvestedInStock
+
+  // 3. Реализованная прибыль (только с проданных)
   const totalRevenue = soldDeals.reduce((sum, deal) => sum + (Number(deal.sell_price) || 0), 0)
-  const totalProfit = totalRevenue - totalBuy - totalDealExp - totalGenExp
+  const totalBuySold = soldDeals.reduce((sum, deal) => sum + (Number(deal.buy_price) || 0), 0)
+  const totalExpSold = soldDeals.reduce((sum, deal) => sum + getDealExpensesSum(deal), 0)
+  const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0)
+  
+  const realizedProfit = totalRevenue - totalBuySold - totalExpSold - totalGenExp;
+
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   const monthlyProfits = soldDeals.reduce((acc, deal) => {
@@ -335,16 +354,45 @@ function App() {
     </div>
   )
 
-  const renderHome = () => (
+  // --- ГЛАВНЫЙ ЭКРАН ---
+  const renderHome = () => {
+    const percentInvested = budget > 0 ? (totalInvestedInStock / budget) * 100 : 0;
+    
+    return (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
+      
+      {/* БЛОК БЮДЖЕТА */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 'bold' }}>Бюджет</div>
+          <button onClick={() => { setTempBudget(budget); setShowBudgetModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>Изменить ✏️</button>
+        </div>
+        
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+          <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+            {formatMoney(freeCash)}
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>свободно</div>
+        </div>
+
+        {/* Полоска прогресса */}
+        <div style={{ width: '100%', height: 8, backgroundColor: 'var(--bg-color)', borderRadius: 4, marginTop: 12, overflow: 'hidden' }}>
+          <div style={{ width: `${Math.min(percentInvested, 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4 }}></div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+          <span>В товаре: {formatMoney(totalInvestedInStock)}</span>
+          <span>Всего: {formatMoney(budget)}</span>
+        </div>
+      </div>
+
+      {/* БЛОК ПРИБЫЛИ (Только с проданных) */}
       <div className="main-profit-card">
-        <h3>Чистая прибыль</h3>
-        <div className="main-profit-value" style={{ fontSize: totalProfit > 999999 ? 28 : 38 }}>{formatMoney(totalProfit)}</div>
+        <h3>Реализованная прибыль</h3>
+        <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38 }}>{formatMoney(realizedProfit)}</div>
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>
-          <div className="stat-row"><span>Выручка:</span> <span>{formatMoney(totalRevenue)}</span></div>
-          <div className="stat-row"><span>Закупки:</span> <span>{formatMoney(totalBuy)}</span></div>
-          <div className="stat-row" style={{ marginBottom: 0 }}><span>Расходы:</span> <span>{formatMoney(totalDealExp + totalGenExp)}</span></div>
+          <div className="stat-row"><span>Выручка с продаж:</span> <span>{formatMoney(totalRevenue)}</span></div>
+          <div className="stat-row" style={{ marginBottom: 0 }}><span>Расходы:</span> <span>{formatMoney(totalExpSold + totalGenExp)}</span></div>
         </div>
       </div>
 
@@ -371,7 +419,7 @@ function App() {
         </div>
       )}
     </div>
-  )
+  )}
 
   const renderPurchase = () => (
     <div>
@@ -564,7 +612,6 @@ function App() {
         <h2 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Настройки</h2>
       </div>
 
-      {/* ПРОФИЛЬ */}
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Профиль</h3>
         <label style={{ fontSize: 12, color: '#888' }}>Имя профиля</label>
@@ -574,7 +621,6 @@ function App() {
         </div>
       </div>
 
-      {/* ПРИВАТНОСТЬ */}
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Приватность</h3>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
@@ -587,7 +633,6 @@ function App() {
         </div>
       </div>
 
-      {/* ВНЕШНИЙ ВИД */}
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Внешний вид</h3>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
@@ -600,7 +645,6 @@ function App() {
         </div>
       </div>
 
-      {/* ПОДПИСКА */}
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Подписка</h3>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
@@ -613,7 +657,6 @@ function App() {
         </div>
       </div>
 
-      {/* ПОДДЕРЖКА */}
       <div className="card">
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Поддержка</h3>
         <div onClick={() => openExternalLink('https://telegra.ph/Polzovatelskoe-soglashenie-10-19-40')} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}>
@@ -627,7 +670,6 @@ function App() {
         </div>
       </div>
 
-      {/* ОПАСНАЯ ЗОНА */}
       <div className="card" style={{ border: '1px solid var(--danger)', backgroundColor: 'rgba(255, 59, 48, 0.05)' }}>
         <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--danger)' }}>Опасная зона</h3>
         <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Удаление аккаунта безвозвратно удалит все ваши сделки, расходы и контакты.</p>
@@ -654,7 +696,6 @@ function App() {
       {activeTab === 'contacts' && renderContacts()}
       {activeTab === 'settings' && renderSettings()}
 
-      {/* БОКОВОЕ МЕНЮ */}
       <div className={`sidebar-overlay ${isMenuOpen ? 'open' : ''}`} onClick={() => setIsMenuOpen(false)}></div>
       <div className={`sidebar ${isMenuOpen ? 'open' : ''}`} style={{ overflow: 'hidden' }}>
         <div className="profile-section">
@@ -664,23 +705,30 @@ function App() {
 
         <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10, overflowY: 'auto' }}>
            <button onClick={() => { setShowSubModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #ff9500, #ff3b30)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(255, 149, 0, 0.3)' }}>⭐ Моя подписка</button>
-           
            {profileData?.show_in_leaderboard && <button onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🏆 Рейтинг перекупов</button>}
-           
            <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>
-           
            <button onClick={() => { const refLink = `https://t.me/Primetrade8_bot?start=ref_${user?.id || ''}`; window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent('Попробуй iTrade!')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🎁 Пригласи друга</button>
-           
            <button onClick={() => { window.open(`https://t.me/primestore8?text=${encodeURIComponent('Привет! Идея: ')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>💡 Предложить идею</button>
-           
            <button onClick={() => { setActiveTab('settings'); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>⚙️ Настройки</button>
-
-           {/* КНОПКА КАНАЛА ТЕПЕРЬ В САМОМ НИЗУ */}
            <button onClick={() => { openExternalLink(MY_CHANNEL_URL); haptic('medium'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🛍 Проверенная техника</button>
         </div>
       </div>
 
-      {/* МОДАЛКИ */}
+      {/* МОДАЛКА БЮДЖЕТА */}
+      {showBudgetModal && (
+        <div className="modal-overlay" style={{ zIndex: 3000 }}>
+          <div className="modal-content">
+            <h3>Изменить бюджет</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Укажите сумму, которой вы располагаете для закупки товара.</p>
+            <input className="input-field" type="text" inputMode="numeric" placeholder="Бюджет (₽)" value={tempBudget} onChange={(e) => setTempBudget(e.target.value.replace(/[^\d]/g, ''))} autoFocus />
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowBudgetModal(false)}>Отмена</button>
+              <button className="btn-confirm" style={{ backgroundColor: 'var(--success)' }} onClick={saveBudget}>Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showModelPicker && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>

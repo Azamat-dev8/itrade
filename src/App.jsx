@@ -64,11 +64,15 @@ function App() {
   const [debtAmount, setDebtAmount] = useState('')
   const [debtType, setDebtType] = useState('they_owe')
 
-  // СОСТОЯНИЯ ДЛЯ КАЛЬКУЛЯТОРА
-  const [calcBuyPrice, setCalcBuyPrice] = useState('')
-  const [calcBuyQty, setCalcBuyQty] = useState('')
-  const [calcSellPrice, setCalcSellPrice] = useState('')
-  const [calcSellQty, setCalcSellQty] = useState('')
+  // --- УМНЫЙ КАЛЬКУЛЯТОР ---
+  const [calcModel, setCalcModel] = useState('');
+  const [calcBuyPrice, setCalcBuyPrice] = useState('');
+  const [calcBuyQty, setCalcBuyQty] = useState('1');
+  const [calcSellPrice, setCalcSellPrice] = useState('');
+  const [calcSellQty, setCalcSellQty] = useState('1');
+  const [calcIsAvitoDelivery, setCalcIsAvitoDelivery] = useState(false);
+  const [calcFee, setCalcFee] = useState('7');
+  const [calcExtraCosts, setCalcExtraCosts] = useState('');
 
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
@@ -405,8 +409,33 @@ function App() {
 
   const handleModelSelect = (modelName) => {
     haptic();
-    if (pickerMode === 'purchase') { setModel(modelName); setShowModelPicker(false); setModelSearch(''); } 
-    else { setFilterModels(prev => prev.includes(modelName) ? prev.filter(m => m !== modelName) : [...prev, modelName]); }
+    if (pickerMode === 'purchase') { 
+      setModel(modelName); 
+      setShowModelPicker(false); 
+      setModelSearch(''); 
+    } else if (pickerMode === 'calculator') {
+      setCalcModel(modelName);
+      setShowModelPicker(false);
+      setModelSearch('');
+      
+      // Автоподстановка истории
+      const history = deals.filter(d => d.model === modelName);
+      if (history.length > 0) {
+        const avgBuy = history.reduce((sum, d) => sum + Number(d.buy_price), 0) / history.length;
+        setCalcBuyPrice(Math.round(avgBuy).toString());
+        
+        const soldHistory = history.filter(d => d.sell_price);
+        if (soldHistory.length > 0) {
+          const avgSell = soldHistory.reduce((sum, d) => sum + Number(d.sell_price), 0) / soldHistory.length;
+          setCalcSellPrice(Math.round(avgSell).toString());
+        }
+      } else {
+        setCalcBuyPrice('');
+        setCalcSellPrice('');
+      }
+    } else { 
+      setFilterModels(prev => prev.includes(modelName) ? prev.filter(m => m !== modelName) : [...prev, modelName]); 
+    }
   }
 
   const removeFilterModel = (modelName) => { haptic(); setFilterModels(prev => prev.filter(m => m !== modelName)); }
@@ -649,13 +678,27 @@ function App() {
     </div>
   )}
 
-  // --- КАЛЬКУЛЯТОР ---
+  // --- УМНЫЙ КАЛЬКУЛЯТОР ---
   const renderCalculator = () => {
     const calcBuyCost = (Number(calcBuyPrice) || 0) * (Number(calcBuyQty) || 0);
     const calcSellRevenue = (Number(calcSellPrice) || 0) * (Number(calcSellQty) || 0);
-    const newFreeCash = freeCash - calcBuyCost + calcSellRevenue;
-    const plannedProfit = calcSellRevenue - calcBuyCost;
+    
+    const feeAmount = calcIsAvitoDelivery ? calcSellRevenue * (Number(calcFee) / 100) : 0;
+    const netRevenue = calcSellRevenue - feeAmount;
+    
+    const extraCosts = Number(calcExtraCosts) || 0;
+    const totalCosts = calcBuyCost + extraCosts;
+    
+    const plannedProfit = netRevenue - totalCosts;
+    const newFreeCash = freeCash - totalCosts + netRevenue;
     const isEnoughMoney = newFreeCash >= 0;
+    const roi = totalCosts > 0 ? (plannedProfit / totalCosts) * 100 : 0;
+
+    // История для справки
+    const modelHistory = calcModel ? deals.filter(d => d.model === calcModel) : [];
+    const soldHistory = modelHistory.filter(d => d.sell_price);
+    const avgMarketBuy = modelHistory.length > 0 ? modelHistory.reduce((sum, d) => sum + Number(d.buy_price), 0) / modelHistory.length : 0;
+    const avgMarketSell = soldHistory.length > 0 ? soldHistory.reduce((sum, d) => sum + Number(d.sell_price), 0) / soldHistory.length : 0;
 
     return (
       <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
@@ -669,30 +712,69 @@ function App() {
           <div className="stat-row"><span>Свободные средства:</span> <span>{formatMoney(freeCash)}</span></div>
           <div className="stat-row"><span>Заморожено в товаре:</span> <span>{formatMoney(totalInvestedInStock)}</span></div>
           <div className="stat-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', fontWeight: 'bold', fontSize: 16 }}>
-            <span>Общий капитал:</span> <span>{formatMoney(freeCash + totalInvestedInStock)}</span>
-          </div>
+            <span>Общий капитал:</span> <span>{formatMoney(freeCash + totalInvestedInStock)}</span></div>
         </div>
 
         <div className="card">
-          <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--warning)' }}>Планирую купить 📦</h3>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="Цена закупа (₽)" value={calcBuyPrice} onChange={(e) => setCalcBuyPrice(e.target.value.replace(/[^\d]/g, ''))} />
-            <input className="input-field" type="text" inputMode="numeric" placeholder="Кол-во (шт)" value={calcBuyQty} onChange={(e) => setCalcBuyQty(e.target.value.replace(/[^\d]/g, ''))} style={{ width: 100 }} />
+          <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Параметры сделки</h3>
+          
+          <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Модель (для справки)</label>
+          <div className="input-field" onClick={() => { setPickerMode('calculator'); setShowModelPicker(true); haptic(); }} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: calcModel ? 'var(--text-main)' : 'var(--text-muted)' }}>{calcModel || 'Выберите модель...'}</span>
+            <span style={{ opacity: 0.5 }}>▼</span>
           </div>
-          <div style={{ fontSize: 14, color: 'var(--danger)', fontWeight: 'bold' }}>
-            Потрачено на закуп: {formatMoney(calcBuyCost)}
-          </div>
-        </div>
 
-        <div className="card">
-          <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--success)' }}>Планирую продать 💰</h3>
+          {calcModel && (
+            <div style={{ backgroundColor: 'var(--bg-color)', padding: 10, borderRadius: 8, marginBottom: 15, fontSize: 13, color: 'var(--text-muted)' }}>
+              {avgMarketBuy > 0 || avgMarketSell > 0 ? (
+                <>
+                  <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Твоя история по {calcModel}:</div>
+                  {avgMarketBuy > 0 && <div>Средняя покупка: {formatMoney(avgMarketBuy)}</div>}
+                  {avgMarketSell > 0 && <div>Средняя продажа: {formatMoney(avgMarketSell)}</div>}
+                  {avgMarketBuy === 0 && <div>Ты еще не покупал эту модель.</div>}
+                </>
+              ) : (
+                <div>Ты впервые работаешь с этой моделью.</div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 10 }}>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="Цена продажи (₽)" value={calcSellPrice} onChange={(e) => setCalcSellPrice(e.target.value.replace(/[^\d]/g, ''))} />
-            <input className="input-field" type="text" inputMode="numeric" placeholder="Кол-во (шт)" value={calcSellQty} onChange={(e) => setCalcSellQty(e.target.value.replace(/[^\d]/g, ''))} style={{ width: 100 }} />
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Цена закупа (₽)</label>
+              <input className="input-field" type="text" inputMode="numeric" placeholder="0" value={calcBuyPrice} onChange={(e) => setCalcBuyPrice(e.target.value.replace(/[^\d]/g, ''))} />
+            </div>
+            <div style={{ width: 80 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Кол-во</label>
+              <input className="input-field" type="text" inputMode="numeric" placeholder="1" value={calcBuyQty} onChange={(e) => setCalcBuyQty(e.target.value.replace(/[^\d]/g, ''))} />
+            </div>
           </div>
-          <div style={{ fontSize: 14, color: 'var(--success)', fontWeight: 'bold' }}>
-            Выручка с продаж: {formatMoney(calcSellRevenue)}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Цена продажи (₽)</label>
+              <input className="input-field" type="text" inputMode="numeric" placeholder="0" value={calcSellPrice} onChange={(e) => setCalcSellPrice(e.target.value.replace(/[^\d]/g, ''))} />
+            </div>
+            <div style={{ width: 80 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Кол-во</label>
+              <input className="input-field" type="text" inputMode="numeric" placeholder="1" value={calcSellQty} onChange={(e) => setCalcSellQty(e.target.value.replace(/[^\d]/g, ''))} />
+            </div>
           </div>
+
+          <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Доп. расходы на партию (такси, ремонт)</label>
+          <input className="input-field" type="text" inputMode="numeric" placeholder="0" value={calcExtraCosts} onChange={(e) => setCalcExtraCosts(e.target.value.replace(/[^\d]/g, ''))} />
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+            <label style={{ fontSize: 13, fontWeight: 'bold' }}>Продажа через Авито Доставку?</label>
+            <button onClick={() => { setCalcIsAvitoDelivery(!calcIsAvitoDelivery); haptic(); }} style={{ padding: '6px 12px', borderRadius: 20, background: calcIsAvitoDelivery ? '#34c759' : '#e5e5ea', color: calcIsAvitoDelivery ? '#fff' : '#000', border: 'none', fontWeight: 'bold' }}>{calcIsAvitoDelivery ? 'ДА' : 'НЕТ'}</button>
+          </div>
+
+          {calcIsAvitoDelivery && (
+            <div style={{ marginTop: 10 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Комиссия Авито (%)</label>
+              <input className="input-field" type="text" inputMode="numeric" placeholder="7" value={calcFee} onChange={(e) => setCalcFee(e.target.value.replace(/[^\d]/g, ''))} />
+            </div>
+          )}
         </div>
 
         <div className="card" style={{ backgroundColor: isEnoughMoney ? 'rgba(52, 199, 89, 0.1)' : 'rgba(255, 59, 48, 0.1)', border: `2px solid ${isEnoughMoney ? 'var(--success)' : 'var(--danger)'}` }}>
@@ -704,7 +786,25 @@ function App() {
             </div>
           )}
 
-          <div className="stat-row"><span>Планируемая прибыль:</span> <span style={{ color: plannedProfit >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 'bold' }}>{formatMoney(plannedProfit)}</span></div>
+          {calcIsAvitoDelivery && (
+            <div className="stat-row"><span>Комиссия Авито:</span> <span style={{ color: 'var(--danger)' }}>-{formatMoney(feeAmount)}</span></div>
+          )}
+          {extraCosts > 0 && (
+            <div className="stat-row"><span>Доп. расходы:</span> <span style={{ color: 'var(--danger)' }}>-{formatMoney(extraCosts)}</span></div>
+          )}
+
+          <div className="stat-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <span>Рентабельность (ROI):</span> 
+            <span style={{ fontWeight: 'bold', color: roi >= 15 ? 'var(--success)' : roi > 0 ? 'var(--warning)' : 'var(--danger)' }}>
+              {roi.toFixed(1)}%
+            </span>
+          </div>
+          
+          <div className="stat-row" style={{ fontSize: 16, fontWeight: 'bold', marginTop: 5 }}>
+            <span>Планируемая прибыль:</span> 
+            <span style={{ color: plannedProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatMoney(plannedProfit)}</span>
+          </div>
+
           <div className="stat-row" style={{ fontSize: 18, fontWeight: 'bold', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
             <span>Бюджет после сделок:</span> <span style={{ color: isEnoughMoney ? 'var(--success)' : 'var(--danger)' }}>{formatMoney(newFreeCash)}</span>
           </div>

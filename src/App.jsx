@@ -64,6 +64,12 @@ function App() {
   const [debtAmount, setDebtAmount] = useState('')
   const [debtType, setDebtType] = useState('they_owe')
 
+  // СОСТОЯНИЯ ДЛЯ КАЛЬКУЛЯТОРА
+  const [calcBuyPrice, setCalcBuyPrice] = useState('')
+  const [calcBuyQty, setCalcBuyQty] = useState('')
+  const [calcSellPrice, setCalcSellPrice] = useState('')
+  const [calcSellQty, setCalcSellQty] = useState('')
+
   const [model, setModel] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [storage, setStorage] = useState('')
@@ -412,7 +418,6 @@ function App() {
 
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-  // --- МАТЕМАТИКА ---
   const soldDeals = deals.filter(d => d.status === 'sold')
   const inStockDeals = deals.filter(d => d.status === 'in_stock')
   
@@ -425,8 +430,6 @@ function App() {
 
   const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
-  // НОВАЯ ФОРМУЛА БЮДЖЕТА:
-  // Стартовый бюджет + Прибыль со всех сделок - Общие расходы - Деньги, замороженные на складе
   const freeCash = budget + realizedProfit - totalGenExp - totalInvestedInStock;
 
   const avgProfit = soldDeals.length > 0 ? realizedProfit / soldDeals.length : 0;
@@ -645,6 +648,70 @@ function App() {
       )}
     </div>
   )}
+
+  // --- КАЛЬКУЛЯТОР ---
+  const renderCalculator = () => {
+    const calcBuyCost = (Number(calcBuyPrice) || 0) * (Number(calcBuyQty) || 0);
+    const calcSellRevenue = (Number(calcSellPrice) || 0) * (Number(calcSellQty) || 0);
+    const newFreeCash = freeCash - calcBuyCost + calcSellRevenue;
+    const plannedProfit = calcSellRevenue - calcBuyCost;
+    const isEnoughMoney = newFreeCash >= 0;
+
+    return (
+      <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
+          <button onClick={() => { setActiveTab('home'); haptic(); }} style={{ background: 'none', border: 'none', fontSize: 24, padding: '0 10px 0 0', cursor: 'pointer', color: 'var(--accent)' }}>←</button>
+          <h2 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Калькулятор</h2>
+        </div>
+
+        <div className="card">
+          <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Текущая ситуация</h3>
+          <div className="stat-row"><span>Свободные средства:</span> <span>{formatMoney(freeCash)}</span></div>
+          <div className="stat-row"><span>Заморожено в товаре:</span> <span>{formatMoney(totalInvestedInStock)}</span></div>
+          <div className="stat-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', fontWeight: 'bold', fontSize: 16 }}>
+            <span>Общий капитал:</span> <span>{formatMoney(freeCash + totalInvestedInStock)}</span>
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--warning)' }}>Планирую купить 📦</h3>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input className="input-field" type="text" inputMode="numeric" placeholder="Цена закупа (₽)" value={calcBuyPrice} onChange={(e) => setCalcBuyPrice(e.target.value.replace(/[^\d]/g, ''))} />
+            <input className="input-field" type="text" inputMode="numeric" placeholder="Кол-во (шт)" value={calcBuyQty} onChange={(e) => setCalcBuyQty(e.target.value.replace(/[^\d]/g, ''))} style={{ width: 100 }} />
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--danger)', fontWeight: 'bold' }}>
+            Потрачено на закуп: {formatMoney(calcBuyCost)}
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--success)' }}>Планирую продать 💰</h3>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input className="input-field" type="text" inputMode="numeric" placeholder="Цена продажи (₽)" value={calcSellPrice} onChange={(e) => setCalcSellPrice(e.target.value.replace(/[^\d]/g, ''))} />
+            <input className="input-field" type="text" inputMode="numeric" placeholder="Кол-во (шт)" value={calcSellQty} onChange={(e) => setCalcSellQty(e.target.value.replace(/[^\d]/g, ''))} style={{ width: 100 }} />
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--success)', fontWeight: 'bold' }}>
+            Выручка с продаж: {formatMoney(calcSellRevenue)}
+          </div>
+        </div>
+
+        <div className="card" style={{ backgroundColor: isEnoughMoney ? 'rgba(52, 199, 89, 0.1)' : 'rgba(255, 59, 48, 0.1)', border: `2px solid ${isEnoughMoney ? 'var(--success)' : 'var(--danger)'}` }}>
+          <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-main)' }}>Результат</h3>
+          
+          {calcBuyCost > freeCash && (
+            <div style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: 10, fontSize: 14 }}>
+              ⚠️ Внимание! Не хватает {formatMoney(calcBuyCost - freeCash)} на закуп.
+            </div>
+          )}
+
+          <div className="stat-row"><span>Планируемая прибыль:</span> <span style={{ color: plannedProfit >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 'bold' }}>{formatMoney(plannedProfit)}</span></div>
+          <div className="stat-row" style={{ fontSize: 18, fontWeight: 'bold', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <span>Бюджет после сделок:</span> <span style={{ color: isEnoughMoney ? 'var(--success)' : 'var(--danger)' }}>{formatMoney(newFreeCash)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const renderPurchase = () => (
     <div>
@@ -954,13 +1021,14 @@ function App() {
 
   return (
     <div className="app-container">
-      {activeTab !== 'settings' && (
+      {activeTab !== 'settings' && activeTab !== 'calculator' && (
         <button className="hamburger-btn" onClick={() => { setIsMenuOpen(true); haptic(); }} style={{ position: 'absolute', top: 16, left: 16 }}>☰</button>
       )}
 
       {isInitialLoading ? renderSkeleton() : (
         <>
           {activeTab === 'home' && renderHome()}
+          {activeTab === 'calculator' && renderCalculator()}
           {activeTab === 'purchase' && renderPurchase()}
           {activeTab === 'stock' && renderStock()}
           {activeTab === 'deals' && renderDeals()}
@@ -979,6 +1047,9 @@ function App() {
 
         <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10, overflowY: 'auto' }}>
            <button onClick={() => { setShowSubModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #ff9500, #ff3b30)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(255, 149, 0, 0.3)' }}>⭐ Моя подписка</button>
+           
+           <button onClick={() => { setActiveTab('calculator'); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🧮 Калькулятор</button>
+
            {profileData?.show_in_leaderboard && <button onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🏆 Рейтинг перекупов</button>}
            <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>
            <button onClick={() => { const refLink = `https://t.me/Primetrade8_bot?start=ref_${user?.id || ''}`; window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent('Попробуй PrimeTrade!')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🎁 Пригласи друга</button>

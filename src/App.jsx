@@ -27,7 +27,11 @@ function App() {
   const [generalExpenses, setGeneralExpenses] = useState([])
   const [debts, setDebts] = useState([]) 
   const [leaderboard, setLeaderboard] = useState([])
-  const [isDataLoading, setIsDataLoading] = useState(true)
+  
+  // РАЗДЕЛЯЕМ ЗАГРУЗКУ: Скелетон только при старте, Кнопки - при действиях
+  const [isInitialLoading, setIsInitialLoading] = useState(true) 
+  const [isActionLoading, setIsActionLoading] = useState(false)
+  
   const [activeTab, setActiveTab] = useState('home')
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -142,7 +146,7 @@ function App() {
 
   const fetchData = async () => {
     if (!user) return;
-    setIsDataLoading(true);
+    // Убрали setIsInitialLoading(true), чтобы скелетон не мигал при каждом обновлении данных
     
     const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name, phone), buyer:buyer_id(name, phone)').eq('user_id', user.id).order('created_at', { ascending: false })
     if (dealsData) setDeals(dealsData)
@@ -174,7 +178,8 @@ function App() {
     const { data: lbData } = await supabase.from('public_leaderboard').select('*').order('gross_profit', { ascending: false }).limit(10)
     if (lbData) setLeaderboard(lbData)
     
-    setIsDataLoading(false);
+    // Отключаем скелетон ТОЛЬКО когда данные загрузились в первый раз
+    setIsInitialLoading(false);
   }
 
   const updateSetting = async (key, value) => {
@@ -241,7 +246,7 @@ function App() {
 
   const clearAllData = async () => {
     if (!window.confirm('ВНИМАНИЕ! Это удалит ВСЕ ваши сделки, контакты и расходы. Продолжить?')) return;
-    setIsDataLoading(true);
+    setIsActionLoading(true);
     try {
       await supabase.from('deals').delete().eq('user_id', user.id);
       await supabase.from('expenses').delete().eq('user_id', user.id);
@@ -249,10 +254,9 @@ function App() {
       await supabase.from('debts').delete().eq('user_id', user.id);
       fetchData(); haptic('heavy');
     } catch (error) { alert('Ошибка: ' + error.message); } 
-    finally { setIsDataLoading(false); }
+    finally { setIsActionLoading(false); }
   };
 
-  // ФУНКЦИЯ СЖАТИЯ ФОТО (МАГИЯ)
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -263,7 +267,7 @@ function App() {
         img.onload = () => {
           const canvas = document.createElement('canvas');
           let { width, height } = img;
-          const MAX_SIZE = 800; // Максимальная ширина/высота
+          const MAX_SIZE = 800; 
           
           if (width > height && width > MAX_SIZE) {
             height *= MAX_SIZE / width;
@@ -278,7 +282,6 @@ function App() {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
           
-          // Сжимаем в JPEG с качеством 0.7
           canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7);
         };
         img.onerror = (error) => reject(error);
@@ -287,7 +290,6 @@ function App() {
     });
   };
 
-  // ЗАГРУЗКА НЕСКОЛЬКИХ ФОТО СРАЗУ
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -319,7 +321,7 @@ function App() {
   const addDeal = async (e) => {
     e.preventDefault()
     if (!model || !buyPrice || !user) return alert('Заполните модель и цену')
-    setIsDataLoading(true)
+    setIsActionLoading(true)
     
     const { data: newDeals, error } = await supabase.from('deals').insert([{ 
         model, buy_price: Number(buyPrice), status: 'in_stock',
@@ -339,12 +341,12 @@ function App() {
       setNewDealExpAmount(''); setNewDealExpCat('Ремонт'); setDealLocation(''); setDealPhotos([]);
       fetchData(); haptic('medium'); setShowSuccessMsg(true); setTimeout(() => setShowSuccessMsg(false), 3000);
     } else { alert('Ошибка: ' + (error?.message || 'Неизвестная ошибка')) }
-    setIsDataLoading(false)
+    setIsActionLoading(false)
   }
 
   const confirmSell = async () => {
     if (!sellPrice) return alert('Введите цену')
-    setIsDataLoading(true)
+    setIsActionLoading(true)
     await supabase.from('deals').update({ 
       sell_price: Number(sellPrice), status: 'sold', 
       buyer_id: buyerId ? Number(buyerId) : null, 
@@ -352,18 +354,29 @@ function App() {
       warranty_months: Number(sellWarranty)
     }).eq('id', sellingDeal.id)
     setSellingDeal(null); fetchData();
+    setIsActionLoading(false)
   }
 
   const addGeneralExpense = async (e) => {
     e.preventDefault();
     if (!genExpAmount || !user) return;
+    setIsActionLoading(true);
     const finalCategory = genExpCategory === 'Свой вариант' ? (customGenExpCategory || 'Другое') : genExpCategory;
     await supabase.from('expenses').insert([{ amount: Number(genExpAmount), category: finalCategory, note: genExpNote || null, user_id: user.id }]);
     setGenExpAmount(''); setGenExpNote(''); setCustomGenExpCategory(''); setGenExpCategory('Авито');
     fetchData(); haptic('medium');
+    setIsActionLoading(false);
   }
 
-  const addContact = async (e) => { e.preventDefault(); if (!contactName || !user) return; await supabase.from('contacts').insert([{ name: contactName, phone: contactPhone, note: contactNote, user_id: user.id }]); setContactName(''); setContactPhone(''); setContactNote(''); fetchData(); }
+  const addContact = async (e) => { 
+    e.preventDefault(); 
+    if (!contactName || !user) return; 
+    setIsActionLoading(true);
+    await supabase.from('contacts').insert([{ name: contactName, phone: contactPhone, note: contactNote, user_id: user.id }]); 
+    setContactName(''); setContactPhone(''); setContactNote(''); fetchData(); 
+    setIsActionLoading(false);
+  }
+
   const deleteDeal = async (id) => { if (!window.confirm('Удалить устройство?')) return; await supabase.from('deals').delete().eq('id', id); fetchData(); }
   const confirmExpense = async () => { if (!expenseAmount || !user) return; await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount: Number(expenseAmount), category: expenseCategory, user_id: user.id }]); setExpenseDeal(null); fetchData(); }
   const saveEditContact = async () => { if (!editContactName) return; await supabase.from('contacts').update({ name: editContactName, phone: editContactPhone, note: editContactNote }).eq('id', editingContact.id); setEditingContact(null); fetchData(); }
@@ -581,8 +594,8 @@ function App() {
         <button className="btn-success" onClick={() => { setCsvData(''); setShowExportModal(true); }} style={{ padding: '12px 16px' }}>📥 Экспорт</button>
       </div>
       
-      <button onClick={clearAllData} disabled={isDataLoading} style={{ width: '100%', padding: '12px', marginBottom: '16px', backgroundColor: 'var(--card-bg)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-        🗑️ Очистить статистику
+      <button onClick={clearAllData} disabled={isActionLoading} style={{ width: '100%', padding: '12px', marginBottom: '16px', backgroundColor: 'var(--card-bg)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+        🗑️ {isActionLoading ? 'Очистка...' : 'Очистить статистику'}
       </button>
 
       {showChart && chartData.length > 0 && (
@@ -670,7 +683,7 @@ function App() {
             <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма расхода" value={newDealExpAmount} onChange={(e) => setNewDealExpAmount(e.target.value.replace(/[^\d]/g, ''))}/>
           </div>
           
-          <button className="btn-primary" type="submit" disabled={isDataLoading}>{isDataLoading ? 'Сохранение...' : 'Сохранить на склад'}</button>
+          <button className="btn-primary" type="submit" disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Сохранить на склад'}</button>
           
           {showSuccessMsg && <div style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(52, 199, 89, 0.15)', color: '#34c759', textAlign: 'center', borderRadius: 12, fontSize: 14, fontWeight: 'bold' }}>✅ Устройство успешно сохранено!</div>}
         </form>
@@ -831,7 +844,7 @@ function App() {
   const renderContacts = () => (
     <div>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Контакты</h2>
-      <div className="card"><form onSubmit={addContact}><input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/><input className="input-field" type="text" placeholder="Телефон" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}/><input className="input-field" type="text" placeholder="Комментарий" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/><button className="btn-primary" type="submit">Сохранить</button></form></div>
+      <div className="card"><form onSubmit={addContact}><input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)}/><input className="input-field" type="text" placeholder="Телефон" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}/><input className="input-field" type="text" placeholder="Комментарий" value={contactNote} onChange={(e) => setContactNote(e.target.value)}/><button className="btn-primary" type="submit" disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Сохранить'}</button></form></div>
       {contacts.map((c) => (<div key={c.id} className="card" style={{ padding: 16 }}><div className="card-header"><div style={{ fontWeight: 600, fontSize: 16 }}>{c.name || 'Без имени'}</div><div><button className="icon-btn" onClick={() => {setEditingContact(c); setEditContactName(c.name || ''); setEditContactPhone(c.phone || ''); setEditContactNote(c.note || '');}}>✏️</button><button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button></div></div>{c.phone && (
         <button onClick={() => handlePhoneCall(c.phone)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontSize: 15, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, cursor: 'pointer', textDecoration: 'underline' }}>
           📞 {c.phone}
@@ -917,7 +930,8 @@ function App() {
         <button className="hamburger-btn" onClick={() => { setIsMenuOpen(true); haptic(); }} style={{ position: 'absolute', top: 16, left: 16 }}>☰</button>
       )}
 
-      {isDataLoading ? renderSkeleton() : (
+      {/* ЗДЕСЬ СКЕЛЕТОН ПОКАЗЫВАЕТСЯ ТОЛЬКО ПРИ ПЕРВИЧНОЙ ЗАГРУЗКЕ */}
+      {isInitialLoading ? renderSkeleton() : (
         <>
           {activeTab === 'home' && renderHome()}
           {activeTab === 'purchase' && renderPurchase()}
@@ -1014,7 +1028,7 @@ function App() {
       )}
 
       {sellingDeal && (
-        <div className="modal-overlay"><div className="modal-content"><h3>Продажа: {sellingDeal.model || 'Устройство'}</h3><input className="input-field" type="text" inputMode="numeric" placeholder="Цена (₽)" value={sellPrice} onChange={(e) => setSellPrice(e.target.value.replace(/[^\d]/g, ''))} autoFocus/><select className="input-field" value={buyerId} onChange={(e) => setBuyerId(e.target.value)}><option value="">Кто купил?</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}</select><label style={{fontSize: 12, color: '#888', marginTop: 5, display: 'block'}}>Гарантия</label><select className="input-field" value={sellWarranty} onChange={(e) => setSellWarranty(e.target.value)}><option value="0">Без гарантии</option><option value="1">1 месяц</option><option value="3">3 месяца</option><option value="6">6 месяцев</option><option value="12">1 год</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setSellingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmSell}>Продать</button></div></div></div>
+        <div className="modal-overlay"><div className="modal-content"><h3>Продажа: {sellingDeal.model || 'Устройство'}</h3><input className="input-field" type="text" inputMode="numeric" placeholder="Цена (₽)" value={sellPrice} onChange={(e) => setSellPrice(e.target.value.replace(/[^\d]/g, ''))} autoFocus/><select className="input-field" value={buyerId} onChange={(e) => setBuyerId(e.target.value)}><option value="">Кто купил?</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}</select><label style={{fontSize: 12, color: '#888', marginTop: 5, display: 'block'}}>Гарантия</label><select className="input-field" value={sellWarranty} onChange={(e) => setSellWarranty(e.target.value)}><option value="0">Без гарантии</option><option value="1">1 месяц</option><option value="3">3 месяца</option><option value="6">6 месяцев</option><option value="12">1 год</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setSellingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmSell} disabled={isActionLoading}>{isActionLoading ? 'Продажа...' : 'Продать'}</button></div></div></div>
       )}
 
       {showLeaderboardModal && (
@@ -1029,11 +1043,11 @@ function App() {
         <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}><button onClick={() => setShowGuideModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: '#00000088', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 16 }}>✕</button><h3 style={{ paddingRight: 30 }}>📚 Как пользоваться</h3><div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>1. Покупка устройства</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Перейдите во вкладку «Покупка». Выберите модель, цену, память и АКБ. Здесь же можно добавить расходы, фото дефектов и место хранения.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>2. Управление складом</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>На вкладке «Склад» отображаются все устройства в наличии. Если телефон лежит больше 21 дня, появится значок ⚠️.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>3. Продажа и гарантии</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Нажмите «Продать». Укажите цену, покупателя и срок гарантии. В истории появится бейдж гарантии.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>4. Долги и задатки</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>На главном экране есть блок долгов. Нажмите «+ Добавить», чтобы записать, кто кому и сколько должен.</div></div></div><div style={{ marginTop: 25 }}><button className="btn-primary" style={{ backgroundColor: 'var(--accent)', width: '100%', padding: '16px' }} onClick={() => setShowGuideModal(false)}>Понятно</button></div></div></div>
       )}
 
-      {expenseDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Расход: {expenseDeal.model || 'Устройство'}</h3><input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value.replace(/[^\d]/g, ''))} autoFocus/><select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmExpense}>Добавить</button></div></div></div>)}
+      {expenseDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Расход: {expenseDeal.model || 'Устройство'}</h3><input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value.replace(/[^\d]/g, ''))} autoFocus/><select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}><option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option></select><div className="modal-actions"><button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button><button className="btn-confirm" onClick={confirmExpense} disabled={isActionLoading}>{isActionLoading ? 'Добавление...' : 'Добавить'}</button></div></div></div>)}
       
-      {editingDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать</h3><input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/><input className="input-field" type="text" inputMode="numeric" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value.replace(/[^\d]/g, ''))}/><input className="input-field" type="text" placeholder="Место хранения" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={saveEdit}>Сохранить</button></div></div></div>)}
+      {editingDeal && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать</h3><input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}/><input className="input-field" type="text" inputMode="numeric" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value.replace(/[^\d]/g, ''))}/><input className="input-field" type="text" placeholder="Место хранения" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button><button className="btn-confirm" onClick={saveEdit} disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Сохранить'}</button></div></div></div>)}
       
-      {editingContact && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать контакт</h3><input className="input-field" type="text" value={editContactName} onChange={(e) => setEditContactName(e.target.value)}/><input className="input-field" type="text" value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)}/><input className="input-field" type="text" value={editContactNote} onChange={(e) => setEditContactNote(e.target.value)}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingContact(null)}>Отмена</button><button className="btn-confirm" onClick={saveEditContact}>Сохранить</button></div></div></div>)}
+      {editingContact && (<div className="modal-overlay"><div className="modal-content"><h3>Редактировать контакт</h3><input className="input-field" type="text" value={editContactName} onChange={(e) => setEditContactName(e.target.value)}/><input className="input-field" type="text" value={editContactPhone} onChange={(e) => setEditContactPhone(e.target.value)}/><input className="input-field" type="text" value={editContactNote} onChange={(e) => setEditContactNote(e.target.value)}/><div className="modal-actions"><button className="btn-cancel" onClick={() => setEditingContact(null)}>Отмена</button><button className="btn-confirm" onClick={saveEditContact} disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Сохранить'}</button></div></div></div>)}
 
       {showExportModal && (
         <div className="modal-overlay"><div className="modal-content" style={{ display: 'flex', flexDirection: 'column' }}><h3>Экспорт</h3><textarea value={csvData} readOnly onClick={(e) => e.target.select()} style={{ flex: 1, minHeight: '150px', padding: 10, borderRadius: 12, border: '1px solid #ccc', fontSize: 12, marginBottom: 15 }} /><div className="modal-actions"><button className="btn-cancel" onClick={() => setShowExportModal(false)}>Закрыть</button><button className="btn-confirm" style={{ backgroundColor: 'var(--success)' }} onClick={() => { const t = document.createElement("textarea"); t.value = csvData; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); alert('✅ Скопировано!'); setShowExportModal(false); } catch (err) { alert('Скопируйте вручную'); } document.body.removeChild(t); }}>Копировать</button></div></div></div>

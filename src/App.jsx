@@ -718,10 +718,23 @@ function App() {
         <div className="card">
           <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Параметры сделки</h3>
           
-          <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Модель (для справки)</label>
-          <div className="input-field" onClick={() => { setPickerMode('calculator'); setShowModelPicker(true); haptic(); }} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: calcModel ? 'var(--text-main)' : 'var(--text-muted)' }}>{calcModel || 'Выберите модель...'}</span>
-            <span style={{ opacity: 0.5 }}>▼</span>
+                    <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Модель (для справки)</label>
+          <div className="input-field" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 0 }}>
+            <div 
+              onClick={() => { setPickerMode('calculator'); setShowModelPicker(true); haptic(); }} 
+              style={{ flex: 1, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px' }}
+            >
+              <span style={{ color: calcModel ? 'var(--text-main)' : 'var(--text-muted)' }}>{calcModel || 'Выберите модель...'}</span>
+              <span style={{ opacity: 0.5 }}>▼</span>
+            </div>
+            {calcModel && (
+              <button 
+                onClick={() => { setCalcModel(''); setCalcBuyPrice(''); setCalcSellPrice(''); haptic(); }}
+                style={{ background: 'none', border: 'none', color: '#888', fontSize: 20, padding: '10px 16px', cursor: 'pointer', borderLeft: '1px solid var(--border)' }}
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {calcModel && (

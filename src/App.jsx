@@ -291,6 +291,9 @@ function App() {
     return (Number(amount) || 0).toLocaleString('ru-RU') + ' ₽';
   }
 
+  // ВАЖНО: Эта функция перенесена наверх, чтобы избежать ошибки ReferenceError
+  const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
   // --- МАТЕМАТИКА ---
   const soldDeals = deals.filter(d => d.status === 'sold')
   const inStockDeals = deals.filter(d => d.status === 'in_stock')
@@ -308,8 +311,6 @@ function App() {
   const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0)
   
   const realizedProfit = totalRevenue - totalBuySold - totalExpSold - totalGenExp;
-
-  const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   const monthlyProfits = soldDeals.reduce((acc, deal) => {
     const date = new Date(deal.sold_at || deal.created_at || Date.now());
@@ -714,7 +715,6 @@ function App() {
         </div>
       </div>
 
-      {/* МОДАЛКА БЮДЖЕТА */}
       {showBudgetModal && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
           <div className="modal-content">

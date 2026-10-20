@@ -34,10 +34,11 @@ function App() {
   const [viewingDeal, setViewingDeal] = useState(null)
   const [viewingPhoto, setViewingPhoto] = useState(null)
 
-  // ОНБОРДИНГ
-  const [showOnboarding, setShowOnboarding] = useState(false)
-  const [onboardingStep, setOnboardingStep] = useState(1)
-  const [onboardingBudget, setOnboardingBudget] = useState('')
+  // БЭКАП
+  const [showBackupModal, setShowBackupModal] = useState(false)
+  const [backupJson, setBackupJson] = useState('')
+  const [showBackupInfo, setShowBackupInfo] = useState(false)
+
   const [photoLimitWarning, setPhotoLimitWarning] = useState(false)
 
   const [activeTab, setActiveTab] = useState('home')
@@ -185,17 +186,11 @@ function App() {
       setShowChart(profileInfo.show_chart !== false)
       setDailySummary(profileInfo.daily_summary || false)
       setBudget(Number(profileInfo.resale_budget) || 0)
-      
-      // Если бюджета нет и сделок нет — включаем онбординг
-      if (Number(profileInfo.resale_budget) === 0 && (!dealsData || dealsData.length === 0)) {
-        setShowOnboarding(true)
-      }
     } else {
       const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 }
       await supabase.from('user_profiles').insert([newProf])
       setProfileData(newProf)
       setDisplayName(newProf.display_name)
-      setShowOnboarding(true)
     }
 
     const { data: lbData } = await supabase.from('public_leaderboard').select('*').order('gross_profit', { ascending: false }).limit(10)
@@ -205,7 +200,7 @@ function App() {
   }
 
   // --- БЭКАП И ВОССТАНОВЛЕНИЕ ---
-  const downloadBackup = () => {
+  const handleBackup = () => {
     haptic('medium');
     const backup = {
       deals: deals.map(d => ({ ...d, seller: undefined, buyer: undefined })),
@@ -216,13 +211,9 @@ function App() {
       profile: { resale_budget: budget }
     };
     
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `primetrade_backup_${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
+    const dataStr = JSON.stringify(backup, null, 2);
+    setBackupJson(dataStr);
+    setShowBackupModal(true);
   }
 
   const restoreBackup = async (e) => {
@@ -1288,11 +1279,22 @@ function App() {
       </div>
 
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Данные</h3>
-        <button onClick={downloadBackup} className="btn-cancel" style={{ width: '100%', marginBottom: 10, backgroundColor: 'var(--bg-color)', border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+          <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Данные</h3>
+          <button onClick={() => setShowBackupInfo(!showBackupInfo)} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, cursor: 'pointer' }}>❓ Для чего это?</button>
+        </div>
+
+        {showBackupInfo && (
+          <div style={{ backgroundColor: 'var(--bg-color)', padding: 10, borderRadius: 8, fontSize: 13, color: 'var(--text-muted)', marginBottom: 15 }}>
+            Резервная копия позволяет сохранить все ваши сделки, контакты и расходы в файл. Если вы смените телефон или удалите приложение, вы сможете восстановить все данные из этого файла.
+          </div>
+        )}
+
+        <button onClick={handleBackup} className="btn-cancel" style={{ width: '100%', marginBottom: 10, backgroundColor: 'var(--bg-color)', border: '1px solid var(--border)', boxSizing: 'border-box' }}>
           💾 Скачать резервную копию
         </button>
-        <label className="btn-cancel" style={{ width: '100%', backgroundColor: 'var(--bg-color)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '14px', borderRadius: '12px', fontWeight: '600', fontSize: '16px', color: 'var(--text-main)' }}>
+        
+        <label style={{ width: '100%', backgroundColor: 'var(--bg-color)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '14px', borderRadius: '12px', fontWeight: '600', fontSize: '16px', color: 'var(--text-main)', boxSizing: 'border-box' }}>
           📂 Загрузить копию
           <input type="file" accept=".json" onChange={restoreBackup} style={{ display: 'none' }} />
         </label>
@@ -1561,40 +1563,29 @@ function App() {
         </div>
       )}
 
-      {showOnboarding && (
-        <div className="modal-overlay" style={{ zIndex: 10000, alignItems: 'center' }}>
-          <div className="modal-content" style={{ borderRadius: 24, padding: 30, textAlign: 'center' }}>
-            {onboardingStep === 1 && (
-              <>
-                <div style={{ fontSize: 60, marginBottom: 15 }}>👋</div>
-                <h2>Добро пожаловать в PrimeTrade!</h2>
-                <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>Твой личный помощник для учета техники Apple и контроля прибыли.</p>
-                <button className="btn-primary" onClick={() => setOnboardingStep(2)}>Начать</button>
-              </>
-            )}
-            {onboardingStep === 2 && (
-              <>
-                <div style={{ fontSize: 60, marginBottom: 15 }}>💰</div>
-                <h2>Укажите бюджет</h2>
-                <p style={{ color: 'var(--text-muted)', marginBottom: 15 }}>Сколько денег вы готовы вложить в закупку?</p>
-                <input className="input-field" type="text" inputMode="numeric" placeholder="Бюджет (₽)" value={onboardingBudget} onChange={(e) => setOnboardingBudget(e.target.value.replace(/[^\d]/g, ''))} autoFocus />
-                <button className="btn-primary" onClick={async () => {
-                  if (!onboardingBudget) return;
-                  haptic('medium');
-                  setBudget(Number(onboardingBudget));
-                  await supabase.from('user_profiles').update({ resale_budget: Number(onboardingBudget) }).eq('telegram_id', user.id);
-                  setOnboardingStep(3);
-                }}>Сохранить и продолжить</button>
-              </>
-            )}
-            {onboardingStep === 3 && (
-              <>
-                <div style={{ fontSize: 60, marginBottom: 15 }}>📦</div>
-                <h2>Добавьте первый телефон</h2>
-                <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>Перейдите во вкладку «Покупка», чтобы добавить устройство.</p>
-                <button className="btn-primary" onClick={() => { setShowOnboarding(false); setActiveTab('purchase'); }}>Перейти к покупке</button>
-              </>
-            )}
+      {/* МОДАЛКА БЭКАПА */}
+      {showBackupModal && (
+        <div className="modal-overlay" style={{ zIndex: 4000 }}>
+          <div className="modal-content" style={{ display: 'flex', flexDirection: 'column' }}>
+            <h3>Резервная копия</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Скопируйте этот текст и сохраните его в надежном месте (например, в Заметках).</p>
+            <textarea 
+              value={backupJson} 
+              readOnly 
+              onClick={(e) => e.target.select()} 
+              style={{ flex: 1, minHeight: '150px', padding: 10, borderRadius: 12, border: '1px solid #ccc', fontSize: 10, fontFamily: 'monospace', marginBottom: 15 }} 
+            />
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowBackupModal(false)}>Закрыть</button>
+              <button className="btn-confirm" style={{ backgroundColor: 'var(--success)' }} onClick={() => {
+                navigator.clipboard.writeText(backupJson).then(() => {
+                  alert('✅ Скопировано!');
+                  setShowBackupModal(false);
+                }).catch(() => {
+                  const t = document.createElement("textarea"); t.value = backupJson; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); alert('✅ Скопировано!'); setShowBackupModal(false);
+                });
+              }}>Копировать</button>
+            </div>
           </div>
         </div>
       )}

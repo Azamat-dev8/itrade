@@ -1578,9 +1578,11 @@ function App() {
                             <button 
                 className="btn-primary" 
                 disabled={isProcessingPayment}
-                onClick={async () => {
+                                   onClick={async () => {
+                  alert('Кнопка нажата!'); // <--- ДОБАВЬ ЭТО
                   haptic('heavy');
                   setIsProcessingPayment(true);
+                  // ... дальше остальной код
                   
                   try {
                     // Вызываем нашу Edge Function

@@ -927,12 +927,35 @@ function App() {
             onClick={() => { setViewingDeal(deal); haptic(); }}
             style={{ borderLeft: `4px solid ${isDeadStock ? 'var(--danger)' : 'var(--warning)'}`, cursor: 'pointer' }}
           >
-            <div className="card-header">
+                        <div className="card-header">
               <div style={{ fontWeight: 700, fontSize: 17 }}>
                 {deal.model || 'Без названия'} 
                 {isDeadStock && <span style={{marginLeft: 8, fontSize: 16}} title="Залежавшийся товар!">⚠️</span>}
               </div>
-              <div style={{ color: 'var(--text-muted)', fontSize: 18 }}>›</div>
+              <div style={{ display: 'flex', gap: 5 }}>
+                <button 
+                  className="icon-btn" 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    setEditingDeal(deal); 
+                    setEditModel(deal.model || ''); 
+                    setEditBuyPrice(deal.buy_price || ''); 
+                    setEditLocation(deal.location || ''); 
+                    haptic();
+                  }}
+                >
+                  ✏️
+                </button>
+                <button 
+                  className="icon-btn" 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    deleteDeal(deal.id); 
+                  }}
+                >
+                  🗑️
+                </button>
+              </div>
             </div>
             {renderSpecs(deal)}
             

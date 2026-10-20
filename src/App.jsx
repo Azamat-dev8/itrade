@@ -1575,17 +1575,34 @@ function App() {
 
               </div>
 
-              <button 
+                            <button 
                 className="btn-primary" 
                 disabled={isProcessingPayment}
-                onClick={() => {
+                onClick={async () => {
                   haptic('heavy');
                   setIsProcessingPayment(true);
-                  // ЗДЕСЬ БУДЕТ ВЫЗОВ PLATEGA
-                  setTimeout(() => {
+                  
+                  try {
+                    // Вызываем нашу Edge Function
+                    const { data, error } = await supabase.functions.invoke('create-platega-subscription', {
+                      body: { telegram_id: user?.id, plan_id: selectedPlan }
+                    });
+
+                    if (error) throw error;
+
+                    // Если получили ссылку - открываем её в Telegram
+                    if (data?.redirect) {
+                      if (window.Telegram?.WebApp?.openLink) {
+                        window.Telegram.WebApp.openLink(data.redirect);
+                      } else {
+                        window.open(data.redirect, '_blank');
+                      }
+                    }
+                  } catch (err) {
+                    alert('Ошибка создания платежа: ' + err.message);
+                  } finally {
                     setIsProcessingPayment(false);
-                    alert('Тут будет переход на оплату Platega для тарифа: ' + selectedPlan + ' мес.');
-                  }, 1500);
+                  }
                 }}
                 style={{ backgroundColor: 'var(--accent)', padding: '16px', fontSize: 16, opacity: isProcessingPayment ? 0.7 : 1 }}
               >

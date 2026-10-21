@@ -231,6 +231,15 @@ function App() {
       if (genExpData) setGeneralExpenses(genExpData);
       if (debtsData) setDebts(debtsData);
       if (lbData) setLeaderboard(lbData);
+       if (dealsData) {
+        setDeals(dealsData);
+        localStorage.setItem('pt_deals', JSON.stringify(dealsData)); // <--- ДОБАВЬ ЭТО
+      }  
+       if (contactsData) {
+        setContacts(contactsData);
+        localStorage.setItem('pt_contacts', JSON.stringify(contactsData)); // <--- И ЭТО
+      }
+      
 
       if (profileInfo) {
         setProfileData(profileInfo);
@@ -772,6 +781,38 @@ function App() {
   const renderHome = () => {
     const percentInvested = budget > 0 ? (totalInvestedInStock / (budget + realizedProfit)) * 100 : 0;
 
+     // --- НОВЫЕ МЕТРИКИ ---
+    const soldWithDates = soldDeals.filter(d => d.sold_at && d.created_at);
+    const totalDays = soldWithDates.reduce((sum, d) => sum + (new Date(d.sold_at) - new Date(d.created_at)), 0);
+    const avgDays = soldWithDates.length > 0 ? Math.round(totalDays / soldWithDates.length / (1000 * 60 * 60 * 24)) : 0;
+    const bestModel = topModels.length > 0 ? topModels[0].name : 'Пока нет';
+
+    // --- КАЛЕНДАРЬ ПРИБЫЛИ (Последние 28 дней) ---
+    const calendarDays = [];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+     // Собираем все транзакции по дням
+    const dailyData = {};
+    soldDeals.forEach(d => {
+      if(!d.sold_at) return;
+      const date = new Date(d.sold_at).setHours(0,0,0,0);
+      const margin = (Number(d.sell_price) - Number(d.buy_price)) * (d.sold_quantity || 0) - getDealExpensesSum(d);
+      if (!dailyData[date]) dailyData[date] = 0;
+      dailyData[date] += margin;
+    });
+    generalExpenses.forEach(e => {
+      const date = new Date(e.created_at).setHours(0,0,0,0);
+      if (!dailyData[date]) dailyData[date] = 0;
+      dailyData[date] -= Number(e.amount);
+    });
+
+    for (let i = 27; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const time = d.getTime();
+      const val = dailyData[time] || 0;
+      calendarDays.push({ date: d, value: val });
+    }
     return (
       <div>
         <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
@@ -804,6 +845,46 @@ function App() {
         </div>
 
         <div className="main-profit-card">
+                  {/* НОВЫЙ БЛОК: МЕТРИКИ И КАЛЕНДАРЬ */}
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Аналитика</h3>
+          
+          <div style={{ display: 'flex', gap: 10, marginBottom: 15 }}>
+            <div style={{ flex: 1, backgroundColor: 'var(--bg-color)', padding: 12, borderRadius: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Средний срок продажи</div>
+              <div style={{ fontSize: 20, fontWeight: 'bold', color: 'var(--accent)' }}>{avgDays} дн.</div>
+            </div>
+            <div style={{ flex: 1, backgroundColor: 'var(--bg-color)', padding: 12, borderRadius: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Топ модель</div>
+              <div style={{ fontSize: 16, fontWeight: 'bold', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bestModel}</div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>Календарь прибыли (28 дней)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+            {calendarDays.map((day, i) => {
+              let bgColor = 'var(--border)';
+              if (day.value > 0) bgColor = '#34c759'; // Зеленый
+              if (day.value < 0) bgColor = '#ff3b30'; // Красный
+              
+              return (
+                <div 
+                  key={i} 
+                  title={`${day.date.toLocaleDateString('ru-RU')}: ${formatMoney(day.value)}`}
+                  style={{ 
+                    aspectRatio: '1', borderRadius: 6, backgroundColor: bgColor, 
+                    opacity: day.value === 0 ? 0.3 : 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}
+                ></div>
+              );
+            })}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+            <span>28 дней назад</span>
+            <span>Сегодня</span>
+          </div>
+        </div>
           <h3>Реализованная прибыль</h3>
           <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38 }}>{formatMoney(realizedProfit)}</div>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>
@@ -1313,7 +1394,8 @@ function App() {
       </div>
       {generalExpenses.map(exp => (
         <div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8, alignItems: 'center' }}>
-          <div style={{ fontWeight: 600 }}>{exp.category}</div>
+          <div style={{ fontWeight: 600, color: 'var(--accent)' }}>#{exp.category}</div> 
+          
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ fontWeight: 700, color: 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>-{formatMoney(exp.amount)}</div>
             <button className="icon-btn" onClick={() => deleteExpense(exp.id)}>🗑️</button>

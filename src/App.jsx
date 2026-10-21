@@ -226,7 +226,6 @@ function App() {
     }
   }
 
-  // --- БЭКАП ---
   const handleBackup = () => {
     haptic('medium');
     const backup = {
@@ -1206,9 +1205,15 @@ function App() {
       ) : (
         <>
           <div style={{ marginBottom: 16 }}>
-            <div style={{ position: 'relative' }}>
-              <input className="input-field" type="text" placeholder="Поиск по IMEI или модели..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }} />
-              <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <input className="input-field" type="text" placeholder="Поиск по IME..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ marginBottom: 0, paddingLeft: 35 }} />
+                <span style={{ position: 'absolute', left: 12, top: 15, fontSize: 14, color: '#888' }}>🔍</span>
+              </div>
+              <button className="input-field" style={{ flex: 1, marginBottom: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }} onClick={() => { setPickerMode('deals'); setShowModelPicker(true); haptic(); }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filterModels.length > 0 ? 'var(--text-main)' : 'var(--text-muted)' }}>{filterModels.length > 0 ? `Выбрано: ${filterModels.length}` : 'Все модели'}</span>
+                <span style={{ opacity: 0.5 }}>▼</span>
+              </button>
             </div>
           </div>
           {filteredSold.map((deal) => {
@@ -1225,14 +1230,29 @@ function App() {
                   </div>
                 </div>
                 {renderSpecs(deal)}
+                
                 {deal.description && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8, fontStyle: 'italic' }}>📝 {deal.description}</div>}
                 <div style={{ marginBottom: 10 }}>{getWarrantyBadge(deal)}</div>
+                
                 {deal.seller && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>👤 Купил у: {deal.seller.name}</div>}
                 {deal.buyer && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>👤 Продал: {deal.buyer.name}</div>}
-                <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 8 }}>Закуп: {formatMoney(deal.buy_price)}/шт</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Куплен: {new Date(deal.created_at || Date.now()).toLocaleDateString('ru-RU')} • Продан: {deal.sold_at ? new Date(deal.sold_at).toLocaleDateString('ru-RU') : '-'}</div>
-                {deal.expenses && deal.expenses.length > 0 && <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6 }}>{deal.expenses.map(e => `${e.category}: ${formatMoney(e.amount)}`).join(' • ')}</div>}
-                <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10, fontVariantNumeric: 'tabular-nums' }}>Чистая прибыль: {formatMoney(margin)}</div>
+
+                <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 8 }}>
+                  Закуп: {formatMoney(deal.buy_price)} | Продажа: {formatMoney(deal.sell_price)}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Куплен: {new Date(deal.created_at || Date.now()).toLocaleDateString('ru-RU')} • Продан: {deal.sold_at ? new Date(deal.sold_at).toLocaleDateString('ru-RU') : '-'}
+                </div>
+                
+                {deal.expenses && deal.expenses.length > 0 && (
+                  <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6, textAlign: 'center', fontWeight: 'bold' }}>
+                    {deal.expenses.map(e => `${e.category}: ${formatMoney(e.amount)}`).join(' • ')}
+                  </div>
+                )}
+                
+                <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                  Чистая прибыль: {formatMoney(margin)}
+                </div>
               </div>
             )
           })}

@@ -162,7 +162,19 @@ function App() {
     }
   }, [])
 
-  useEffect(() => { if (user) fetchData() }, [user])
+    useEffect(() => {
+    if (user) {
+      // 1. Мгновенно грузим данные из кэша телефона
+      const cachedDeals = localStorage.getItem('pt_deals');
+      if (cachedDeals) setDeals(JSON.parse(cachedDeals));
+      
+      const cachedContacts = localStorage.getItem('pt_contacts');
+      if (cachedContacts) setContacts(JSON.parse(cachedContacts));
+
+      // 2. Отправляем запрос в базу за свежими данными
+      fetchData();
+    }
+  }, [user]);
 
   const haptic = (style = 'light') => {
     const tg = window.Telegram?.WebApp;
@@ -194,38 +206,45 @@ function App() {
     window.open(`tel:${cleanPhone}`, '_blank');
   };
 
-  const fetchData = async () => {
+    const fetchData = async () => {
     if (!user) return;
     try {
-      const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name, phone), buyer:buyer_id(name, phone)').eq('user_id', user.id).order('created_at', { ascending: false })
-      if (dealsData) setDeals(dealsData)
+      // Запускаем все 6 запросов ОДНОВРЕМЕННО
+      const [
+        { data: dealsData },
+        { data: contactsData },
+        { data: genExpData },
+        { data: debtsData },
+        { data: profileInfo },
+        { data: lbData }
+      ] = await Promise.all([
+        supabase.from('deals').select('*, expenses(*), seller:seller_id(name, phone), buyer:buyer_id(name, phone)').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('contacts').select('*').eq('user_id', user.id).order('name'),
+        supabase.from('expenses').select('*').eq('user_id', user.id).is('deal_id', null).order('created_at', { ascending: false }),
+        supabase.from('debts').select('*, contact:contact_id(name)').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('user_profiles').select('*').eq('telegram_id', user.id).single(),
+        supabase.from('public_leaderboard').select('*').order('gross_profit', { ascending: false }).limit(10)
+      ]);
 
-      const { data: contactsData } = await supabase.from('contacts').select('*').eq('user_id', user.id).order('name')
-      if (contactsData) setContacts(contactsData)
+      if (dealsData) setDeals(dealsData);
+      if (contactsData) setContacts(contactsData);
+      if (genExpData) setGeneralExpenses(genExpData);
+      if (debtsData) setDebts(debtsData);
+      if (lbData) setLeaderboard(lbData);
 
-      const { data: genExpData } = await supabase.from('expenses').select('*').eq('user_id', user.id).is('deal_id', null).order('created_at', { ascending: false })
-      if (genExpData) setGeneralExpenses(genExpData)
-
-      const { data: debtsData } = await supabase.from('debts').select('*, contact:contact_id(name)').eq('user_id', user.id).order('created_at', { ascending: false })
-      if (debtsData) setDebts(debtsData)
-
-      const { data: profileInfo } = await supabase.from('user_profiles').select('*').eq('telegram_id', user.id).single()
       if (profileInfo) {
-        setProfileData(profileInfo)
-        setDisplayName(profileInfo.display_name || user.first_name || 'Аноним')
-        setHideAmounts(profileInfo.hide_amounts || false)
-        setShowChart(profileInfo.show_chart !== false)
-        setDailySummary(profileInfo.daily_summary || false)
-        setBudget(Number(profileInfo.resale_budget) || 0)
+        setProfileData(profileInfo);
+        setDisplayName(profileInfo.display_name || user.first_name || 'Аноним');
+        setHideAmounts(profileInfo.hide_amounts || false);
+        setShowChart(profileInfo.show_chart !== false);
+        setDailySummary(profileInfo.daily_summary || false);
+        setBudget(Number(profileInfo.resale_budget) || 0);
       } else {
-        const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 }
-        await supabase.from('user_profiles').insert([newProf])
-        setProfileData(newProf)
-        setDisplayName(newProf.display_name)
+        const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 };
+        await supabase.from('user_profiles').insert([newProf]);
+        setProfileData(newProf);
+        setDisplayName(newProf.display_name);
       }
-
-      const { data: lbData } = await supabase.from('public_leaderboard').select('*').order('gross_profit', { ascending: false }).limit(10)
-      if (lbData) setLeaderboard(lbData)
     } catch (error) {
       console.error("Ошибка при загрузке данных:", error);
     } finally {

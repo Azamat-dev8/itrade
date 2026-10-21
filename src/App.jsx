@@ -22,6 +22,8 @@ const CATEGORIES = [
 ];
 
 const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут"
+// ⚠️ ВСТАВЬ СЮДА ССЫЛКУ НА СВОЙ ЗАКРЫТЫЙ ЧАТ (начинается с https://t.me/+...)
+const CLOSED_CHAT_URL = "https://t.me/ваш_закрытый_чат" 
 
 const detectCategory = (model) => {
   if (!model) return 'Аксессуары';
@@ -146,6 +148,10 @@ function App() {
   const [addFormPhotos, setAddFormPhotos] = useState([])
   const [uploadingAddPhoto, setUploadingAddPhoto] = useState(false)
 
+  // Для генератора объявлений
+  const [showAdModal, setShowAdModal] = useState(false)
+  const [adText, setAdText] = useState('')
+
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (tg) {
@@ -164,7 +170,6 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      // Мгновенная загрузка из кэша
       const cachedDeals = localStorage.getItem('pt_deals');
       if (cachedDeals) setDeals(JSON.parse(cachedDeals));
       
@@ -208,7 +213,6 @@ function App() {
   const fetchData = async () => {
     if (!user) return;
     try {
-      // Параллельная загрузка всех данных
       const [
         { data: dealsData },
         { data: contactsData },
@@ -650,6 +654,20 @@ function App() {
     } else if (pickerMode === 'addManual') {
       setAddForm(prev => ({ ...prev, model: modelName })); setShowModelPicker(false); setModelSearch('');
     } else { setFilterModels(prev => prev.includes(modelName) ? prev.filter(m => m !== modelName) : [...prev, modelName]); }
+  }
+
+  // --- ГЕНЕРАТОР ОБЪЯВЛЕНИЙ ---
+  const generateAdText = (deal) => {
+    let text = `🔥 В продаже: ${deal.model}\n`;
+    if (deal.storage_gb) text += `📦 Память: ${deal.storage_gb >= 1024 ? deal.storage_gb/1024 + ' TB' : deal.storage_gb + ' GB'}\n`;
+    if (deal.battery_health) text += `🔋 АКБ: ${deal.battery_health}%\n`;
+    if (deal.description) text += `📝 Состояние: ${deal.description}\n`;
+    if (deal.location) text += `📍 Локация: ${deal.location}\n`;
+    
+    const rawPrice = deal.sell_price ? Number(deal.sell_price).toLocaleString('ru-RU') + ' ₽' : 'Договорная';
+    text += `💰 Цена для своих: ${rawPrice}\n\n`;
+    text += `Нажмите, чтобы написать мне в ЛС!`;
+    return text;
   }
 
   const formatMoney = (amount) => {
@@ -1442,7 +1460,7 @@ function App() {
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.5 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.6 • Сделано для перекупов</div>
     </div>
   )
 
@@ -1474,7 +1492,12 @@ function App() {
 
         <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10, overflowY: 'auto' }}>
           <button onClick={() => { setShowSubModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #ff9500, #ff3b30)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>⭐ Моя подписка</button>
+          
           <button onClick={() => { setActiveTab('calculator'); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🧮 Калькулятор</button>
+
+          {/* НОВАЯ КНОПКА ЧАТА */}
+          <button onClick={() => { openExternalLink(CLOSED_CHAT_URL); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🤝 Закрытый чат</button>
+          
           {profileData?.show_in_leaderboard && <button onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🏆 Рейтинг перекупов</button>}
           <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>
           <button onClick={() => { const refLink = `https://t.me/Primetrade8_bot?start=ref_${user?.id || ''}`; window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent('Попробуй PrimeTrade!')}`, '_blank'); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🎁 Пригласи друга</button>
@@ -1782,10 +1805,33 @@ function App() {
                 </div>
               </div>
 
+              <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                <button className="btn-primary" style={{ flex: 1, padding: '16px', backgroundColor: 'var(--accent)' }} onClick={() => { setAdText(generateAdText(viewingDeal)); setShowAdModal(true); }}>📢 Пост в чат</button>
+              </div>
+
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="btn-cancel" style={{ flex: 1, padding: '16px', backgroundColor: '#fff3cd', color: '#b28900' }} onClick={() => { setViewingDeal(null); setExpenseDeal(viewingDeal); setExpenseAmount(''); }}>+ Расход</button>
                 <button className="btn-success" style={{ flex: 1, padding: '16px' }} onClick={() => { setViewingDeal(null); setSellingDeal(viewingDeal); setSellPrice(''); setSellWarranty('0'); setSellQuantity('1'); }}>Продать</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdModal && (
+        <div className="modal-overlay" style={{ zIndex: 5000 }}>
+          <div className="modal-content">
+            <h3>Объявление для чата</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Скопируйте текст и отправьте в клуб перекупов.</p>
+            <textarea value={adText} readOnly style={{ width: '100%', minHeight: 180, padding: 10, borderRadius: 12, border: '1px solid var(--border)', fontSize: 14, fontFamily: 'inherit', marginBottom: 15, boxSizing: 'border-box' }} />
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowAdModal(false)}>Закрыть</button>
+              <button className="btn-confirm" style={{ backgroundColor: 'var(--success)' }} onClick={() => {
+                navigator.clipboard.writeText(adText).then(() => {
+                  alert('✅ Текст скопирован! Вставьте его в чат.');
+                  setShowAdModal(false);
+                });
+              }}>Копировать</button>
             </div>
           </div>
         </div>

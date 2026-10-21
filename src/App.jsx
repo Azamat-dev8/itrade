@@ -1064,7 +1064,7 @@ function App() {
             </select>
 
             <div style={{ marginBottom: 15, marginTop: 5 }}>
-              <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото дефектов / коробки (до 3 шт):</div>
+              <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото устройства (до 3 шт):</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {dealPhotos.map((url, idx) => (
                   <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>

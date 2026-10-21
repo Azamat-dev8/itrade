@@ -163,10 +163,15 @@ function App() {
 
   useEffect(() => { if (user) fetchData() }, [user])
 
-  const haptic = (type = 'light') => {
-    const tg = window.Telegram?.WebApp
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(type)
-  }
+    const haptic = (style = 'light') => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg?.HapticFeedback) return;
+    if (['success', 'error', 'warning'].includes(style)) {
+      tg.HapticFeedback.notificationOccurred(style);
+    } else {
+      tg.HapticFeedback.impactOccurred(['light', 'medium', 'heavy', 'rigid', 'soft'].includes(style) ? style : 'light');
+    }
+  };
 
   const toggleTheme = () => {
     const isNowDark = !isDarkTheme;
@@ -462,7 +467,7 @@ function App() {
     setUploadingAddPhoto(false);
   }
 
-  const addDeal = async (e) => {
+    const addDeal = async (e) => {
     e.preventDefault()
     if (!model || !buyPrice || !user) return alert('Заполните модель и цену')
     setIsActionLoading(true)
@@ -496,11 +501,9 @@ function App() {
         haptic('medium');
         setShowSuccessMsg(true);
         setTimeout(() => setShowSuccessMsg(false), 3000);
-      } else {
-        alert('Не удалось сохранить устройство')
       }
     } catch (err) {
-      alert('Ошибка: ' + err.message)
+      alert('Ошибка базы данных: ' + err.message)
     } finally {
       setIsActionLoading(false)
     }
@@ -539,11 +542,9 @@ function App() {
         setAddFormPhotos([]);
         await fetchData(); 
         haptic('success');
-      } else {
-        alert('Не удалось сохранить товар');
       }
     } catch (err) {
-      alert('Ошибка: ' + err.message);
+      alert('Ошибка базы данных: ' + err.message);
     } finally {
       setIsActionLoading(false);
     }

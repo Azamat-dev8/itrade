@@ -142,7 +142,7 @@ function App() {
   const [editDescription, setEditDescription] = useState('')
 
   const [showAddModal, setShowAddModal] = useState(false)
-  const [addForm, setAddForm] = useState({ model: '', description: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' })
+  const [addForm, setAddForm] = useState({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' })
   const [addFormPhotos, setAddFormPhotos] = useState([])
   const [uploadingAddPhoto, setUploadingAddPhoto] = useState(false)
 
@@ -151,7 +151,8 @@ function App() {
     if (tg) {
       tg.ready(); tg.expand(); setUser(tg.initDataUnsafe?.user || null)
       const applyTheme = () => {
-        const isDark = tg.colorScheme === 'dark';
+        const storedTheme = localStorage.getItem('theme');
+        const isDark = storedTheme ? storedTheme === 'dark' : tg.colorScheme === 'dark';
         document.body.classList.toggle('dark-theme', isDark);
         setIsDarkTheme(isDark);
       }
@@ -163,7 +164,7 @@ function App() {
 
   useEffect(() => { if (user) fetchData() }, [user])
 
-    const haptic = (style = 'light') => {
+  const haptic = (style = 'light') => {
     const tg = window.Telegram?.WebApp;
     if (!tg?.HapticFeedback) return;
     if (['success', 'error', 'warning'].includes(style)) {
@@ -171,11 +172,12 @@ function App() {
     } else {
       tg.HapticFeedback.impactOccurred(['light', 'medium', 'heavy', 'rigid', 'soft'].includes(style) ? style : 'light');
     }
-  };
+  }
 
   const toggleTheme = () => {
     const isNowDark = !isDarkTheme;
     setIsDarkTheme(isNowDark);
+    localStorage.setItem('theme', isNowDark ? 'dark' : 'light');
     document.body.classList.toggle('dark-theme', isNowDark);
     haptic('medium');
   }
@@ -467,7 +469,7 @@ function App() {
     setUploadingAddPhoto(false);
   }
 
-    const addDeal = async (e) => {
+  const addDeal = async (e) => {
     e.preventDefault()
     if (!model || !buyPrice || !user) return alert('Заполните модель и цену')
     setIsActionLoading(true)
@@ -534,11 +536,8 @@ function App() {
       if (error) throw new Error(error.message);
 
       if (newDeals && newDeals.length > 0) {
-        if (addForm.exp_amount && Number(addForm.exp_amount) > 0) {
-          await supabase.from('expenses').insert([{ deal_id: newDeals[0].id, amount: Number(addForm.exp_amount), category: 'Ремонт', user_id: user.id }]);
-        }
         setShowAddModal(false);
-        setAddForm({ model: '', description: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' });
+        setAddForm({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' });
         setAddFormPhotos([]);
         await fetchData(); 
         haptic('success');
@@ -1001,85 +1000,100 @@ function App() {
   }
 
   // =============== ПОКУПКА ===============
-  const renderPurchase = () => (
-    <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Покупка</h2>
-      <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить устройство</h3>
-        <form onSubmit={addDeal}>
-          <div className="input-field" onClick={() => { setPickerMode('purchase'); setShowModelPicker(true); haptic(); }} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: model ? 'var(--text-main)' : 'var(--text-muted)' }}>{model || 'Выберите модель устройства...'}</span>
-            <span style={{ opacity: 0.5 }}>▼</span>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <input className="input-field" type="text" inputMode="numeric" placeholder="Цена закупа (₽) за 1 шт" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value.replace(/[^\d]/g, ''))} />
-            </div>
-            <div style={{ width: 100 }}>
-              <input className="input-field" type="text" inputMode="numeric" placeholder="Кол-во" value={dealQuantity} onChange={(e) => setDealQuantity(e.target.value.replace(/[^\d]/g, ''))} />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10 }}>
-            <select className="input-field" value={storage} onChange={(e) => setStorage(e.target.value)}>
-              <option value="">Память</option>
-              <option value="64">64 GB</option><option value="128">128 GB</option><option value="256">256 GB</option>
-              <option value="512">512 GB</option><option value="1024">1 TB</option><option value="2048">2 TB</option>
-            </select>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="АКБ (%)" value={battery} onChange={(e) => { let val = Number(e.target.value.replace(/[^\d]/g, '')); if (val > 100) val = 100; setBattery(val || ''); }} />
-          </div>
-
-          <input className="input-field" type="text" placeholder="Место хранения" value={dealLocation} onChange={(e) => setDealLocation(e.target.value)} />
-
-          <textarea className="input-field" placeholder="Описание (состояние, комплект, дефекты...)" value={dealDescription} onChange={(e) => setDealDescription(e.target.value)} style={{ minHeight: 60, resize: 'vertical' }} />
-
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={imei} onChange={(e) => setImei(e.target.value)} style={{ marginBottom: 10, paddingRight: 35 }} />
-              {imei && <button type="button" onClick={() => { setImei(''); haptic(); }} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
-            </div>
-            <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12 }}>📷</button>
-          </div>
-
-          <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
-            <option value="">Кто продал? (Необязательно)</option>
-            {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
-          </select>
-
-          <div style={{ marginBottom: 15, marginTop: 5 }}>
-            <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото дефектов / коробки (до 3 шт):</div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {dealPhotos.map((url, idx) => (
-                <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
-                  <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <button type="button" onClick={() => setDealPhotos(prev => prev.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}>✕</button>
-                </div>
-              ))}
-              {dealPhotos.length < 3 && (
-                <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)' }}>
-                  {uploadingPhoto ? '...' : '+'}
-                  <input type="file" accept="image/*" multiple onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
-                </label>
+  const renderPurchase = () => {
+    const isNoStorage = model.includes('AirPods') || model.includes('Apple Watch');
+    
+    return (
+      <div>
+        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Покупка</h2>
+        <div className="card">
+          <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить устройство</h3>
+          <form onSubmit={addDeal}>
+            
+            <div className="input-field" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 0 }}>
+              <div 
+                onClick={() => { setPickerMode('purchase'); setShowModelPicker(true); haptic(); }} 
+                style={{ flex: 1, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px' }}
+              >
+                <span style={{ color: model ? 'var(--text-main)' : 'var(--text-muted)' }}>{model || 'Выберите модель устройства...'}</span>
+                <span style={{ opacity: 0.5 }}>▼</span>
+              </div>
+              {model && (
+                <button type="button" onClick={() => { setModel(''); haptic(); }} style={{ background: 'none', border: 'none', color: '#888', fontSize: 20, padding: '10px 16px', cursor: 'pointer', borderLeft: '1px solid var(--border)' }}>✕</button>
               )}
             </div>
-            {photoLimitWarning && <div style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(255, 59, 48, 0.1)', color: 'var(--danger)', borderRadius: 12, fontSize: 13, textAlign: 'center', fontWeight: 'bold' }}>Максимум 3 фото</div>}
-          </div>
 
-          <div style={{ marginTop: 10, marginBottom: 5, fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)' }}>Расходы при покупке 📉</div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <select className="input-field" value={newDealExpCat} onChange={(e) => setNewDealExpCat(e.target.value)}>
-              <option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси/Доставка">Такси/Доставка</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option><option value="Другое">Другое</option>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <input className="input-field" type="text" inputMode="numeric" placeholder="Цена закупа (₽) за 1 шт" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value.replace(/[^\d]/g, ''))} />
+              </div>
+              <div style={{ width: 100 }}>
+                <input className="input-field" type="text" inputMode="numeric" placeholder="Кол-во" value={dealQuantity} onChange={(e) => setDealQuantity(e.target.value.replace(/[^\d]/g, ''))} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              {!isNoStorage && (
+                <select className="input-field" value={storage} onChange={(e) => setStorage(e.target.value)}>
+                  <option value="">Память</option>
+                  <option value="64">64 GB</option><option value="128">128 GB</option><option value="256">256 GB</option>
+                  <option value="512">512 GB</option><option value="1024">1 TB</option><option value="2048">2 TB</option>
+                </select>
+              )}
+              <input className="input-field" type="text" inputMode="numeric" placeholder="АКБ (%)" value={battery} onChange={(e) => { let val = Number(e.target.value.replace(/[^\d]/g, '')); if (val > 100) val = 100; setBattery(val || ''); }} />
+            </div>
+
+            <input className="input-field" type="text" placeholder="Место хранения" value={dealLocation} onChange={(e) => setDealLocation(e.target.value)} />
+
+            <textarea className="input-field" placeholder="Описание (состояние, комплект, дефекты...)" value={dealDescription} onChange={(e) => setDealDescription(e.target.value)} style={{ minHeight: 60, resize: 'vertical' }} />
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={imei} onChange={(e) => setImei(e.target.value)} style={{ marginBottom: 10, paddingRight: 35 }} />
+                {imei && <button type="button" onClick={() => { setImei(''); haptic(); }} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
+              </div>
+              <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12 }}>📷</button>
+            </div>
+
+            <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
+              <option value="">Кто продал? (Необязательно)</option>
+              {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
             </select>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма расхода" value={newDealExpAmount} onChange={(e) => setNewDealExpAmount(e.target.value.replace(/[^\d]/g, ''))} />
-          </div>
 
-          <button className="btn-primary" type="submit" disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Сохранить на склад'}</button>
-          {showSuccessMsg && <div style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(52, 199, 89, 0.15)', color: '#34c759', textAlign: 'center', borderRadius: 12, fontSize: 14, fontWeight: 'bold' }}>✅ Устройство сохранено!</div>}
-        </form>
+            <div style={{ marginBottom: 15, marginTop: 5 }}>
+              <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото дефектов / коробки (до 3 шт):</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {dealPhotos.map((url, idx) => (
+                  <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
+                    <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button type="button" onClick={() => setDealPhotos(prev => prev.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}>✕</button>
+                  </div>
+                ))}
+                {dealPhotos.length < 3 && (
+                  <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)' }}>
+                    {uploadingPhoto ? '...' : '+'}
+                    <input type="file" accept="image/*" multiple onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
+                  </label>
+                )}
+              </div>
+              {photoLimitWarning && <div style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(255, 59, 48, 0.1)', color: 'var(--danger)', borderRadius: 12, fontSize: 13, textAlign: 'center', fontWeight: 'bold' }}>Максимум 3 фото</div>}
+            </div>
+
+            <div style={{ marginTop: 10, marginBottom: 5, fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)' }}>Расходы при покупке 📉</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <select className="input-field" value={newDealExpCat} onChange={(e) => setNewDealExpCat(e.target.value)}>
+                <option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси/Доставка">Такси/Доставка</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option><option value="Другое">Другое</option>
+              </select>
+              <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма расхода" value={newDealExpAmount} onChange={(e) => setNewDealExpAmount(e.target.value.replace(/[^\d]/g, ''))} />
+            </div>
+
+            <button className="btn-primary" type="submit" disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Сохранить на склад'}</button>
+            {showSuccessMsg && <div style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(52, 199, 89, 0.15)', color: '#34c759', textAlign: 'center', borderRadius: 12, fontSize: 14, fontWeight: 'bold' }}>✅ Устройство сохранено!</div>}
+          </form>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   // =============== СКЛАД — ПЛИТКИ КАТЕГОРИЙ ===============
   const renderStockCategories = () => {
@@ -1129,7 +1143,7 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
           <button onClick={() => { setSelectedCategory(null); setSearchQuery(''); setFilterModels([]); haptic(); }} style={{ background: 'none', border: 'none', fontSize: 24, padding: '0 10px 0 0', cursor: 'pointer', color: 'var(--accent)' }}>←</button>
           <h2 style={{ fontSize: 28, fontWeight: 700, margin: 0, flex: 1 }}>{cat?.icon} {cat?.name}</h2>
-          <button onClick={() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); }} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>+ Добавить</button>
+          <button onClick={() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); }} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>+ Добавить</button>
         </div>
 
         {!emptyCat && (
@@ -1323,7 +1337,7 @@ function App() {
       </div>
 
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 15 }}>Профиль</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', marginBottom: 15 }}>Профиль</h3>
         <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Имя профиля</label>
         <div style={{ display: 'flex', gap: 10 }}>
           <input className="input-field" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ flex: 1, marginBottom: 0 }} placeholder="Введите имя..." />
@@ -1332,7 +1346,7 @@ function App() {
       </div>
 
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 15 }}>Приватность</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', marginBottom: 15 }}>Приватность</h3>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ flex: 1, paddingRight: 10 }}>
             <div style={{ fontWeight: 'bold', fontSize: 15 }}>Скрыть суммы</div>
@@ -1350,7 +1364,7 @@ function App() {
       </div>
 
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 15 }}>Внешний вид</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', marginBottom: 15 }}>Внешний вид</h3>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ flex: 1, paddingRight: 10 }}><div style={{ fontWeight: 'bold', fontSize: 15 }}>Тёмная тема</div></div>
           <button onClick={toggleTheme} style={{ padding: '8px 16px', borderRadius: 20, background: isDarkTheme ? '#34c759' : '#e5e5ea', color: isDarkTheme ? '#fff' : '#000', border: 'none', fontWeight: 'bold', minWidth: 65 }}>{isDarkTheme ? 'ВКЛ' : 'ВЫКЛ'}</button>
@@ -1365,7 +1379,7 @@ function App() {
       </div>
 
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 15 }}>Подписка</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', marginBottom: 15 }}>Подписка</h3>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ flex: 1, paddingRight: 10 }}>
             <div style={{ fontWeight: 'bold', fontSize: 15 }}>PrimeTrade PRO</div>
@@ -1393,19 +1407,19 @@ function App() {
       </div>
 
       <div className="card">
-        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 15 }}>Поддержка</h3>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)', marginBottom: 15 }}>Поддержка</h3>
         <div onClick={() => openExternalLink('https://telegra.ph/Polzovatelskoe-soglashenie-10-19-40')} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>📄 Пользовательское соглашение</span><span style={{ color: '#888' }}>›</span></div>
         <div onClick={() => openExternalLink('https://telegra.ph/Politika-konfidencialnosti-10-19-87')} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>🔒 Политика конфиденциальности</span><span style={{ color: '#888' }}>›</span></div>
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.2 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.3 • Сделано для перекупов</div>
     </div>
   )
 
   return (
     <div className="app-container">
-      {activeTab !== 'settings' && activeTab !== 'calculator' && !selectedCategory && (
+      {activeTab !== 'settings' && activeTab !== 'calculator' && (
         <button className="hamburger-btn" onClick={() => { setIsMenuOpen(true); haptic(); }} style={{ position: 'absolute', top: 16, left: 16 }}>☰</button>
       )}
 
@@ -1496,7 +1510,6 @@ function App() {
             
             <textarea className="input-field" placeholder="Описание (необязательно)" value={addForm.description} onChange={(e) => setAddForm({ ...addForm, description: e.target.value })} style={{ minHeight: 60, resize: 'vertical' }} />
             
-            <input className="input-field" type="text" inputMode="numeric" placeholder="Расходы на партию (₽, необязательно)" value={addForm.exp_amount} onChange={(e) => setAddForm({ ...addForm, exp_amount: e.target.value.replace(/[^\d]/g, '') })} />
             <input className="input-field" type="text" placeholder="Место хранения (необязательно)" value={addForm.location} onChange={(e) => setAddForm({ ...addForm, location: e.target.value })} />
             {(selectedCategory === 'iPhone' || selectedCategory === 'iPad' || selectedCategory === 'MacBook' || selectedCategory === 'Apple Watch') && (
               <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={addForm.imei} onChange={(e) => setAddForm({ ...addForm, imei: e.target.value })} />

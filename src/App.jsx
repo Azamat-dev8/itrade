@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { supabase } from './supabaseClient'
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
-import Scanner from './Scanner'
 import './App.css'
+
+// Ленивая загрузка тяжелых компонентов для быстрого старта
+const Scanner = lazy(() => import('./Scanner'));
+const BarChart = lazy(() => import('recharts').then(m => ({ default: m.BarChart })));
+const Bar = lazy(() => import('recharts').then(m => ({ default: m.Bar })));
+const XAxis = lazy(() => import('recharts').then(m => ({ default: m.XAxis })));
+const Tooltip = lazy(() => import('recharts').then(m => ({ default: m.Tooltip })));
+const ResponsiveContainer = lazy(() => import('recharts').then(m => ({ default: m.ResponsiveContainer })));
+const Cell = lazy(() => import('recharts').then(m => ({ default: m.Cell })));
+const LabelList = lazy(() => import('recharts').then(m => ({ default: m.LabelList })));
 
 const DEVICE_CATALOG = {
   'iPhone': ["iPhone 7", "iPhone 7 Plus", "iPhone 8", "iPhone 8 Plus", "iPhone X", "iPhone XR", "iPhone XS", "iPhone XS Max", "iPhone 11", "iPhone 11 Pro", "iPhone 11 Pro Max", "iPhone SE (2020)", "iPhone 12 mini", "iPhone 12", "iPhone 12 Pro", "iPhone 12 Pro Max", "iPhone 13 mini", "iPhone 13", "iPhone 13 Pro", "iPhone 13 Pro Max", "iPhone SE (2022)", "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro", "iPhone 14 Pro Max", "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max", "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max", "iPhone 17", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 18", "iPhone 18 Pro", "iPhone 18 Pro Max", "iPhone Duo"],
@@ -162,19 +170,18 @@ function App() {
     }
   }, [])
 
-    useEffect(() => {
+  useEffect(() => {
     if (user) {
-      // 1. Мгновенно грузим данные из кэша телефона
+      // Мгновенная загрузка из кэша
       const cachedDeals = localStorage.getItem('pt_deals');
       if (cachedDeals) setDeals(JSON.parse(cachedDeals));
       
       const cachedContacts = localStorage.getItem('pt_contacts');
       if (cachedContacts) setContacts(JSON.parse(cachedContacts));
 
-      // 2. Отправляем запрос в базу за свежими данными
       fetchData();
     }
-  }, [user]);
+  }, [user])
 
   const haptic = (style = 'light') => {
     const tg = window.Telegram?.WebApp;
@@ -206,10 +213,10 @@ function App() {
     window.open(`tel:${cleanPhone}`, '_blank');
   };
 
-    const fetchData = async () => {
+  const fetchData = async () => {
     if (!user) return;
     try {
-      // Запускаем все 6 запросов ОДНОВРЕМЕННО
+      // Параллельная загрузка всех данных
       const [
         { data: dealsData },
         { data: contactsData },
@@ -226,20 +233,17 @@ function App() {
         supabase.from('public_leaderboard').select('*').order('gross_profit', { ascending: false }).limit(10)
       ]);
 
-      if (dealsData) setDeals(dealsData);
-      if (contactsData) setContacts(contactsData);
+      if (dealsData) {
+        setDeals(dealsData);
+        localStorage.setItem('pt_deals', JSON.stringify(dealsData));
+      }
+      if (contactsData) {
+        setContacts(contactsData);
+        localStorage.setItem('pt_contacts', JSON.stringify(contactsData));
+      }
       if (genExpData) setGeneralExpenses(genExpData);
       if (debtsData) setDebts(debtsData);
       if (lbData) setLeaderboard(lbData);
-       if (dealsData) {
-        setDeals(dealsData);
-        localStorage.setItem('pt_deals', JSON.stringify(dealsData)); // <--- ДОБАВЬ ЭТО
-      }  
-       if (contactsData) {
-        setContacts(contactsData);
-        localStorage.setItem('pt_contacts', JSON.stringify(contactsData)); // <--- И ЭТО
-      }
-      
 
       if (profileInfo) {
         setProfileData(profileInfo);
@@ -249,10 +253,10 @@ function App() {
         setDailySummary(profileInfo.daily_summary || false);
         setBudget(Number(profileInfo.resale_budget) || 0);
       } else {
-        const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 };
-        await supabase.from('user_profiles').insert([newProf]);
-        setProfileData(newProf);
-        setDisplayName(newProf.display_name);
+        const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 }
+        await supabase.from('user_profiles').insert([newProf])
+        setProfileData(newProf)
+        setDisplayName(newProf.display_name)
       }
     } catch (error) {
       console.error("Ошибка при загрузке данных:", error);
@@ -391,6 +395,8 @@ function App() {
       await supabase.from('expenses').delete().eq('user_id', user.id);
       await supabase.from('contacts').delete().eq('user_id', user.id);
       await supabase.from('debts').delete().eq('user_id', user.id);
+      localStorage.removeItem('pt_deals');
+      localStorage.removeItem('pt_contacts');
       fetchData(); haptic('heavy');
     } catch (error) { alert('Ошибка: ' + error.message); }
     finally { setIsActionLoading(false); }
@@ -781,38 +787,6 @@ function App() {
   const renderHome = () => {
     const percentInvested = budget > 0 ? (totalInvestedInStock / (budget + realizedProfit)) * 100 : 0;
 
-     // --- НОВЫЕ МЕТРИКИ ---
-    const soldWithDates = soldDeals.filter(d => d.sold_at && d.created_at);
-    const totalDays = soldWithDates.reduce((sum, d) => sum + (new Date(d.sold_at) - new Date(d.created_at)), 0);
-    const avgDays = soldWithDates.length > 0 ? Math.round(totalDays / soldWithDates.length / (1000 * 60 * 60 * 24)) : 0;
-    const bestModel = topModels.length > 0 ? topModels[0].name : 'Пока нет';
-
-    // --- КАЛЕНДАРЬ ПРИБЫЛИ (Последние 28 дней) ---
-    const calendarDays = [];
-    const today = new Date();
-    today.setHours(0,0,0,0);
-     // Собираем все транзакции по дням
-    const dailyData = {};
-    soldDeals.forEach(d => {
-      if(!d.sold_at) return;
-      const date = new Date(d.sold_at).setHours(0,0,0,0);
-      const margin = (Number(d.sell_price) - Number(d.buy_price)) * (d.sold_quantity || 0) - getDealExpensesSum(d);
-      if (!dailyData[date]) dailyData[date] = 0;
-      dailyData[date] += margin;
-    });
-    generalExpenses.forEach(e => {
-      const date = new Date(e.created_at).setHours(0,0,0,0);
-      if (!dailyData[date]) dailyData[date] = 0;
-      dailyData[date] -= Number(e.amount);
-    });
-
-    for (let i = 27; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const time = d.getTime();
-      const val = dailyData[time] || 0;
-      calendarDays.push({ date: d, value: val });
-    }
     return (
       <div>
         <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
@@ -845,46 +819,6 @@ function App() {
         </div>
 
         <div className="main-profit-card">
-                  {/* НОВЫЙ БЛОК: МЕТРИКИ И КАЛЕНДАРЬ */}
-        <div className="card" style={{ marginBottom: 16 }}>
-          <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Аналитика</h3>
-          
-          <div style={{ display: 'flex', gap: 10, marginBottom: 15 }}>
-            <div style={{ flex: 1, backgroundColor: 'var(--bg-color)', padding: 12, borderRadius: 12 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Средний срок продажи</div>
-              <div style={{ fontSize: 20, fontWeight: 'bold', color: 'var(--accent)' }}>{avgDays} дн.</div>
-            </div>
-            <div style={{ flex: 1, backgroundColor: 'var(--bg-color)', padding: 12, borderRadius: 12 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Топ модель</div>
-              <div style={{ fontSize: 16, fontWeight: 'bold', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bestModel}</div>
-            </div>
-          </div>
-
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>Календарь прибыли (28 дней)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
-            {calendarDays.map((day, i) => {
-              let bgColor = 'var(--border)';
-              if (day.value > 0) bgColor = '#34c759'; // Зеленый
-              if (day.value < 0) bgColor = '#ff3b30'; // Красный
-              
-              return (
-                <div 
-                  key={i} 
-                  title={`${day.date.toLocaleDateString('ru-RU')}: ${formatMoney(day.value)}`}
-                  style={{ 
-                    aspectRatio: '1', borderRadius: 6, backgroundColor: bgColor, 
-                    opacity: day.value === 0 ? 0.3 : 1,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}
-                ></div>
-              );
-            })}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
-            <span>28 дней назад</span>
-            <span>Сегодня</span>
-          </div>
-        </div>
           <h3>Реализованная прибыль</h3>
           <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38 }}>{formatMoney(realizedProfit)}</div>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>
@@ -967,16 +901,18 @@ function App() {
           <div className="card">
             <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Прибыль по месяцам</h3>
             <div style={{ width: '100%', height: 220 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
-                  <Tooltip cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} formatter={(value) => [formatMoney(value), 'Прибыль']} />
-                  <Bar dataKey="profit" maxBarSize={45} radius={[6, 6, 0, 0]}>
-                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} />)}
-                    <LabelList dataKey="profit" position="center" fill="#ffffff" style={{ fontWeight: 'bold', fontSize: 13, textShadow: '0 1px 2px rgba(0,0,0,0.4)' }} formatter={(value) => { if (hideAmounts) return '***'; if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'; if (value >= 1000) return (value / 1000).toFixed(0) + 'k'; return value; }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <Suspense fallback={<div style={{height: 220, display:'flex', alignItems:'center', justifyContent:'center', color:'#888'}}>Загрузка графика...</div>}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
+                    <Tooltip cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} formatter={(value) => [formatMoney(value), 'Прибыль']} />
+                    <Bar dataKey="profit" maxBarSize={45} radius={[6, 6, 0, 0]}>
+                      {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} />)}
+                      <LabelList dataKey="profit" position="center" fill="#ffffff" style={{ fontWeight: 'bold', fontSize: 13, textShadow: '0 1px 2px rgba(0,0,0,0.4)' }} formatter={(value) => { if (hideAmounts) return '***'; if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'; if (value >= 1000) return (value / 1000).toFixed(0) + 'k'; return value; }} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Suspense>
             </div>
           </div>
         )}
@@ -1394,8 +1330,7 @@ function App() {
       </div>
       {generalExpenses.map(exp => (
         <div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8, alignItems: 'center' }}>
-          <div style={{ fontWeight: 600, color: 'var(--accent)' }}>#{exp.category}</div> 
-          
+          <div style={{ fontWeight: 600 }}>{exp.category}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ fontWeight: 700, color: 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>-{formatMoney(exp.amount)}</div>
             <button className="icon-btn" onClick={() => deleteExpense(exp.id)}>🗑️</button>
@@ -1517,7 +1452,7 @@ function App() {
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.3 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.4 • Сделано для перекупов</div>
     </div>
   )
 
@@ -1620,7 +1555,7 @@ function App() {
             )}
 
             <div style={{ marginBottom: 15, marginTop: 5 }}>
-              <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото (до 3 шт):</div>
+              <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото устройства (до 3 шт):</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {addFormPhotos.map((url, idx) => (
                   <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
@@ -1812,7 +1747,11 @@ function App() {
         </div>
       )}
 
-      {showScanner && <Scanner key={Date.now()} onScan={(text) => { setImei(text); setShowScanner(false); }} onClose={() => setShowScanner(false)} />}
+      {showScanner && (
+        <Suspense fallback={null}>
+          <Scanner key={Date.now()} onScan={(text) => { setImei(text); setShowScanner(false); }} onClose={() => setShowScanner(false)} />
+        </Suspense>
+      )}
 
       {viewingDeal && (
         <div className="modal-overlay" style={{ zIndex: 4000 }}>

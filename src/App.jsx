@@ -4,7 +4,6 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList } f
 import Scanner from './Scanner'
 import './App.css'
 
-
 const DEVICE_CATALOG = {
   'iPhone': ["iPhone 7", "iPhone 7 Plus", "iPhone 8", "iPhone 8 Plus", "iPhone X", "iPhone XR", "iPhone XS", "iPhone XS Max", "iPhone 11", "iPhone 11 Pro", "iPhone 11 Pro Max", "iPhone SE (2020)", "iPhone 12 mini", "iPhone 12", "iPhone 12 Pro", "iPhone 12 Pro Max", "iPhone 13 mini", "iPhone 13", "iPhone 13 Pro", "iPhone 13 Pro Max", "iPhone SE (2022)", "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro", "iPhone 14 Pro Max", "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max", "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max", "iPhone 17", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 18", "iPhone 18 Pro", "iPhone 18 Pro Max", "iPhone Duo"],
   'iPad': ["iPad 9", "iPad 10", "iPad Air 4", "iPad Air 5", "iPad Air 6", "iPad Pro 11 (2021)", "iPad Pro 12.9 (2021)", "iPad Pro 11 (2022)", "iPad Pro 12.9 (2022)", "iPad Pro M4"],
@@ -142,7 +141,6 @@ function App() {
   const [editLocation, setEditLocation] = useState('')
   const [editDescription, setEditDescription] = useState('')
 
-  // Модалка быстрого добавления товара в категорию
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState({ model: '', description: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' })
   const [addFormPhotos, setAddFormPhotos] = useState([])
@@ -191,38 +189,41 @@ function App() {
 
   const fetchData = async () => {
     if (!user) return;
+    try {
+      const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name, phone), buyer:buyer_id(name, phone)').eq('user_id', user.id).order('created_at', { ascending: false })
+      if (dealsData) setDeals(dealsData)
 
-    const { data: dealsData } = await supabase.from('deals').select('*, expenses(*), seller:seller_id(name, phone), buyer:buyer_id(name, phone)').eq('user_id', user.id).order('created_at', { ascending: false })
-    if (dealsData) setDeals(dealsData)
+      const { data: contactsData } = await supabase.from('contacts').select('*').eq('user_id', user.id).order('name')
+      if (contactsData) setContacts(contactsData)
 
-    const { data: contactsData } = await supabase.from('contacts').select('*').eq('user_id', user.id).order('name')
-    if (contactsData) setContacts(contactsData)
+      const { data: genExpData } = await supabase.from('expenses').select('*').eq('user_id', user.id).is('deal_id', null).order('created_at', { ascending: false })
+      if (genExpData) setGeneralExpenses(genExpData)
 
-    const { data: genExpData } = await supabase.from('expenses').select('*').eq('user_id', user.id).is('deal_id', null).order('created_at', { ascending: false })
-    if (genExpData) setGeneralExpenses(genExpData)
+      const { data: debtsData } = await supabase.from('debts').select('*, contact:contact_id(name)').eq('user_id', user.id).order('created_at', { ascending: false })
+      if (debtsData) setDebts(debtsData)
 
-    const { data: debtsData } = await supabase.from('debts').select('*, contact:contact_id(name)').eq('user_id', user.id).order('created_at', { ascending: false })
-    if (debtsData) setDebts(debtsData)
+      const { data: profileInfo } = await supabase.from('user_profiles').select('*').eq('telegram_id', user.id).single()
+      if (profileInfo) {
+        setProfileData(profileInfo)
+        setDisplayName(profileInfo.display_name || user.first_name || 'Аноним')
+        setHideAmounts(profileInfo.hide_amounts || false)
+        setShowChart(profileInfo.show_chart !== false)
+        setDailySummary(profileInfo.daily_summary || false)
+        setBudget(Number(profileInfo.resale_budget) || 0)
+      } else {
+        const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 }
+        await supabase.from('user_profiles').insert([newProf])
+        setProfileData(newProf)
+        setDisplayName(newProf.display_name)
+      }
 
-    const { data: profileInfo } = await supabase.from('user_profiles').select('*').eq('telegram_id', user.id).single()
-    if (profileInfo) {
-      setProfileData(profileInfo)
-      setDisplayName(profileInfo.display_name || user.first_name || 'Аноним')
-      setHideAmounts(profileInfo.hide_amounts || false)
-      setShowChart(profileInfo.show_chart !== false)
-      setDailySummary(profileInfo.daily_summary || false)
-      setBudget(Number(profileInfo.resale_budget) || 0)
-    } else {
-      const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 }
-      await supabase.from('user_profiles').insert([newProf])
-      setProfileData(newProf)
-      setDisplayName(newProf.display_name)
+      const { data: lbData } = await supabase.from('public_leaderboard').select('*').order('gross_profit', { ascending: false }).limit(10)
+      if (lbData) setLeaderboard(lbData)
+    } catch (error) {
+      console.error("Ошибка при загрузке данных:", error);
+    } finally {
+      setIsInitialLoading(false);
     }
-
-    const { data: lbData } = await supabase.from('public_leaderboard').select('*').order('gross_profit', { ascending: false }).limit(10)
-    if (lbData) setLeaderboard(lbData)
-
-    setIsInitialLoading(false);
   }
 
   // --- БЭКАП ---
@@ -466,67 +467,87 @@ function App() {
     e.preventDefault()
     if (!model || !buyPrice || !user) return alert('Заполните модель и цену')
     setIsActionLoading(true)
-    const qty = Math.max(1, Number(dealQuantity) || 1);
-    const { data: newDeals, error } = await supabase.from('deals').insert([{
-      model, buy_price: Number(buyPrice), status: 'in_stock',
-      category: detectCategory(model),
-      quantity: qty,
-      sold_quantity: 0,
-      is_accounted: true, // Всегда учитываем при покупке
-      description: dealDescription || null,
-      storage_gb: storage ? Number(storage) : null, battery_health: battery ? Number(battery) : null,
-      imei: imei || null, seller_id: sellerId ? Number(sellerId) : null,
-      user_id: user.id, user_name: displayName || 'Аноним',
-      location: dealLocation || null,
-      photos: dealPhotos.length > 0 ? dealPhotos : null
-    }]).select()
+    try {
+      const qty = Math.max(1, Number(dealQuantity) || 1);
+      const { data: newDeals, error } = await supabase.from('deals').insert([{
+        model, buy_price: Number(buyPrice), status: 'in_stock',
+        category: detectCategory(model),
+        quantity: qty,
+        sold_quantity: 0,
+        is_accounted: true,
+        description: dealDescription || null,
+        storage_gb: storage ? Number(storage) : null, battery_health: battery ? Number(battery) : null,
+        imei: imei || null, seller_id: sellerId ? Number(sellerId) : null,
+        user_id: user.id, user_name: displayName || 'Аноним',
+        location: dealLocation || null,
+        photos: dealPhotos.length > 0 ? dealPhotos : null
+      }]).select()
 
-    if (!error && newDeals) {
-      const newDealId = newDeals[0].id;
-      if (newDealExpAmount && Number(newDealExpAmount) > 0) {
-        await supabase.from('expenses').insert([{ deal_id: newDealId, amount: Number(newDealExpAmount), category: newDealExpCat, user_id: user.id }])
+      if (error) throw new Error(error.message);
+
+      if (newDeals && newDeals.length > 0) {
+        const newDealId = newDeals[0].id;
+        if (newDealExpAmount && Number(newDealExpAmount) > 0) {
+          await supabase.from('expenses').insert([{ deal_id: newDealId, amount: Number(newDealExpAmount), category: newDealExpCat, user_id: user.id }])
+        }
+        setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId('');
+        setNewDealExpAmount(''); setNewDealExpCat('Ремонт'); setDealLocation(''); setDealPhotos([]); setDealDescription('');
+        setDealQuantity('1');
+        await fetchData();
+        haptic('medium');
+        setShowSuccessMsg(true);
+        setTimeout(() => setShowSuccessMsg(false), 3000);
+      } else {
+        alert('Не удалось сохранить устройство')
       }
-      setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId('');
-      setNewDealExpAmount(''); setNewDealExpCat('Ремонт'); setDealLocation(''); setDealPhotos([]); setDealDescription('');
-      setDealQuantity('1');
-      fetchData(); haptic('medium'); setShowSuccessMsg(true); setTimeout(() => setShowSuccessMsg(false), 3000);
-    } else { alert('Ошибка: ' + (error?.message || 'Неизвестная ошибка')) }
-    setIsActionLoading(false)
+    } catch (err) {
+      alert('Ошибка: ' + err.message)
+    } finally {
+      setIsActionLoading(false)
+    }
   }
 
   const addManualProduct = async () => {
     if (!addForm.model || !addForm.buy_price || !user) return alert('Заполните модель и цену');
     if (!selectedCategory) return;
     setIsActionLoading(true);
-    const qty = Math.max(1, Number(addForm.quantity) || 1);
-    const { data: newDeals, error } = await supabase.from('deals').insert([{
-      model: addForm.model,
-      category: selectedCategory,
-      buy_price: Number(addForm.buy_price),
-      quantity: qty,
-      sold_quantity: 0,
-      is_accounted: addForm.is_accounted,
-      status: 'in_stock',
-      description: addForm.description || null,
-      imei: addForm.imei || null,
-      location: addForm.location || null,
-      photos: addFormPhotos.length > 0 ? addFormPhotos : null,
-      user_id: user.id,
-      user_name: displayName || 'Аноним'
-    }]).select();
+    try {
+      const qty = Math.max(1, Number(addForm.quantity) || 1);
+      const { data: newDeals, error } = await supabase.from('deals').insert([{
+        model: addForm.model,
+        category: selectedCategory,
+        buy_price: Number(addForm.buy_price),
+        quantity: qty,
+        sold_quantity: 0,
+        is_accounted: addForm.is_accounted,
+        status: 'in_stock',
+        description: addForm.description || null,
+        imei: addForm.imei || null,
+        location: addForm.location || null,
+        photos: addFormPhotos.length > 0 ? addFormPhotos : null,
+        user_id: user.id,
+        user_name: displayName || 'Аноним'
+      }]).select();
 
-    if (!error && newDeals) {
-      if (addForm.exp_amount && Number(addForm.exp_amount) > 0) {
-        await supabase.from('expenses').insert([{ deal_id: newDeals[0].id, amount: Number(addForm.exp_amount), category: 'Ремонт', user_id: user.id }]);
+      if (error) throw new Error(error.message);
+
+      if (newDeals && newDeals.length > 0) {
+        if (addForm.exp_amount && Number(addForm.exp_amount) > 0) {
+          await supabase.from('expenses').insert([{ deal_id: newDeals[0].id, amount: Number(addForm.exp_amount), category: 'Ремонт', user_id: user.id }]);
+        }
+        setShowAddModal(false);
+        setAddForm({ model: '', description: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' });
+        setAddFormPhotos([]);
+        await fetchData(); 
+        haptic('success');
+      } else {
+        alert('Не удалось сохранить товар');
       }
-      setShowAddModal(false);
-      setAddForm({ model: '', description: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' });
-      setAddFormPhotos([]);
-      fetchData(); haptic('success');
-    } else {
-      alert('Ошибка: ' + (error?.message || 'Неизвестная ошибка'));
+    } catch (err) {
+      alert('Ошибка: ' + err.message);
+    } finally {
+      setIsActionLoading(false);
     }
-    setIsActionLoading(false);
   };
 
   const confirmSell = async () => {
@@ -534,20 +555,29 @@ function App() {
     const qtyToSell = Number(sellQuantity) || 1;
     if (qtyToSell > sellingDeal.quantity) return alert(`В наличии только ${sellingDeal.quantity} шт.`);
     setIsActionLoading(true);
-    const newQuantity = sellingDeal.quantity - qtyToSell;
-    const newSoldQuantity = (sellingDeal.sold_quantity || 0) + qtyToSell;
-    const newStatus = newQuantity === 0 ? 'sold' : 'in_stock';
-    await supabase.from('deals').update({
-      quantity: newQuantity,
-      sold_quantity: newSoldQuantity,
-      sell_price: Number(sellPrice),
-      status: newStatus,
-      buyer_id: buyerId ? Number(buyerId) : null,
-      sold_at: newQuantity === 0 ? new Date().toISOString() : sellingDeal.sold_at,
-      warranty_months: Number(sellWarranty)
-    }).eq('id', sellingDeal.id)
-    setSellingDeal(null); fetchData();
-    setIsActionLoading(false)
+    try {
+      const newQuantity = sellingDeal.quantity - qtyToSell;
+      const newSoldQuantity = (sellingDeal.sold_quantity || 0) + qtyToSell;
+      const newStatus = newQuantity === 0 ? 'sold' : 'in_stock';
+      const { error } = await supabase.from('deals').update({
+        quantity: newQuantity,
+        sold_quantity: newSoldQuantity,
+        sell_price: Number(sellPrice),
+        status: newStatus,
+        buyer_id: buyerId ? Number(buyerId) : null,
+        sold_at: newQuantity === 0 ? new Date().toISOString() : sellingDeal.sold_at,
+        warranty_months: Number(sellWarranty)
+      }).eq('id', sellingDeal.id);
+      
+      if (error) throw new Error(error.message);
+      
+      setSellingDeal(null); 
+      await fetchData();
+    } catch (err) {
+      alert('Ошибка при продаже: ' + err.message);
+    } finally {
+      setIsActionLoading(false);
+    }
   }
 
   const addGeneralExpense = async (e) => {
@@ -1195,9 +1225,6 @@ function App() {
                   </div>
                 </div>
                 {renderSpecs(deal)}
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
-                  Продано: <b>{deal.sold_quantity} шт.</b> по {formatMoney(deal.sell_price)}/шт
-                </div>
                 {deal.description && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8, fontStyle: 'italic' }}>📝 {deal.description}</div>}
                 <div style={{ marginBottom: 10 }}>{getWarrantyBadge(deal)}</div>
                 {deal.seller && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>👤 Купил у: {deal.seller.name}</div>}
@@ -1351,7 +1378,7 @@ function App() {
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.1 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.2 • Сделано для перекупов</div>
     </div>
   )
 

@@ -108,10 +108,10 @@ function App() {
   const [newDealExpCat, setNewDealExpCat] = useState('Ремонт')
   const [newDealExpAmount, setNewDealExpAmount] = useState('')
   const [dealLocation, setDealLocation] = useState('')
+  const [dealDescription, setDealDescription] = useState('')
   const [dealPhotos, setDealPhotos] = useState([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [dealQuantity, setDealQuantity] = useState('1')
-  const [dealIsAccounted, setDealIsAccounted] = useState(true)
 
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
@@ -139,10 +139,13 @@ function App() {
   const [editModel, setEditModel] = useState('')
   const [editBuyPrice, setEditBuyPrice] = useState('')
   const [editLocation, setEditLocation] = useState('')
+  const [editDescription, setEditDescription] = useState('')
 
   // Модалка быстрого добавления товара в категорию
   const [showAddModal, setShowAddModal] = useState(false)
-  const [addForm, setAddForm] = useState({ model: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' })
+  const [addForm, setAddForm] = useState({ model: '', description: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' })
+  const [addFormPhotos, setAddFormPhotos] = useState([])
+  const [uploadingAddPhoto, setUploadingAddPhoto] = useState(false)
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
@@ -360,14 +363,14 @@ function App() {
   const handleExportClick = () => {
     haptic();
     if (deals.length === 0) return alert('Нет данных для экспорта');
-    const headers = ['Категория', 'Модель', 'Кол-во', 'Закупка', 'Продажа', 'Прибыль', 'Дата покупки', 'Дата продажи'];
+    const headers = ['Категория', 'Модель', 'Описание', 'Кол-во', 'Закупка', 'Продажа', 'Прибыль', 'Дата покупки', 'Дата продажи'];
     const rows = deals.map(d => {
       const exp = getDealExpensesSum(d);
       const initQty = (d.quantity || 0) + (d.sold_quantity || 0);
       const perUnitExp = initQty > 0 ? exp / initQty : 0;
       const m = d.sold_quantity > 0 ? (d.sold_quantity * (Number(d.sell_price) || 0)) - (d.sold_quantity * Number(d.buy_price)) - (d.sold_quantity * perUnitExp) : '';
       return [
-        `"${d.category || ''}"`, `"${d.model}"`, initQty, d.buy_price, d.sell_price || '', m,
+        `"${d.category || ''}"`, `"${d.model}"`, `"${d.description || ''}"`, initQty, d.buy_price, d.sell_price || '', m,
         new Date(d.created_at).toLocaleDateString('ru-RU'),
         d.sold_at ? new Date(d.sold_at).toLocaleDateString('ru-RU') : ''
       ].join(';');
@@ -435,6 +438,29 @@ function App() {
     setUploadingPhoto(false);
   }
 
+  const handleAddModalPhotoUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    if (addFormPhotos.length + files.length > 3) {
+      alert('Максимум 3 фото');
+      return;
+    }
+    setUploadingAddPhoto(true);
+    const newUrls = [];
+    for (const file of files) {
+      try {
+        const compressedBlob = await compressImage(file);
+        const fileName = `${user.id}-${Date.now()}-${Math.random()}.jpg`;
+        const { error } = await supabase.storage.from('deal-photos').upload(fileName, compressedBlob, { contentType: 'image/jpeg' });
+        if (error) throw error;
+        const { data: { publicUrl } } = supabase.storage.from('deal-photos').getPublicUrl(fileName);
+        newUrls.push(publicUrl);
+      } catch (err) { alert('Ошибка загрузки: ' + err.message); }
+    }
+    setAddFormPhotos(prev => [...prev, ...newUrls]);
+    setUploadingAddPhoto(false);
+  }
+
   const addDeal = async (e) => {
     e.preventDefault()
     if (!model || !buyPrice || !user) return alert('Заполните модель и цену')
@@ -445,7 +471,8 @@ function App() {
       category: detectCategory(model),
       quantity: qty,
       sold_quantity: 0,
-      is_accounted: dealIsAccounted,
+      is_accounted: true, // Всегда учитываем при покупке
+      description: dealDescription || null,
       storage_gb: storage ? Number(storage) : null, battery_health: battery ? Number(battery) : null,
       imei: imei || null, seller_id: sellerId ? Number(sellerId) : null,
       user_id: user.id, user_name: displayName || 'Аноним',
@@ -459,8 +486,8 @@ function App() {
         await supabase.from('expenses').insert([{ deal_id: newDealId, amount: Number(newDealExpAmount), category: newDealExpCat, user_id: user.id }])
       }
       setModel(''); setBuyPrice(''); setStorage(''); setBattery(''); setImei(''); setSellerId('');
-      setNewDealExpAmount(''); setNewDealExpCat('Ремонт'); setDealLocation(''); setDealPhotos([]);
-      setDealQuantity('1'); setDealIsAccounted(true);
+      setNewDealExpAmount(''); setNewDealExpCat('Ремонт'); setDealLocation(''); setDealPhotos([]); setDealDescription('');
+      setDealQuantity('1');
       fetchData(); haptic('medium'); setShowSuccessMsg(true); setTimeout(() => setShowSuccessMsg(false), 3000);
     } else { alert('Ошибка: ' + (error?.message || 'Неизвестная ошибка')) }
     setIsActionLoading(false)
@@ -479,8 +506,10 @@ function App() {
       sold_quantity: 0,
       is_accounted: addForm.is_accounted,
       status: 'in_stock',
+      description: addForm.description || null,
       imei: addForm.imei || null,
       location: addForm.location || null,
+      photos: addFormPhotos.length > 0 ? addFormPhotos : null,
       user_id: user.id,
       user_name: displayName || 'Аноним'
     }]).select();
@@ -490,7 +519,8 @@ function App() {
         await supabase.from('expenses').insert([{ deal_id: newDeals[0].id, amount: Number(addForm.exp_amount), category: 'Ремонт', user_id: user.id }]);
       }
       setShowAddModal(false);
-      setAddForm({ model: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' });
+      setAddForm({ model: '', description: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' });
+      setAddFormPhotos([]);
       fetchData(); haptic('success');
     } else {
       alert('Ошибка: ' + (error?.message || 'Неизвестная ошибка'));
@@ -544,7 +574,7 @@ function App() {
   const confirmExpense = async () => { if (!expenseAmount || !user) return; await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount: Number(expenseAmount), category: expenseCategory, user_id: user.id }]); setExpenseDeal(null); fetchData(); }
   const saveEditContact = async () => { if (!editContactName) return; await supabase.from('contacts').update({ name: editContactName, phone: editContactPhone, note: editContactNote }).eq('id', editingContact.id); setEditingContact(null); fetchData(); }
   const deleteContact = async (id) => { if (!window.confirm('Удалить контакт?')) return; await supabase.from('contacts').delete().eq('id', id); fetchData(); }
-  const saveEdit = async () => { if (!editModel || !editBuyPrice) return; await supabase.from('deals').update({ model: editModel, buy_price: Number(editBuyPrice), location: editLocation }).eq('id', editingDeal.id); setEditingDeal(null); fetchData(); }
+  const saveEdit = async () => { if (!editModel || !editBuyPrice) return; await supabase.from('deals').update({ model: editModel, buy_price: Number(editBuyPrice), location: editLocation, description: editDescription || null }).eq('id', editingDeal.id); setEditingDeal(null); fetchData(); }
 
   const handleModelSelect = (modelName) => {
     haptic();
@@ -971,6 +1001,8 @@ function App() {
 
           <input className="input-field" type="text" placeholder="Место хранения" value={dealLocation} onChange={(e) => setDealLocation(e.target.value)} />
 
+          <textarea className="input-field" placeholder="Описание (состояние, комплект, дефекты...)" value={dealDescription} onChange={(e) => setDealDescription(e.target.value)} style={{ minHeight: 60, resize: 'vertical' }} />
+
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div style={{ flex: 1, position: 'relative' }}>
               <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={imei} onChange={(e) => setImei(e.target.value)} style={{ marginBottom: 10, paddingRight: 35 }} />
@@ -1009,11 +1041,6 @@ function App() {
               <option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси/Доставка">Такси/Доставка</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option><option value="Другое">Другое</option>
             </select>
             <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма расхода" value={newDealExpAmount} onChange={(e) => setNewDealExpAmount(e.target.value.replace(/[^\d]/g, ''))} />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 5, marginBottom: 15 }}>
-            <label style={{ fontSize: 13, fontWeight: 'bold' }}>Учитывать в расчётах</label>
-            <button type="button" onClick={() => { setDealIsAccounted(!dealIsAccounted); haptic(); }} style={{ padding: '6px 12px', borderRadius: 20, background: dealIsAccounted ? '#34c759' : '#e5e5ea', color: dealIsAccounted ? '#fff' : '#000', border: 'none', fontWeight: 'bold' }}>{dealIsAccounted ? 'ДА' : 'НЕТ'}</button>
           </div>
 
           <button className="btn-primary" type="submit" disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Сохранить на склад'}</button>
@@ -1071,7 +1098,7 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
           <button onClick={() => { setSelectedCategory(null); setSearchQuery(''); setFilterModels([]); haptic(); }} style={{ background: 'none', border: 'none', fontSize: 24, padding: '0 10px 0 0', cursor: 'pointer', color: 'var(--accent)' }}>←</button>
           <h2 style={{ fontSize: 28, fontWeight: 700, margin: 0, flex: 1 }}>{cat?.icon} {cat?.name}</h2>
-          <button onClick={() => { setAddForm({ model: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' }); setShowAddModal(true); haptic('medium'); }} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>+ Добавить</button>
+          <button onClick={() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', exp_amount: '', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); }} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>+ Добавить</button>
         </div>
 
         {!emptyCat && (
@@ -1101,7 +1128,7 @@ function App() {
                     {isDeadStock && <span style={{ marginLeft: 8, fontSize: 16 }} title="Залежавшийся товар!">⚠️</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 5 }}>
-                    <button className="icon-btn" onClick={(e) => { e.stopPropagation(); setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || ''); setEditLocation(deal.location || ''); haptic(); }}>✏️</button>
+                    <button className="icon-btn" onClick={(e) => { e.stopPropagation(); setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || ''); setEditLocation(deal.location || ''); setEditDescription(deal.description || ''); haptic(); }}>✏️</button>
                     <button className="icon-btn" onClick={(e) => { e.stopPropagation(); deleteDeal(deal.id); }}>🗑️</button>
                   </div>
                 </div>
@@ -1115,6 +1142,7 @@ function App() {
                   </div>
                 )}
 
+                {deal.description && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>📝 {deal.description}</div>}
                 {deal.seller && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>👤 Продавец: {deal.seller.name}</div>}
 
                 <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10, marginBottom: 14 }}>
@@ -1161,7 +1189,7 @@ function App() {
                 <div className="card-header">
                   <div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model || 'Без названия'}</div>
                   <div>
-                    <button className="icon-btn" onClick={() => { setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || ''); }}>✏️</button>
+                    <button className="icon-btn" onClick={() => { setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || ''); setEditLocation(deal.location || ''); setEditDescription(deal.description || ''); }}>✏️</button>
                     <button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button>
                   </div>
                 </div>
@@ -1169,6 +1197,7 @@ function App() {
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
                   Продано: <b>{deal.sold_quantity} шт.</b> по {formatMoney(deal.sell_price)}/шт
                 </div>
+                {deal.description && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8, fontStyle: 'italic' }}>📝 {deal.description}</div>}
                 <div style={{ marginBottom: 10 }}>{getWarrantyBadge(deal)}</div>
                 {deal.seller && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>👤 Купил у: {deal.seller.name}</div>}
                 {deal.buyer && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>👤 Продал: {deal.buyer.name}</div>}
@@ -1321,7 +1350,7 @@ function App() {
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.0 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.1 • Сделано для перекупов</div>
     </div>
   )
 
@@ -1410,15 +1439,38 @@ function App() {
             ) : (
               <input className="input-field" type="text" placeholder="Название (например, Стекло iPhone 15)" value={addForm.model} onChange={(e) => setAddForm({ ...addForm, model: e.target.value })} />
             )}
+            
             <div style={{ display: 'flex', gap: 10 }}>
               <input className="input-field" type="text" inputMode="numeric" placeholder="Цена закупа (за 1 шт)" value={addForm.buy_price} onChange={(e) => setAddForm({ ...addForm, buy_price: e.target.value.replace(/[^\d]/g, '') })} style={{ flex: 1 }} />
               <input className="input-field" type="text" inputMode="numeric" placeholder="Кол-во" value={addForm.quantity} onChange={(e) => setAddForm({ ...addForm, quantity: e.target.value.replace(/[^\d]/g, '') })} style={{ width: 90 }} />
             </div>
+            
+            <textarea className="input-field" placeholder="Описание (необязательно)" value={addForm.description} onChange={(e) => setAddForm({ ...addForm, description: e.target.value })} style={{ minHeight: 60, resize: 'vertical' }} />
+            
             <input className="input-field" type="text" inputMode="numeric" placeholder="Расходы на партию (₽, необязательно)" value={addForm.exp_amount} onChange={(e) => setAddForm({ ...addForm, exp_amount: e.target.value.replace(/[^\d]/g, '') })} />
             <input className="input-field" type="text" placeholder="Место хранения (необязательно)" value={addForm.location} onChange={(e) => setAddForm({ ...addForm, location: e.target.value })} />
             {(selectedCategory === 'iPhone' || selectedCategory === 'iPad' || selectedCategory === 'MacBook' || selectedCategory === 'Apple Watch') && (
               <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={addForm.imei} onChange={(e) => setAddForm({ ...addForm, imei: e.target.value })} />
             )}
+
+            <div style={{ marginBottom: 15, marginTop: 5 }}>
+              <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото (до 3 шт):</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {addFormPhotos.map((url, idx) => (
+                  <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
+                    <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button onClick={() => setAddFormPhotos(prev => prev.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}>✕</button>
+                  </div>
+                ))}
+                {addFormPhotos.length < 3 && (
+                  <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)' }}>
+                    {uploadingAddPhoto ? '...' : '+'}
+                    <input type="file" accept="image/*" multiple onChange={handleAddModalPhotoUpload} style={{ display: 'none' }} disabled={uploadingAddPhoto} />
+                  </label>
+                )}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 5, marginBottom: 15 }}>
               <label style={{ fontSize: 13, fontWeight: 'bold' }}>Учитывать в расчётах</label>
               <button onClick={() => { setAddForm({ ...addForm, is_accounted: !addForm.is_accounted }); haptic(); }} style={{ padding: '6px 12px', borderRadius: 20, background: addForm.is_accounted ? '#34c759' : '#e5e5ea', color: addForm.is_accounted ? '#fff' : '#000', border: 'none', fontWeight: 'bold' }}>{addForm.is_accounted ? 'ДА' : 'НЕТ'}</button>
@@ -1530,7 +1582,7 @@ function App() {
       )}
 
       {showGuideModal && (
-        <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}><button onClick={() => setShowGuideModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: '#00000088', border: 'none', borderRadius: '50%', width: 32, height: 32, color: 'white', fontSize: 16 }}>✕</button><h3 style={{ paddingRight: 30 }}>📚 Как пользоваться</h3><div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>1. Покупка</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Добавляйте устройства и сразу указывайте количество — удобно для партий.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>2. Склад по категориям</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>6 категорий: iPhone, AirPods, iPad, Apple Watch, MacBook, Аксессуары. Внутри — кнопка «+ Добавить».</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>3. Продажа по частям</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Если у вас 5 AirPods, можете продать 1 штуку — остальные останутся на складе.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>4. Учёт в расчётах</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Галочка «Учитывать в расчётах» — если выключить, товар не попадёт в статистику прибыли.</div></div></div><button className="btn-primary" style={{ marginTop: 25, width: '100%', padding: '16px' }} onClick={() => setShowGuideModal(false)}>Понятно</button></div></div>
+        <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}><button onClick={() => setShowGuideModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: '#00000088', border: 'none', borderRadius: '50%', width: 32, height: 32, color: 'white', fontSize: 16 }}>✕</button><h3 style={{ paddingRight: 30 }}>📚 Как пользоваться</h3><div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>1. Покупка</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Добавляйте устройства и сразу указывайте количество — удобно для партий.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>2. Склад по категориям</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>6 категорий: iPhone, AirPods, iPad, Apple Watch, MacBook, Аксессуары. Внутри — кнопка «+ Добавить».</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>3. Продажа по частям</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Если у вас 5 AirPods, можете продать 1 штуку — остальные останутся на складе.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>4. Учёт в расчётах</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>При добавлении через склад можно отключить учёт, если товар личный.</div></div></div><button className="btn-primary" style={{ marginTop: 25, width: '100%', padding: '16px' }} onClick={() => setShowGuideModal(false)}>Понятно</button></div></div>
       )}
 
       {expenseDeal && (
@@ -1556,6 +1608,7 @@ function App() {
             <input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)} />
             <input className="input-field" type="text" inputMode="numeric" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value.replace(/[^\d]/g, ''))} />
             <input className="input-field" type="text" placeholder="Место хранения" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
+            <textarea className="input-field" placeholder="Описание" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} style={{ minHeight: 60, resize: 'vertical' }} />
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button>
               <button className="btn-confirm" onClick={saveEdit} disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Сохранить'}</button>
@@ -1601,7 +1654,7 @@ function App() {
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--card-bg)' }}>
               <h3 style={{ margin: 0, fontSize: 20 }}>{viewingDeal.model}</h3>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button className="icon-btn" onClick={() => { setViewingDeal(null); setEditingDeal(viewingDeal); setEditModel(viewingDeal.model || ''); setEditBuyPrice(viewingDeal.buy_price || ''); setEditLocation(viewingDeal.location || ''); }}>✏️</button>
+                <button className="icon-btn" onClick={() => { setViewingDeal(null); setEditingDeal(viewingDeal); setEditModel(viewingDeal.model || ''); setEditBuyPrice(viewingDeal.buy_price || ''); setEditLocation(viewingDeal.location || ''); setEditDescription(viewingDeal.description || ''); }}>✏️</button>
                 <button className="icon-btn" onClick={() => { setViewingDeal(null); deleteDeal(viewingDeal.id); }}>🗑️</button>
                 <button className="icon-btn" onClick={() => setViewingDeal(null)} style={{ fontSize: 24 }}>✕</button>
               </div>
@@ -1617,6 +1670,7 @@ function App() {
               <div className="card" style={{ padding: 15, marginBottom: 15 }}>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: 14, color: 'var(--text-muted)' }}>Характеристики</h4>
                 {renderSpecs(viewingDeal)}
+                {viewingDeal.description && <div style={{ fontSize: 14, color: 'var(--text-main)', marginTop: 10, whiteSpace: 'pre-wrap', backgroundColor: 'var(--bg-color)', padding: 10, borderRadius: 8 }}>📝 {viewingDeal.description}</div>}
                 <div className="stat-row" style={{ marginTop: 10 }}><span>Дата закупа:</span><span>{new Date(viewingDeal.created_at || Date.now()).toLocaleDateString('ru-RU')}</span></div>
                 {viewingDeal.seller && <div className="stat-row"><span>Продавец:</span><span>{viewingDeal.seller.name}</span></div>}
               </div>

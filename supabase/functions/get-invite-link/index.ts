@@ -20,17 +20,23 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Проверяем, есть ли у пользователя подписка
+    // Проверяем профиль
     const { data: profile, error } = await supabaseAdmin
       .from('user_profiles')
-      .select('is_admin, subscription_ends_at')
+      .select('is_admin, subscription_ends_at, platega_plan')
       .eq('telegram_id', telegram_id)
       .single()
 
-    const isPro = profile?.is_admin || (profile?.subscription_ends_at && new Date(profile.subscription_ends_at) > new Date())
+    // ГЛАВНОЕ ИСПРАВЛЕНИЕ: Триал не считается доступом к чату. 
+    // Нам нужен либо is_admin, либо реальный план (1m, 6m, 12m)
+    const isPaid = profile?.is_admin || (
+      profile?.subscription_ends_at && 
+      new Date(profile.subscription_ends_at) > new Date() &&
+      profile?.platega_plan !== null // <--- Отсекаем триал
+    );
 
-    if (!isPro) {
-      return new Response(JSON.stringify({ error: "У вас нет активной подписки" }), {
+    if (!isPaid) {
+      return new Response(JSON.stringify({ error: "Доступ к чату только по платной подписке" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       })

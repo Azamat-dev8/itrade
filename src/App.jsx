@@ -849,8 +849,14 @@ function App() {
   };
   const finStats = getFinancialStats();
 
-  const isPro = profileData?.is_admin || (profileData?.subscription_ends_at && new Date(profileData.subscription_ends_at) > new Date());
-
+   const isPro = profileData?.is_admin || (profileData?.subscription_ends_at && new Date(profileData.subscription_ends_at) > new Date());
+  
+  // НОВАЯ ПЕРЕМЕННАЯ: Доступ к чату (только для админов или реально плативших)
+  const hasChatAccess = profileData?.is_admin || (
+    profileData?.subscription_ends_at && 
+    new Date(profileData.subscription_ends_at) > new Date() && 
+    profileData?.platega_plan !== null
+  );
   const requirePro = (action) => {
     if (!isPro) {
       haptic('error');
@@ -1639,7 +1645,7 @@ function App() {
   setIsMenuOpen(false);
   
   // Если нет PRO — показываем окно оплаты
-  if (!isPro) {
+   if (!hasChatAccess) {
     setShowSubModal(true);
     return;
   }

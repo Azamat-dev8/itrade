@@ -149,7 +149,7 @@ function App() {
   const [showAdModal, setShowAdModal] = useState(false)
   const [adText, setAdText] = useState('')
 
-  useEffect(() => {
+    useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (tg) {
       tg.ready(); tg.expand(); setUser(tg.initDataUnsafe?.user || null)
@@ -161,9 +161,23 @@ function App() {
       }
       applyTheme()
       tg.onEvent('themeChanged', applyTheme)
+
+      // --- ЛОВИМ ПАРАМЕТР ОПЛАТЫ ИЗ БОТА ---
+      const urlParams = new URLSearchParams(window.location.search);
+      const startapp = urlParams.get('startapp') || tg.initDataUnsafe?.start_param;
+      
+      if (startapp && startapp.startsWith('pay_')) {
+        const planId = startapp.replace('pay_', ''); // Получаем "1", "6" или "12"
+        if (['1', '6', '12'].includes(planId)) {
+          setSelectedPlan(planId);
+          // Небольшая задержка, чтобы приложение успело прогрузиться перед открытием модалки
+          setTimeout(() => setShowSubModal(true), 500); 
+        }
+      }
+      // -------------------------------------
+
       return () => tg.offEvent('themeChanged', applyTheme)
     } else {
-      // Страховка для локальной разработки или если скрипт ТГ заблокирован
       console.warn("Telegram WebApp не найден. Включаем режим заглушки.");
       setUser({ id: 123456789, first_name: 'Тест', username: 'test_user' });
     }

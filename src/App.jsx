@@ -70,6 +70,7 @@ function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showSubModal, setShowSubModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState('12')
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(2); // 2 = СБП, 13 = Крипта
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false)
   const [showGuideModal, setShowGuideModal] = useState(false)
@@ -1873,12 +1874,29 @@ function App() {
                   );
                 })}
               </div>
+              <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8, color: 'var(--text-muted)' }}>Способ оплаты:</div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+            <div 
+              onClick={() => { setSelectedPaymentMethod(2); haptic(); }} 
+              style={{ flex: 1, padding: 12, borderRadius: 12, border: `2px solid ${selectedPaymentMethod === 2 ? 'var(--accent)' : 'var(--border)'}`, textAlign: 'center', cursor: 'pointer', backgroundColor: selectedPaymentMethod === 2 ? 'rgba(36, 129, 204, 0.1)' : 'var(--bg-color)' }}
+            >
+              <div style={{ fontSize: 24 }}>💳</div>
+              <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 4 }}>СБП</div>
+            </div>
+            <div 
+              onClick={() => { setSelectedPaymentMethod(13); haptic(); }} 
+              style={{ flex: 1, padding: 12, borderRadius: 12, border: `2px solid ${selectedPaymentMethod === 13 ? '#f7931a' : 'var(--border)'}`, textAlign: 'center', cursor: 'pointer', backgroundColor: selectedPaymentMethod === 13 ? 'rgba(247, 147, 26, 0.1)' : 'var(--bg-color)' }}
+            >
+              <div style={{ fontSize: 24 }}>₿</div>
+              <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 4 }}>Крипта</div>
+            </div>
+          </div>
               <button className="btn-primary" disabled={isProcessingPayment} onClick={async () => {
                 haptic('heavy'); setIsProcessingPayment(true);
                 try {
                   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
                   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-                  const response = await fetch(`${supabaseUrl}/functions/v1/create-platega-subscription`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}`, 'apikey': supabaseKey }, body: JSON.stringify({ telegram_id: user?.id, plan_id: selectedPlan }) });
+                  const response = await fetch(`${supabaseUrl}/functions/v1/create-platega-subscription`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}`, 'apikey': supabaseKey }, body: JSON.stringify({ telegram_id: user?.id, plan_id: selectedPlan, payment_method: selectedPaymentMethod  }) });
                   if (!response.ok) { const t = await response.text(); throw new Error(`HTTP ${response.status}: ${t}`); }
                   const data = await response.json();
                   if (data?.redirect) {
@@ -1886,7 +1904,7 @@ function App() {
                     else { const a = document.createElement('a'); a.href = data.redirect; a.target = '_blank'; a.click(); }
                   } else alert('Сервер не вернул ссылку');
                 } catch (err) { alert('Ошибка: ' + err.message); } finally { setIsProcessingPayment(false); }
-              }} style={{ padding: '16px', fontSize: 16, opacity: isProcessingPayment ? 0.7 : 1 }}>{isProcessingPayment ? 'Создание...' : 'Оплатить через СБП'}</button>
+              }} style={{ padding: '16px', fontSize: 16, opacity: isProcessingPayment ? 0.7 : 1 }}>{isProcessingPayment ? 'Создание...' : (selectedPaymentMethod === 13 ? 'Оплатить криптовалютой' : 'Оплатить через СБП')}</button>
               <button className="btn-cancel" onClick={() => setShowSubModal(false)} style={{ width: '100%', marginTop: 10 }}>Закрыть</button>
             </div>
           </div>

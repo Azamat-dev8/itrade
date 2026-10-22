@@ -1911,21 +1911,50 @@ function App() {
         </div>
       )}
 
-      {showGuideModal && (
-        <div className="modal-overlay" style={{ zIndex: 2000 }}><div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}><button onClick={() => setShowGuideModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: '#00000088', border: 'none', borderRadius: '50%', width: 32, height: 32, color: 'white', fontSize: 16 }}>✕</button><h3 style={{ paddingRight: 30 }}>📚 Как пользоваться</h3><div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginTop: 15 }}><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>1. Покупка</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Добавляйте устройства и сразу указывайте количество — удобно для партий.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>2. Склад по категориям</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>6 категорий: iPhone, AirPods, iPad, Apple Watch, MacBook, Аксессуары. Внутри — кнопка «+ Добавить».</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>3. Продажа по частям</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>Если у вас 5 AirPods, можете продать 1 штуку — остальные останутся на складе.</div></div><div><div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>4. Учёт в расчётах</div><div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 5 }}>При добавлении через склад можно отключить учёт, если товар личный.</div></div></div><button className="btn-primary" style={{ marginTop: 25, width: '100%', padding: '16px' }} onClick={() => setShowGuideModal(false)}>Понятно</button></div></div>
-      )}
+            {showGuideModal && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={() => setShowGuideModal(false)}>
+          <div className="modal-content" style={{ maxHeight: '92vh', overflowY: 'auto', padding: 0 }} onClick={(e) => e.stopPropagation()}>
+            
+            {/* Шапка с градиентом */}
+            <div style={{ background: 'linear-gradient(135deg, #2481cc, #1a5c94)', padding: '24px 20px 20px', position: 'sticky', top: 0, zIndex: 10, color: 'white', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+              <div style={{ fontSize: 44, marginBottom: 6 }}>📚</div>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 'bold' }}>Полный гайд</h2>
+              <p style={{ margin: '4px 0 0 0', opacity: 0.9, fontSize: 13 }}>Всё, что нужно знать за 2 минуты</p>
+              <button onClick={() => setShowGuideModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 32, height: 32, color: 'white', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
 
-      {expenseDeal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>Расход: {expenseDeal.model}</h3>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value.replace(/[^\d]/g, ''))} autoFocus />
-            <select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}>
-              <option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option>
-            </select>
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button>
-              <button className="btn-confirm" onClick={confirmExpense} disabled={isActionLoading}>{isActionLoading ? 'Добавление...' : 'Добавить'}</button>
+            <div style={{ padding: 20 }}>
+              {[
+                { icon: '📊', title: 'Главная', color: '#0ABAB5', items: ['Бюджет и свободные средства', 'Реализованная прибыль чистыми', 'Долги и задатки (кто кому)', 'Топ моделей по марже', 'График прибыли по месяцам'] },
+                { icon: '🛒', title: 'Покупка', color: '#34c759', items: ['Выбери модель устройства', 'Укажи цену закупа и количество', 'Заполни АКБ, память, IMEI', 'Загрузи до 3 фото устройства', 'Отметь расходы (ремонт, такси)'] },
+                { icon: '📦', title: 'Склад', color: '#007aff', items: ['6 категорий: iPhone, AirPods, iPad, Apple Watch, MacBook, Аксессуары', 'Продавай по частям (1 из 5 AirPods)', 'Товары старше 21 дня подсвечиваются ⚠️', 'Добавляй партии товара одним кликом'] },
+                { icon: '💰', title: 'Сделки', color: '#ff9500', items: ['История всех проданных устройств', 'Автоматический расчёт чистой прибыли', 'Учёт всех расходов по сделке', 'Экспорт в Excel одной кнопкой'] },
+                { icon: '🧮', title: 'Калькулятор', color: '#af52de', items: ['Рассчитай маржу ДО покупки', 'Учёт комиссии Авито Доставки', 'Твоя история средних цен', 'Подсказка: хватает ли бюджета'] },
+                { icon: '💵', title: 'Доп. расходы', color: '#ff3b30', items: ['Реклама, аренда, бензин, еда', 'Всё, что не привязано к товару', 'Статистика: сколько уходит в месяц', 'Топ категория твоих трат'] },
+                { icon: '👥', title: 'Контакты', color: '#5ac8fa', items: ['База поставщиков и покупателей', 'Быстрый звонок одним касанием', 'Заметки о человеке', 'Привязка контактов к сделкам'] },
+                { icon: '⚙️', title: 'Настройки', color: '#8e8e93', items: ['Скрыть суммы (работа в кафе)', 'Тёмная и светлая тема', 'Ежедневная сводка в бот', 'Резервная копия данных (бэкап)', 'Рейтинг перекупов'] },
+                { icon: '💎', title: 'PRO подписка', color: '#ff9500', items: ['Первые 7 дней — бесплатно', '390₽/мес или 3590₽/год', 'Снимает все ограничения', 'Даёт доступ к закрытому чату'] },
+                { icon: '🤝', title: 'Закрытый чат', color: '#34c759', items: ['Клуб перекупов и владельцев бизнеса', 'Только для PRO-подписчиков', 'Кнопка в боковом меню', 'Доступ по одноразовой ссылке'] },
+              ].map((s, i) => (
+                <div key={i} style={{ marginBottom: 14, padding: 14, backgroundColor: 'var(--bg-color)', borderRadius: 14, borderLeft: `4px solid ${s.color}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <span style={{ fontSize: 26 }}>{s.icon}</span>
+                    <span style={{ fontWeight: 'bold', fontSize: 16 }}>{s.title}</span>
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 22, fontSize: 13, lineHeight: 1.7, color: 'var(--text-muted)' }}>
+                    {s.items.map((it, j) => <li key={j} style={{ marginBottom: 2 }}>{it}</li>)}
+                  </ul>
+                </div>
+              ))}
+
+              <div style={{ padding: 14, backgroundColor: 'rgba(255, 149, 0, 0.1)', borderRadius: 14, border: '1px solid var(--warning)', marginBottom: 18 }}>
+                <div style={{ fontWeight: 'bold', fontSize: 14, marginBottom: 4, color: 'var(--warning)' }}>💡 Совет от разработчика</div>
+                <div style={{ fontSize: 13, color: 'var(--text-main)', lineHeight: 1.5 }}>Делай резервную копию раз в неделю в «Настройках». Это занимает 10 секунд, но спасёт все данные при смене телефона или случайном удалении приложения.</div>
+              </div>
+
+              <button className="btn-primary" style={{ width: '100%', padding: 16, fontSize: 16, boxShadow: '0 4px 15px rgba(36, 129, 204, 0.4)' }} onClick={() => { setShowGuideModal(false); haptic('success'); }}>
+                Понятно, поехали! 🚀
+              </button>
             </div>
           </div>
         </div>

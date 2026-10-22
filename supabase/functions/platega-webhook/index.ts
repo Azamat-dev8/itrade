@@ -19,6 +19,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
     const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")
+    const CLOSED_CHAT_ID = Deno.env.get("TELEGRAM_CLOSED_CHAT_ID")
 
     const body = await req.json()
     console.log("Входящий запрос от Platega:", JSON.stringify(body))
@@ -40,12 +41,8 @@ serve(async (req) => {
         return new Response("ok", { status: 200, headers: corsHeaders });
       }
 
-      if (!telegramId) {
-        console.error("В payload нет userId")
-        return new Response("ok", { status: 200, headers: corsHeaders })
-      }
+      if (!telegramId) return new Response("ok", { status: 200, headers: corsHeaders })
 
-      // Получаем текущий профиль, чтобы узнать, есть ли у него еще активные дни
       const { data: currentProfile } = await supabaseAdmin
         .from('user_profiles')
         .select('subscription_ends_at')
@@ -53,7 +50,6 @@ serve(async (req) => {
         .single();
 
       let baseDate = new Date();
-      // Если у пользователя уже есть активная подписка (или триал), прибавляем дни к ней
       if (currentProfile?.subscription_ends_at && new Date(currentProfile.subscription_ends_at) > new Date()) {
         baseDate = new Date(currentProfile.subscription_ends_at);
       }
@@ -67,27 +63,54 @@ serve(async (req) => {
       const formattedDate = endsAt.toLocaleDateString('ru-RU');
 
       // Обновляем базу
-      const { error: updateError } = await supabaseAdmin
+      await supabaseAdmin
         .from('user_profiles')
-        .update({ 
-          subscription_ends_at: endsAt.toISOString(),
-          platega_plan: plan
-        })
+        .update({ subscription_ends_at: endsAt.toISOString(), platega_plan: plan })
         .eq('telegram_id', Number(telegramId))
 
-      if (updateError) {
-        console.error("Ошибка обновления профиля:", updateError)
-        throw updateError
+      // --- ГЕНЕРАЦИЯ ССЫЛКИ В ЧАТ ---
+      let inviteLink = "";
+      if (BOT_TOKEN && CLOSED_CHAT_ID) {
+        // 1. На всякий случай разбаниваем пользователя (вдруг он был исключен)
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/unbanChatMember`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: CLOSED_CHAT_ID, user_id: telegramId, only_if_banned: true })
+        });
+
+        // 2. Создаем одноразовую ссылку (действует 24 часа)
+        const inviteRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createChatInviteLink`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: CLOSED_CHAT_ID,
+            member_limit: 1,
+            expire_date: Math.floor(Date.now() / 1000) + 86400 // 24 часа
+          })
+        });
+        
+        const inviteData = await inviteRes.json();
+        if (inviteData.ok) {
+          inviteLink = inviteData.result.invite_link;
+        } else {
+          console.error("Ошибка создания ссылки:", inviteData);
+        }
       }
 
-      // Отправляем сообщение в Telegram
+      // 3. Отправляем сообщение пользователю
       if (BOT_TOKEN) {
+        const messageText = `🎉 *Оплата прошла успешно!*\n\nВаша подписка PrimeTrade PRO активна до *${formattedDate}*.\n\n` +
+          (inviteLink 
+            ? `👇 Ваша персональная ссылка для входа в закрытый чат (действует 1 раз и 24 часа):\n${inviteLink}\n\n` 
+            : `⚠️ Ссылка на закрытый чат временно недоступна. Напишите в поддержку.\n\n`) +
+          `Спасибо, что выбираете нас! 🚀`;
+
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: telegramId,
-            text: `🎉 *Оплата прошла успешно!*\n\nВаша подписка PrimeTrade PRO активна до *${formattedDate}*.\n\nСпасибо, что выбираете нас! 🚀`,
+            text: messageText,
             parse_mode: "Markdown"
           })
         })

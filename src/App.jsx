@@ -1634,7 +1634,48 @@ function App() {
           
           <button onClick={() => { setActiveTab('calculator'); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(0,122,255,0.2)' }}>🧮 Калькулятор</button>
 
-          <button onClick={() => { openExternalLink(CLOSED_CHAT_URL); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(52,199,89,0.2)' }}>🤝 Закрытый чат</button>
+          <button onClick={async () => {
+  haptic();
+  setIsMenuOpen(false);
+  
+  // Если нет PRO — показываем окно оплаты
+  if (!isPro) {
+    setShowSubModal(true);
+    return;
+  }
+  
+  // Если PRO есть — запрашиваем свежую ссылку
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    const response = await fetch(`${supabaseUrl}/functions/v1/get-invite-link`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Authorization': `Bearer ${supabaseKey}`, 
+        'apikey': supabaseKey 
+      },
+      body: JSON.stringify({ telegram_id: user?.id })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Ошибка: ${errText}`);
+    }
+    
+    const data = await response.json();
+    if (data?.link) {
+      openExternalLink(data.link);
+    } else {
+      alert('Сервер не вернул ссылку');
+    }
+  } catch (err) {
+    alert('Не удалось получить доступ к чату: ' + err.message);
+  }
+}} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(52,199,89,0.2)' }}>
+  🤝 Закрытый чат {!isPro && '🔒'}
+</button>
           
           {profileData?.show_in_leaderboard && <button onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🏆 Рейтинг перекупов</button>}
           <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>

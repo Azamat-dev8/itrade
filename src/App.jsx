@@ -812,7 +812,6 @@ function App() {
   };
   const finStats = getFinancialStats();
 
-  // --- ПРОВЕРКА ПОДПИСКИ ---
   const isPro = profileData?.is_admin || (profileData?.subscription_ends_at && new Date(profileData.subscription_ends_at) > new Date());
 
   const requirePro = (action) => {
@@ -931,7 +930,7 @@ function App() {
             <h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3>
             <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.reduce((s, d) => s + (d.quantity || 0), 0)} шт.</div>
           </div>
-          <button className="btn-success" onClick={requirePro(handleExportClick)} style={{ width: '100%', padding: '14px', fontSize: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>📥 Экспорт в Excel {!isPro && '🔒'}</button>
+          <button className="btn-success" onClick={() => requirePro(handleExportClick)} style={{ width: '100%', padding: '14px', fontSize: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>📥 Экспорт в Excel {!isPro && '🔒'}</button>
         </div>
 
         <button onClick={clearAllData} disabled={isActionLoading} style={{ width: '100%', padding: '12px', marginBottom: '16px', backgroundColor: 'var(--card-bg)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 0 15px rgba(255,59,48,0.1)' }}>
@@ -1236,7 +1235,7 @@ function App() {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <h2 style={{ fontSize: 24, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>{cat?.icon} {cat?.name}</h2>
-          <button onClick={requirePro(() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); })} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', boxShadow: `0 2px 10px ${cat?.color}60` }}>+ Добавить {!isPro && '🔒'}</button>
+          <button onClick={() => requirePro(() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); })} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', boxShadow: `0 2px 10px ${cat?.color}60` }}>+ Добавить {!isPro && '🔒'}</button>
         </div>
 
         {!emptyCat && (
@@ -1537,7 +1536,7 @@ function App() {
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.5.0 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.5.1 • Сделано для перекупов</div>
     </div>
   )
 

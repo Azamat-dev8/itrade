@@ -22,7 +22,6 @@ const CATEGORIES = [
 ];
 
 const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут"
-// ⚠️ ВСТАВЬ СЮДА ССЫЛКУ НА СВОЙ ЗАКРЫТЫЙ ЧАТ (начинается с https://t.me/+...)
 const CLOSED_CHAT_URL = "https://t.me/ваш_закрытый_чат" 
 
 const detectCategory = (model) => {
@@ -148,7 +147,6 @@ function App() {
   const [addFormPhotos, setAddFormPhotos] = useState([])
   const [uploadingAddPhoto, setUploadingAddPhoto] = useState(false)
 
-  // Для генератора объявлений
   const [showAdModal, setShowAdModal] = useState(false)
   const [adText, setAdText] = useState('')
 
@@ -656,14 +654,12 @@ function App() {
     } else { setFilterModels(prev => prev.includes(modelName) ? prev.filter(m => m !== modelName) : [...prev, modelName]); }
   }
 
-  // --- ГЕНЕРАТОР ОБЪЯВЛЕНИЙ ---
   const generateAdText = (deal) => {
     let text = `🔥 В продаже: ${deal.model}\n`;
     if (deal.storage_gb) text += `📦 Память: ${deal.storage_gb >= 1024 ? deal.storage_gb/1024 + ' TB' : deal.storage_gb + ' GB'}\n`;
     if (deal.battery_health) text += `🔋 АКБ: ${deal.battery_health}%\n`;
     if (deal.description) text += `📝 Состояние: ${deal.description}\n`;
     if (deal.location) text += `📍 Локация: ${deal.location}\n`;
-    
     const rawPrice = deal.sell_price ? Number(deal.sell_price).toLocaleString('ru-RU') + ' ₽' : 'Договорная';
     text += `💰 Цена для своих: ${rawPrice}\n\n`;
     text += `Нажмите, чтобы написать мне в ЛС!`;
@@ -793,27 +789,53 @@ function App() {
     </div>
   )
 
+  // --- ФИНАНСОВАЯ СТАТИСТИКА ДЛЯ ДОП. РАСХОДОВ ---
+  const getFinancialStats = () => {
+    const now = new Date();
+    let thisMonthTotal = 0;
+    const categoryTotals = {};
+
+    generalExpenses.forEach(exp => {
+      const amount = Number(exp.amount) || 0;
+      const date = new Date(exp.created_at || Date.now());
+      
+      // Считаем за этот месяц
+      if (date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) {
+        thisMonthTotal += amount;
+      }
+      
+      // Считаем по категориям
+      if (!categoryTotals[exp.category]) categoryTotals[exp.category] = 0;
+      categoryTotals[exp.category] += amount;
+    });
+
+    const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0] || ['Нет', 0];
+    
+    return { thisMonthTotal, topCategory };
+  };
+  const finStats = getFinancialStats();
+
   // =============== ГЛАВНАЯ ===============
   const renderHome = () => {
     const percentInvested = budget > 0 ? (totalInvestedInStock / (budget + realizedProfit)) * 100 : 0;
 
     return (
       <div>
-        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
+        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Статистика</h2>
 
-        <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card neon-card-blue" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 'bold' }}>Бюджет</div>
-            <button onClick={() => { setTempBudget(budget); setShowBudgetModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>Изменить ✏️</button>
+            <button onClick={() => { setTempBudget(budget); setShowBudgetModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', textShadow: '0 0 10px var(--accent)' }}>Изменить ✏️</button>
           </div>
           {budget > 0 ? (
             <>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(freeCash)}</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)', fontVariantNumeric: 'tabular-nums', textShadow: freeCash >= 0 ? '0 0 15px rgba(52,199,89,0.5)' : '0 0 15px rgba(255,59,48,0.5)' }}>{formatMoney(freeCash)}</div>
                 <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>свободно</div>
               </div>
               <div style={{ width: '100%', height: 8, backgroundColor: 'var(--bg-color)', borderRadius: 4, marginTop: 12, overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(Math.max(percentInvested, 0), 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4 }}></div>
+                <div style={{ width: `${Math.min(Math.max(percentInvested, 0), 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4, boxShadow: '0 0 10px currentColor' }}></div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
                 <span>В товаре: {formatMoney(totalInvestedInStock)}</span>
@@ -828,9 +850,9 @@ function App() {
           )}
         </div>
 
-        <div className="main-profit-card">
+        <div className="main-profit-card" style={{ boxShadow: '0 0 30px rgba(10, 186, 181, 0.3)' }}>
           <h3>Реализованная прибыль</h3>
-          <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38 }}>{formatMoney(realizedProfit)}</div>
+          <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38, textShadow: '0 0 20px rgba(255,255,255,0.4)' }}>{formatMoney(realizedProfit)}</div>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>
             <div className="stat-row"><span>Выручка с продаж:</span> <span>{formatMoney(totalRevenue)}</span></div>
             <div className="stat-row"><span>Средняя прибыль (с 1 шт):</span> <span>{formatMoney(avgProfit)}</span></div>
@@ -845,7 +867,7 @@ function App() {
           </div>
         </div>
 
-        <div className="debt-card" style={{ marginBottom: 16 }}>
+        <div className="debt-card neon-glow-orange" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <h3>Долги и задатки</h3>
             <button onClick={() => { setDebtContactId(''); setDebtAmount(''); setShowDebtModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'white', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}>+ Добавить</button>
@@ -888,7 +910,7 @@ function App() {
                     <div style={{ fontWeight: 'bold', fontSize: 14 }}>{m.name}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Продано: {m.count} шт.</div>
                   </div>
-                  <div style={{ fontWeight: 'bold', color: 'var(--success)', fontVariantNumeric: 'tabular-nums' }}>+{formatMoney(m.avg)}</div>
+                  <div style={{ fontWeight: 'bold', color: 'var(--success)', fontVariantNumeric: 'tabular-nums', textShadow: '0 0 10px rgba(52,199,89,0.3)' }}>+{formatMoney(m.avg)}</div>
                 </div>
               ))}
             </div>
@@ -903,7 +925,7 @@ function App() {
           <button className="btn-success" onClick={handleExportClick} style={{ width: '100%', padding: '14px', fontSize: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>📥 Экспорт в Excel</button>
         </div>
 
-        <button onClick={clearAllData} disabled={isActionLoading} style={{ width: '100%', padding: '12px', marginBottom: '16px', backgroundColor: 'var(--card-bg)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+        <button onClick={clearAllData} disabled={isActionLoading} style={{ width: '100%', padding: '12px', marginBottom: '16px', backgroundColor: 'var(--card-bg)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 0 15px rgba(255,59,48,0.1)' }}>
           🗑️ {isActionLoading ? 'Очистка...' : 'Очистить статистику'}
         </button>
 
@@ -916,7 +938,7 @@ function App() {
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
                   <Tooltip cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} formatter={(value) => [formatMoney(value), 'Прибыль']} />
                   <Bar dataKey="profit" maxBarSize={45} radius={[6, 6, 0, 0]}>
-                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} />)}
+                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} style={{ filter: `drop-shadow(0 0 5px ${entry.profit >= 0 ? 'rgba(52,199,89,0.5)' : 'rgba(255,59,48,0.5)'})` }} />)}
                     <LabelList dataKey="profit" position="center" fill="#ffffff" style={{ fontWeight: 'bold', fontSize: 13, textShadow: '0 1px 2px rgba(0,0,0,0.4)' }} formatter={(value) => { if (hideAmounts) return '***'; if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'; if (value >= 1000) return (value / 1000).toFixed(0) + 'k'; return value; }} />
                   </Bar>
                 </BarChart>
@@ -1022,7 +1044,7 @@ function App() {
           )}
         </div>
 
-        <div className="card" style={{ backgroundColor: isEnoughMoney ? 'rgba(52, 199, 89, 0.1)' : 'rgba(255, 59, 48, 0.1)', border: `2px solid ${isEnoughMoney ? 'var(--success)' : 'var(--danger)'}` }}>
+        <div className="card" style={{ backgroundColor: isEnoughMoney ? 'rgba(52, 199, 89, 0.1)' : 'rgba(255, 59, 48, 0.1)', border: `1px solid ${isEnoughMoney ? 'var(--success)' : 'var(--danger)'}`, boxShadow: isEnoughMoney ? '0 0 20px rgba(52,199,89,0.2)' : '0 0 20px rgba(255,59,48,0.2)' }}>
           <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-main)' }}>Результат</h3>
           {calcBuyCost > freeCash && <div style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: 10, fontSize: 14 }}>⚠️ Не хватает {formatMoney(calcBuyCost - freeCash)} на закуп.</div>}
           {calcIsAvitoDelivery && <div className="stat-row"><span>Комиссия Авито:</span> <span style={{ color: 'var(--danger)' }}>-{formatMoney(feeAmount)}</span></div>}
@@ -1033,7 +1055,7 @@ function App() {
           </div>
           <div className="stat-row" style={{ fontSize: 16, fontWeight: 'bold', marginTop: 5 }}>
             <span>Планируемая прибыль:</span>
-            <span style={{ color: plannedProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatMoney(plannedProfit)}</span>
+            <span style={{ color: plannedProfit >= 0 ? 'var(--success)' : 'var(--danger)', textShadow: plannedProfit >= 0 ? '0 0 10px rgba(52,199,89,0.4)' : '0 0 10px rgba(255,59,48,0.4)' }}>{formatMoney(plannedProfit)}</span>
           </div>
           <div className="stat-row" style={{ fontSize: 18, fontWeight: 'bold', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
             <span>Бюджет после сделок:</span> <span style={{ color: isEnoughMoney ? 'var(--success)' : 'var(--danger)' }}>{formatMoney(newFreeCash)}</span>
@@ -1050,7 +1072,7 @@ function App() {
     
     return (
       <div>
-        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Покупка</h2>
+        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Покупка</h2>
         <div className="card">
           <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить устройство</h3>
           <form onSubmit={addDeal}>
@@ -1099,7 +1121,7 @@ function App() {
                 <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={imei} onChange={(e) => setImei(e.target.value)} style={{ marginBottom: 10, paddingRight: 35 }} />
                 {imei && <button type="button" onClick={() => { setImei(''); haptic(); }} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
               </div>
-              <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12 }}>📷</button>
+              <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12, boxShadow: '0 0 10px rgba(255,149,0,0.4)' }}>📷</button>
             </div>
 
             <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
@@ -1117,7 +1139,7 @@ function App() {
                   </div>
                 ))}
                 {dealPhotos.length < 3 && (
-                  <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)' }}>
+                  <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)', boxShadow: '0 0 10px rgba(0,122,255,0.1)' }}>
                     {uploadingPhoto ? '...' : '+'}
                     <input type="file" accept="image/*" multiple onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
                   </label>
@@ -1149,7 +1171,7 @@ function App() {
     if (totalItems === 0) {
       return (
         <div>
-          <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Склад</h2>
+          <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Склад</h2>
           <div style={{ textAlign: 'center', marginTop: 60, color: 'var(--text-muted)' }}>
             <div style={{ fontSize: 60, marginBottom: 15 }}>📦</div>
             <h3 style={{ margin: 0, fontSize: 20, color: 'var(--text-main)' }}>Склад пуст</h3>
@@ -1161,14 +1183,14 @@ function App() {
 
     return (
       <div>
-        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Склад</h2>
+        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Склад</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
           {CATEGORIES.map(cat => {
             const items = inStockDeals.filter(d => d.category === cat.id);
             const totalQty = items.reduce((s, d) => s + (d.quantity || 0), 0);
             return (
-              <div key={cat.id} onClick={() => { setSelectedCategory(cat.id); haptic(); }} style={{ background: 'var(--card-bg)', borderRadius: 18, padding: '20px 16px', border: `2px solid ${cat.color}30`, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', cursor: 'pointer', textAlign: 'center', transition: 'transform 0.15s' }}>
-                <div style={{ fontSize: 42, marginBottom: 8 }}>{cat.icon}</div>
+              <div key={cat.id} onClick={() => { setSelectedCategory(cat.id); haptic(); }} className="neon-tile" style={{ borderColor: totalQty > 0 ? cat.color : 'var(--border)', background: totalQty > 0 ? `linear-gradient(135deg, var(--card-bg), ${cat.color}10)` : 'var(--card-bg)' }}>
+                <div style={{ fontSize: 42, marginBottom: 8, filter: totalQty > 0 ? `drop-shadow(0 0 10px ${cat.color}80)` : 'none' }}>{cat.icon}</div>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>{cat.name}</div>
                 <div style={{ fontSize: 13, color: totalQty > 0 ? cat.color : 'var(--text-muted)', fontWeight: 'bold' }}>{totalQty > 0 ? `${totalQty} шт.` : 'пусто'}</div>
               </div>
@@ -1189,8 +1211,8 @@ function App() {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
           <button onClick={() => { setSelectedCategory(null); setSearchQuery(''); setFilterModels([]); haptic(); }} style={{ background: 'none', border: 'none', fontSize: 24, padding: '0 10px 0 0', cursor: 'pointer', color: 'var(--accent)' }}>←</button>
-          <h2 style={{ fontSize: 28, fontWeight: 700, margin: 0, flex: 1 }}>{cat?.icon} {cat?.name}</h2>
-          <button onClick={() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); }} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>+ Добавить</button>
+          <h2 style={{ fontSize: 28, fontWeight: 700, margin: 0, flex: 1, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>{cat?.icon} {cat?.name}</h2>
+          <button onClick={() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); }} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', boxShadow: `0 0 15px ${cat?.color}60` }}>+ Добавить</button>
         </div>
 
         {!emptyCat && (
@@ -1213,7 +1235,7 @@ function App() {
             const daysOnStock = getDaysOnStock(deal);
             const isDeadStock = daysOnStock >= 21;
             return (
-              <div key={deal.id} className="card" onClick={() => { setViewingDeal(deal); haptic(); }} style={{ borderLeft: `4px solid ${isDeadStock ? 'var(--danger)' : cat?.color || 'var(--warning)'}`, cursor: 'pointer' }}>
+              <div key={deal.id} className="card neon-card-blue" onClick={() => { setViewingDeal(deal); haptic(); }} style={{ borderLeft: `4px solid ${isDeadStock ? 'var(--danger)' : cat?.color || 'var(--warning)'}`, cursor: 'pointer' }}>
                 <div className="card-header">
                   <div style={{ fontWeight: 700, fontSize: 17 }}>
                     {deal.model || 'Без названия'}
@@ -1256,7 +1278,7 @@ function App() {
   // =============== СДЕЛКИ ===============
   const renderDeals = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Сделки</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Сделки</h2>
 
       {soldDeals.length === 0 ? (
         <div style={{ textAlign: 'center', marginTop: 60, color: 'var(--text-muted)' }}>
@@ -1283,7 +1305,7 @@ function App() {
             const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
             const margin = (deal.sold_quantity || 0) * ((Number(deal.sell_price) || 0) - Number(deal.buy_price) - perUnitExp);
             return (
-              <div key={deal.id} className="card" style={{ borderLeft: '4px solid var(--success)' }}>
+              <div key={deal.id} className="card neon-glow-green" style={{ borderLeft: '4px solid var(--success)' }}>
                 <div className="card-header">
                   <div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model || 'Без названия'}</div>
                   <div>
@@ -1307,12 +1329,12 @@ function App() {
                 </div>
                 
                 {deal.expenses && deal.expenses.length > 0 && (
-                  <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6, textAlign: 'center', fontWeight: 'bold' }}>
+                  <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6, textAlign: 'center', fontWeight: 'bold', boxShadow: '0 0 10px rgba(255,59,48,0.1)' }}>
                     {deal.expenses.map(e => `${e.category}: ${formatMoney(e.amount)}`).join(' • ')}
                   </div>
                 )}
                 
-                <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10, fontVariantNumeric: 'tabular-nums', textAlign: 'center', textShadow: margin >= 0 ? '0 0 10px rgba(52,199,89,0.4)' : '0 0 10px rgba(255,59,48,0.4)' }}>
                   Чистая прибыль: {formatMoney(margin)}
                 </div>
               </div>
@@ -1323,21 +1345,44 @@ function App() {
     </div>
   )
 
+  // =============== ДОП РАСХОДЫ ===============
   const renderFinance = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Доп. расходы</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Доп. расходы</h2>
+      
+      {/* ФИНАНСОВАЯ СВОДКА */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <div className="card" style={{ flex: 1, margin: 0, padding: 15, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Потрачено за месяц</div>
+          <div style={{ fontSize: 20, fontWeight: 'bold', color: 'var(--danger)', textShadow: '0 0 10px rgba(255,59,48,0.2)' }}>-{formatMoney(finStats.thisMonthTotal)}</div>
+        </div>
+        <div className="card" style={{ flex: 1, margin: 0, padding: 15, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Больше всего уходит на</div>
+          <div style={{ fontSize: 16, fontWeight: 'bold', color: 'var(--warning)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{finStats.topCategory[0]}</div>
+        </div>
+      </div>
+
       <div className="card">
         <form onSubmit={addGeneralExpense}>
           <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={genExpAmount} onChange={(e) => setGenExpAmount(e.target.value.replace(/[^\d]/g, ''))} />
-          <select className="input-field" value={genExpCategory} onChange={(e) => setGenExpCategory(e.target.value)}>
+          
+          {/* ИСПРАВЛЕННЫЙ СЕЛЕКТ (цвет текста и фона) */}
+          <select 
+            className="input-field" 
+            value={genExpCategory} 
+            onChange={(e) => setGenExpCategory(e.target.value)}
+            style={{ color: 'var(--text-main)', backgroundColor: 'var(--bg-color)', appearance: 'auto' }}
+          >
             <option value="Авито">Авито</option><option value="Реклама">Реклама</option><option value="Аренда">Аренда</option><option value="Такси">Такси</option><option value="Бензин">Бензин</option><option value="Еда">Еда</option><option value="Свой вариант">Свой вариант</option>
           </select>
+          
           {genExpCategory === 'Свой вариант' && <input className="input-field" type="text" placeholder="Название расхода" value={customGenExpCategory} onChange={(e) => setCustomGenExpCategory(e.target.value)} />}
-          <button className="btn-primary" type="submit" style={{ backgroundColor: 'var(--danger)', marginTop: 10 }}>Добавить</button>
+          <button className="btn-primary" type="submit" style={{ backgroundColor: 'var(--danger)', marginTop: 10, boxShadow: '0 0 15px rgba(255,59,48,0.3)' }}>Добавить</button>
         </form>
       </div>
+
       {generalExpenses.map(exp => (
-        <div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8, alignItems: 'center' }}>
+        <div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8, alignItems: 'center', borderLeft: '4px solid var(--danger)' }}>
           <div style={{ fontWeight: 600 }}>{exp.category}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ fontWeight: 700, color: 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>-{formatMoney(exp.amount)}</div>
@@ -1348,9 +1393,10 @@ function App() {
     </div>
   )
 
+  // =============== КОНТАКТЫ ===============
   const renderContacts = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Контакты</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Контакты</h2>
       <div className="card">
         <form onSubmit={addContact}>
           <input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)} />
@@ -1360,7 +1406,7 @@ function App() {
         </form>
       </div>
       {contacts.map((c) => (
-        <div key={c.id} className="card" style={{ padding: 16 }}>
+        <div key={c.id} className="card neon-card-purple" style={{ padding: 16 }}>
           <div className="card-header">
             <div style={{ fontWeight: 600, fontSize: 16 }}>{c.name || 'Без имени'}</div>
             <div>
@@ -1368,7 +1414,7 @@ function App() {
               <button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button>
             </div>
           </div>
-          {c.phone && <button onClick={() => handlePhoneCall(c.phone)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontSize: 15, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, cursor: 'pointer', textDecoration: 'underline' }}>📞 {c.phone}</button>}
+          {c.phone && <button onClick={() => handlePhoneCall(c.phone)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontSize: 15, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, cursor: 'pointer', textDecoration: 'underline', textShadow: '0 0 10px rgba(0,122,255,0.3)' }}>📞 {c.phone}</button>}
           {c.note && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}
           <div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>Добавлен: {new Date(c.created_at || Date.now()).toLocaleDateString('ru-RU')}</div>
         </div>
@@ -1376,6 +1422,7 @@ function App() {
     </div>
   )
 
+  // =============== НАСТРОЙКИ ===============
   const renderSettings = () => (
     <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
@@ -1460,12 +1507,39 @@ function App() {
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.3.6 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.4.0 • Сделано для перекупов</div>
     </div>
   )
 
   return (
     <div className="app-container">
+      {/* CSS ДЛЯ НЕОНОВЫХ ЭФФЕКТОВ */}
+      <style>
+        {`
+          @keyframes pulse-neon {
+            0% { box-shadow: 0 0 5px var(--glow-color, rgba(0, 122, 255, 0.2)); }
+            50% { box-shadow: 0 0 20px var(--glow-color, rgba(0, 122, 255, 0.4)); }
+            100% { box-shadow: 0 0 5px var(--glow-color, rgba(0, 122, 255, 0.2)); }
+          }
+          .neon-card-blue { border: 1px solid rgba(0, 122, 255, 0.3); --glow-color: rgba(0, 122, 255, 0.3); animation: pulse-neon 3s infinite; }
+          .neon-glow-green { border: 1px solid rgba(52, 199, 89, 0.3); --glow-color: rgba(52, 199, 89, 0.3); animation: pulse-neon 3s infinite; }
+          .neon-glow-orange { border: 1px solid rgba(255, 149, 0, 0.4); --glow-color: rgba(255, 149, 0, 0.4); animation: pulse-neon 3s infinite; }
+          .neon-card-purple { border: 1px solid rgba(175, 82, 222, 0.3); --glow-color: rgba(175, 82, 222, 0.3); animation: pulse-neon 3s infinite; }
+          
+          .neon-tile {
+            border-radius: 18px;
+            padding: 20px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-width: 2px;
+            border-style: solid;
+          }
+          .neon-tile:hover { transform: scale(1.02); }
+          .neon-tile:active { transform: scale(0.98); }
+        `}
+      </style>
+
       {activeTab !== 'settings' && activeTab !== 'calculator' && (
         <button className="hamburger-btn" onClick={() => { setIsMenuOpen(true); haptic(); }} style={{ position: 'absolute', top: 16, left: 16 }}>☰</button>
       )}
@@ -1491,12 +1565,11 @@ function App() {
         </div>
 
         <div className="sidebar-links" style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 10, overflowY: 'auto' }}>
-          <button onClick={() => { setShowSubModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #ff9500, #ff3b30)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>⭐ Моя подписка</button>
+          <button onClick={() => { setShowSubModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #ff9500, #ff3b30)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 15px rgba(255,149,0,0.4)' }}>⭐ Моя подписка</button>
           
-          <button onClick={() => { setActiveTab('calculator'); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🧮 Калькулятор</button>
+          <button onClick={() => { setActiveTab('calculator'); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(0,122,255,0.2)' }}>🧮 Калькулятор</button>
 
-          {/* НОВАЯ КНОПКА ЧАТА */}
-          <button onClick={() => { openExternalLink(CLOSED_CHAT_URL); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🤝 Закрытый чат</button>
+          <button onClick={() => { openExternalLink(CLOSED_CHAT_URL); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(52,199,89,0.2)' }}>🤝 Закрытый чат</button>
           
           {profileData?.show_in_leaderboard && <button onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🏆 Рейтинг перекупов</button>}
           <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>
@@ -1577,7 +1650,7 @@ function App() {
                   </div>
                 ))}
                 {addFormPhotos.length < 3 && (
-                  <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)' }}>
+                  <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)', boxShadow: '0 0 10px rgba(0,122,255,0.1)' }}>
                     {uploadingAddPhoto ? '...' : '+'}
                     <input type="file" accept="image/*" multiple onChange={handleAddModalPhotoUpload} style={{ display: 'none' }} disabled={uploadingAddPhoto} />
                   </label>
@@ -1644,12 +1717,12 @@ function App() {
       )}
 
       {showLeaderboardModal && (
-        <div className="modal-overlay"><div className="modal-content"><h3>🏆 Топ перекупов</h3>{leaderboard.map((lb, idx) => (<div key={lb.user_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', gap: 10 }}><span style={{ fontSize: 18 }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}</span><span style={{ fontWeight: 600 }}>{lb.user_name} {lb.user_id === user?.id ? '(Вы)' : ''}</span></div><span style={{ fontWeight: 'bold', color: 'var(--success)' }}>{formatMoney(lb.gross_profit)}</span></div>))}<div className="modal-actions"><button className="btn-cancel" onClick={() => setShowLeaderboardModal(false)}>Закрыть</button></div></div></div>
+        <div className="modal-overlay"><div className="modal-content"><h3>🏆 Топ перекупов</h3>{leaderboard.map((lb, idx) => (<div key={lb.user_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', gap: 10 }}><span style={{ fontSize: 18 }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}</span><span style={{ fontWeight: 600 }}>{lb.user_name} {lb.user_id === user?.id ? '(Вы)' : ''}</span></div><span style={{ fontWeight: 'bold', color: 'var(--success)', textShadow: '0 0 10px rgba(52,199,89,0.3)' }}>{formatMoney(lb.gross_profit)}</span></div>))}<div className="modal-actions"><button className="btn-cancel" onClick={() => setShowLeaderboardModal(false)}>Закрыть</button></div></div></div>
       )}
 
       {showSubModal && (
         <div className="modal-overlay" style={{ zIndex: 2000 }}>
-          <div className="modal-content" style={{ padding: 0, overflow: 'hidden', borderRadius: 24 }}>
+          <div className="modal-content" style={{ padding: 0, overflow: 'hidden', borderRadius: 24, boxShadow: '0 0 30px rgba(36,129,204,0.4)' }}>
             <div style={{ background: 'linear-gradient(135deg, #2481cc, #1a5c94)', padding: '30px 20px', textAlign: 'center', color: 'white' }}>
               <div style={{ fontSize: 40, marginBottom: 10 }}>👑</div>
               <h2 style={{ margin: 0, fontSize: 24, fontWeight: 'bold' }}>PrimeTrade PRO</h2>
@@ -1662,7 +1735,7 @@ function App() {
                 {['1', '6', '12'].map(p => {
                   const prices = { '1': { price: '390', per: '390' }, '6': { price: '1990', per: '332' }, '12': { price: '3590', per: '299' } };
                   return (
-                    <div key={p} onClick={() => { setSelectedPlan(p); haptic(); }} style={{ border: `2px solid ${selectedPlan === p ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 16, padding: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: selectedPlan === p ? 'rgba(36, 129, 204, 0.05)' : 'var(--bg-color)', position: 'relative' }}>
+                    <div key={p} onClick={() => { setSelectedPlan(p); haptic(); }} style={{ border: `2px solid ${selectedPlan === p ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 16, padding: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', backgroundColor: selectedPlan === p ? 'rgba(36, 129, 204, 0.05)' : 'var(--bg-color)', position: 'relative', boxShadow: selectedPlan === p ? '0 0 15px rgba(36,129,204,0.2)' : 'none' }}>
                       {p === '12' && <div style={{ position: 'absolute', top: -10, right: 15, backgroundColor: '#ff9500', color: 'white', fontSize: 10, fontWeight: 'bold', padding: '2px 8px', borderRadius: 10 }}>ВЫГОДНО</div>}
                       <div>
                         <div style={{ fontWeight: 'bold', fontSize: 16 }}>{p} мес.</div>
@@ -1806,12 +1879,12 @@ function App() {
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-                <button className="btn-primary" style={{ flex: 1, padding: '16px', backgroundColor: 'var(--accent)' }} onClick={() => { setAdText(generateAdText(viewingDeal)); setShowAdModal(true); }}>📢 Пост в чат</button>
+                <button className="btn-primary" style={{ flex: 1, padding: '16px', backgroundColor: 'var(--accent)', boxShadow: '0 0 15px rgba(0,122,255,0.3)' }} onClick={() => { setAdText(generateAdText(viewingDeal)); setShowAdModal(true); }}>📢 Пост в чат</button>
               </div>
 
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="btn-cancel" style={{ flex: 1, padding: '16px', backgroundColor: '#fff3cd', color: '#b28900' }} onClick={() => { setViewingDeal(null); setExpenseDeal(viewingDeal); setExpenseAmount(''); }}>+ Расход</button>
-                <button className="btn-success" style={{ flex: 1, padding: '16px' }} onClick={() => { setViewingDeal(null); setSellingDeal(viewingDeal); setSellPrice(''); setSellWarranty('0'); setSellQuantity('1'); }}>Продать</button>
+                <button className="btn-success" style={{ flex: 1, padding: '16px', boxShadow: '0 0 15px rgba(52,199,89,0.3)' }} onClick={() => { setViewingDeal(null); setSellingDeal(viewingDeal); setSellPrice(''); setSellWarranty('0'); setSellQuantity('1'); }}>Продать</button>
               </div>
             </div>
           </div>
@@ -1871,12 +1944,12 @@ function App() {
       )}
 
       <div className="tab-bar">
-        <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon">📊</span> Главная</button>
-        <button className={`tab-button ${activeTab === 'purchase' ? 'active' : ''}`} onClick={() => { setActiveTab('purchase'); haptic(); }}><span className="tab-icon">🛒</span> Покупка</button>
-        <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => { setActiveTab('stock'); setSelectedCategory(null); haptic(); }}><span className="tab-icon">📦</span> Склад</button>
-        <button className={`tab-button ${activeTab === 'deals' ? 'active' : ''}`} onClick={() => { setActiveTab('deals'); haptic(); }}><span className="tab-icon">💰</span> Сделки</button>
-        <button className={`tab-button ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => { setActiveTab('finance'); haptic(); }}><span className="tab-icon">💵</span> Доп.расх.</button>
-        <button className={`tab-button ${activeTab === 'contacts' ? 'active' : ''}`} onClick={() => { setActiveTab('contacts'); haptic(); }}><span className="tab-icon">👥</span> Контакты</button>
+        <button className={`tab-button ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); haptic(); }}><span className="tab-icon" style={{ filter: activeTab === 'home' ? 'drop-shadow(0 0 5px var(--accent))' : 'none' }}>📊</span> Главная</button>
+        <button className={`tab-button ${activeTab === 'purchase' ? 'active' : ''}`} onClick={() => { setActiveTab('purchase'); haptic(); }}><span className="tab-icon" style={{ filter: activeTab === 'purchase' ? 'drop-shadow(0 0 5px var(--accent))' : 'none' }}>🛒</span> Покупка</button>
+        <button className={`tab-button ${activeTab === 'stock' ? 'active' : ''}`} onClick={() => { setActiveTab('stock'); setSelectedCategory(null); haptic(); }}><span className="tab-icon" style={{ filter: activeTab === 'stock' ? 'drop-shadow(0 0 5px var(--accent))' : 'none' }}>📦</span> Склад</button>
+        <button className={`tab-button ${activeTab === 'deals' ? 'active' : ''}`} onClick={() => { setActiveTab('deals'); haptic(); }}><span className="tab-icon" style={{ filter: activeTab === 'deals' ? 'drop-shadow(0 0 5px var(--accent))' : 'none' }}>💰</span> Сделки</button>
+        <button className={`tab-button ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => { setActiveTab('finance'); haptic(); }}><span className="tab-icon" style={{ filter: activeTab === 'finance' ? 'drop-shadow(0 0 5px var(--accent))' : 'none' }}>💵</span> Доп.расх.</button>
+        <button className={`tab-button ${activeTab === 'contacts' ? 'active' : ''}`} onClick={() => { setActiveTab('contacts'); haptic(); }}><span className="tab-icon" style={{ filter: activeTab === 'contacts' ? 'drop-shadow(0 0 5px var(--accent))' : 'none' }}>👥</span> Контакты</button>
       </div>
     </div>
   )

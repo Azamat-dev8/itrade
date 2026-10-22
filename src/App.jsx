@@ -812,6 +812,18 @@ function App() {
   };
   const finStats = getFinancialStats();
 
+  // --- ПРОВЕРКА ПОДПИСКИ ---
+  const isPro = profileData?.is_admin || (profileData?.subscription_ends_at && new Date(profileData.subscription_ends_at) > new Date());
+
+  const requirePro = (action) => {
+    if (!isPro) {
+      haptic('error');
+      setShowSubModal(true);
+      return;
+    }
+    action();
+  }
+
   // =============== ГЛАВНАЯ ===============
   const renderHome = () => {
     const percentInvested = budget > 0 ? (totalInvestedInStock / (budget + realizedProfit)) * 100 : 0;
@@ -919,7 +931,7 @@ function App() {
             <h3 style={{ margin: 0, fontSize: 16, color: '#666' }}>На складе</h3>
             <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{inStockDeals.reduce((s, d) => s + (d.quantity || 0), 0)} шт.</div>
           </div>
-          <button className="btn-success" onClick={handleExportClick} style={{ width: '100%', padding: '14px', fontSize: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>📥 Экспорт в Excel</button>
+          <button className="btn-success" onClick={requirePro(handleExportClick)} style={{ width: '100%', padding: '14px', fontSize: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>📥 Экспорт в Excel {!isPro && '🔒'}</button>
         </div>
 
         <button onClick={clearAllData} disabled={isActionLoading} style={{ width: '100%', padding: '12px', marginBottom: '16px', backgroundColor: 'var(--card-bg)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 0 15px rgba(255,59,48,0.1)' }}>
@@ -1070,7 +1082,14 @@ function App() {
     return (
       <div>
         <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Покупка</h2>
-        <div className="card">
+        {!isPro && (
+          <div className="card" style={{ backgroundColor: 'rgba(255,149,0,0.1)', border: '1px solid var(--warning)', marginBottom: 16 }}>
+            <div style={{ fontWeight: 'bold', color: 'var(--warning)', marginBottom: 8 }}>👑 Требуется PRO</div>
+            <div style={{ fontSize: 14 }}>Добавление новых устройств доступно только по подписке. Оформите PRO, чтобы продолжить.</div>
+            <button className="btn-primary" onClick={() => setShowSubModal(true)} style={{ marginTop: 12, backgroundColor: 'var(--warning)' }}>Купить PRO</button>
+          </div>
+        )}
+        <div className="card" style={{ opacity: isPro ? 1 : 0.5, pointerEvents: isPro ? 'auto' : 'none' }}>
           <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить устройство</h3>
           <form onSubmit={addDeal}>
             
@@ -1217,7 +1236,7 @@ function App() {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <h2 style={{ fontSize: 24, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>{cat?.icon} {cat?.name}</h2>
-          <button onClick={() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); }} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', boxShadow: `0 2px 10px ${cat?.color}60` }}>+ Добавить</button>
+          <button onClick={requirePro(() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); })} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', boxShadow: `0 2px 10px ${cat?.color}60` }}>+ Добавить {!isPro && '🔒'}</button>
         </div>
 
         {!emptyCat && (
@@ -1486,9 +1505,11 @@ function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ flex: 1, paddingRight: 10, textAlign: 'left' }}>
             <div style={{ fontWeight: 'bold', fontSize: 15 }}>PrimeTrade PRO</div>
-            <div style={{ fontSize: 12, color: 'var(--success)' }}>Активна (пробный период)</div>
+            <div style={{ fontSize: 12, color: 'var(--success)' }}>
+              {profileData?.is_admin ? 'Админ (бесплатно)' : profileData?.subscription_ends_at ? `Активна до ${new Date(profileData.subscription_ends_at).toLocaleDateString('ru-RU')}` : 'Не активна'}
+            </div>
           </div>
-          <button onClick={() => setShowSubModal(true)} style={{ padding: '8px 16px', borderRadius: 20, background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', minWidth: 65, flexShrink: 0 }}>Продлить</button>
+          <button onClick={() => setShowSubModal(true)} style={{ padding: '8px 16px', borderRadius: 20, background: 'var(--accent)', color: 'white', border: 'none', fontWeight: 'bold', minWidth: 65, flexShrink: 0 }}>{profileData?.is_admin ? 'Админ' : 'Продлить'}</button>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ flex: 1, paddingRight: 10, textAlign: 'left' }}>
@@ -1516,7 +1537,7 @@ function App() {
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.4.2 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.5.0 • Сделано для перекупов</div>
     </div>
   )
 
@@ -1735,7 +1756,7 @@ function App() {
               <div style={{ fontSize: 40, marginBottom: 10 }}>👑</div>
               <h2 style={{ margin: 0, fontSize: 24, fontWeight: 'bold' }}>PrimeTrade PRO</h2>
               <p style={{ margin: '5px 0 0 0', opacity: 0.9, fontSize: 14 }}>
-                {profileData?.subscription_ends_at ? `Активна до ${new Date(profileData.subscription_ends_at).toLocaleDateString('ru-RU')}` : profileData?.trial_ends_at ? `Пробный до ${new Date(profileData.trial_ends_at).toLocaleDateString('ru-RU')}` : 'Полный доступ'}
+                {profileData?.is_admin ? 'У вас статус Админа' : profileData?.subscription_ends_at ? `Активна до ${new Date(profileData.subscription_ends_at).toLocaleDateString('ru-RU')}` : 'Оформите подписку для доступа ко всем функциям'}
               </p>
             </div>
             <div style={{ padding: 20 }}>

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,13 +21,11 @@ serve(async (req) => {
     }
 
     let amount = 0;
-    const interval = 3; // <--- ИСПРАВЛЕНО: теперь const
-    let intervalCount = 0;
-    let description = ""
+    let planLabel = "";
 
-    if (plan_id === '1') { amount = 390; intervalCount = 1; description = "PrimeTrade PRO на 1 месяц"; }
-    else if (plan_id === '6') { amount = 1990; intervalCount = 6; description = "PrimeTrade PRO на 6 месяцев"; }
-    else if (plan_id === '12') { amount = 3590; intervalCount = 12; description = "PrimeTrade PRO на 12 месяцев"; }
+    if (plan_id === '1') { amount = 390; planLabel = "1m"; }
+    else if (plan_id === '6') { amount = 1990; planLabel = "6m"; }
+    else if (plan_id === '12') { amount = 3590; planLabel = "12m"; }
     else throw new Error("Неверный тариф")
 
     const response = await fetch("https://app.platega.io/transaction/process", {
@@ -37,15 +36,14 @@ serve(async (req) => {
         "X-Secret": SECRET,
       },
       body: JSON.stringify({
-        paymentMethod: 6,
+        paymentMethod: 2, // СБП
         paymentDetails: {
-          amount,
+          amount: amount,
           currency: "RUB",
-          interval,
-          intervalCount,
         },
-        description,
-        metadata: { userId: String(telegram_id) }
+        description: `PrimeTrade PRO (${planLabel})`,
+        // ПЕРЕДАЕМ TELEGRAM_ID И ПЛАН В PAYLOAD
+        payload: JSON.stringify({ userId: String(telegram_id), plan: planLabel })
       }),
     })
 
@@ -53,7 +51,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       console.error("Ошибка Platega:", data)
-      throw new Error(data.message || "Ошибка создания подписки")
+      throw new Error(data.message || "Ошибка создания платежа")
     }
 
     return new Response(JSON.stringify({ redirect: data.redirect }), {
@@ -61,10 +59,8 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    // ИСПРАВЛЕНО: безопасное извлечение текста ошибки
-    const message = error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error)
     console.error("Критическая ошибка:", message)
-    
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

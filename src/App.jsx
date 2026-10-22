@@ -246,18 +246,48 @@ function App() {
       if (debtsData) setDebts(debtsData);
       if (lbData) setLeaderboard(lbData);
 
-      if (profileInfo) {
-        setProfileData(profileInfo);
-        setDisplayName(profileInfo.display_name || user.first_name || 'Аноним');
-        setHideAmounts(profileInfo.hide_amounts || false);
-        setShowChart(profileInfo.show_chart !== false);
-        setDailySummary(profileInfo.daily_summary || false);
-        setBudget(Number(profileInfo.resale_budget) || 0);
+            if (profileInfo) {
+        // Если у пользователя нет даты подписки (новый или старый), даем триал на 7 дней
+        if (!profileInfo.subscription_ends_at) {
+          const trialEndsAt = new Date();
+          trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+          
+          const { data: updatedProfile } = await supabase
+            .from('user_profiles')
+            .update({ subscription_ends_at: trialEndsAt.toISOString() })
+            .eq('telegram_id', user.id)
+            .select()
+            .single();
+            
+          if (updatedProfile) {
+            setProfileData(updatedProfile);
+            setDisplayName(updatedProfile.display_name || user.first_name || 'Аноним');
+            setBudget(Number(updatedProfile.resale_budget) || 0);
+          }
+        } else {
+          setProfileData(profileInfo);
+          setDisplayName(profileInfo.display_name || user.first_name || 'Аноним');
+          setHideAmounts(profileInfo.hide_amounts || false);
+          setShowChart(profileInfo.show_chart !== false);
+          setDailySummary(profileInfo.daily_summary || false);
+          setBudget(Number(profileInfo.resale_budget) || 0);
+        }
       } else {
-        const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0 }
-        await supabase.from('user_profiles').insert([newProf])
-        setProfileData(newProf)
-        setDisplayName(newProf.display_name)
+        // Создаем новый профиль с триалом на 7 дней
+        const trialEndsAt = new Date();
+        trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+
+        const newProf = { 
+          telegram_id: user.id, 
+          user_name: user.first_name || 'Аноним', 
+          display_name: user.first_name || 'Аноним', 
+          show_in_leaderboard: false, 
+          resale_budget: 0,
+          subscription_ends_at: trialEndsAt.toISOString() // <--- ВЫДАЕМ ТРИАЛ
+        }
+        const { data: createdProf } = await supabase.from('user_profiles').insert([newProf]).select().single();
+        setProfileData(createdProf || newProf);
+        setDisplayName(newProf.display_name);
       }
     } catch (error) {
       console.error("Ошибка при загрузке данных:", error);

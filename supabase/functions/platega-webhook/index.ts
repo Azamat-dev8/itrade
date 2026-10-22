@@ -18,6 +18,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+    const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")
 
     const body = await req.json()
     console.log("Входящий запрос от Platega:", JSON.stringify(body))
@@ -27,7 +28,6 @@ serve(async (req) => {
     }
 
     if (body.status === "CONFIRMED") {
-      // Достаем данные из payload
       let telegramId = null;
       let plan = '1m';
 
@@ -45,13 +45,28 @@ serve(async (req) => {
         return new Response("ok", { status: 200, headers: corsHeaders })
       }
 
+      // Получаем текущий профиль, чтобы узнать, есть ли у него еще активные дни
+      const { data: currentProfile } = await supabaseAdmin
+        .from('user_profiles')
+        .select('subscription_ends_at')
+        .eq('telegram_id', Number(telegramId))
+        .single();
+
+      let baseDate = new Date();
+      // Если у пользователя уже есть активная подписка (или триал), прибавляем дни к ней
+      if (currentProfile?.subscription_ends_at && new Date(currentProfile.subscription_ends_at) > new Date()) {
+        baseDate = new Date(currentProfile.subscription_ends_at);
+      }
+
       let daysToAdd = 30;
       if (plan === '6m') daysToAdd = 180;
       if (plan === '12m') daysToAdd = 365;
 
-      const now = new Date()
-      const endsAt = new Date(now.setDate(now.getDate() + daysToAdd))
+      const endsAt = new Date(baseDate);
+      endsAt.setDate(endsAt.getDate() + daysToAdd);
+      const formattedDate = endsAt.toLocaleDateString('ru-RU');
 
+      // Обновляем базу
       const { error: updateError } = await supabaseAdmin
         .from('user_profiles')
         .update({ 
@@ -63,6 +78,19 @@ serve(async (req) => {
       if (updateError) {
         console.error("Ошибка обновления профиля:", updateError)
         throw updateError
+      }
+
+      // Отправляем сообщение в Telegram
+      if (BOT_TOKEN) {
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: telegramId,
+            text: `🎉 *Оплата прошла успешно!*\n\nВаша подписка PrimeTrade PRO активна до *${formattedDate}*.\n\nСпасибо, что выбираете нас! 🚀`,
+            parse_mode: "Markdown"
+          })
+        })
       }
 
       console.log(`✅ Подписка активирована для ${telegramId} до ${endsAt.toISOString()} (план: ${plan})`)

@@ -1846,16 +1846,25 @@ function App() {
         <div className="modal-overlay"><div className="modal-content"><h3>🏆 Топ перекупов</h3>{leaderboard.map((lb, idx) => (<div key={lb.user_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', gap: 10 }}><span style={{ fontSize: 18 }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}</span><span style={{ fontWeight: 600 }}>{lb.user_name} {lb.user_id === user?.id ? '(Вы)' : ''}</span></div><span style={{ fontWeight: 'bold', color: 'var(--success)' }}>{formatMoney(lb.gross_profit)}</span></div>))}<div className="modal-actions"><button className="btn-cancel" onClick={() => setShowLeaderboardModal(false)}>Закрыть</button></div></div></div>
       )}
 
-      {showSubModal && (
+            {showSubModal && (
         <div className="modal-overlay" style={{ zIndex: 2000 }}>
-          <div className="modal-content" style={{ padding: 0, overflow: 'hidden', borderRadius: 24, boxShadow: '0 0 30px rgba(36,129,204,0.4)' }}>
-            <div style={{ background: 'linear-gradient(135deg, #2481cc, #1a5c94)', padding: '30px 20px', textAlign: 'center', color: 'white' }}>
+          <div className="modal-content" style={{ padding: 0, overflowY: 'auto', borderRadius: 24, boxShadow: '0 0 30px rgba(36,129,204,0.4)', maxHeight: '90vh' }}>
+            
+            {/* Шапка с градиентом и кнопкой закрытия */}
+            <div style={{ background: 'linear-gradient(135deg, #2481cc, #1a5c94)', padding: '30px 20px', textAlign: 'center', color: 'white', position: 'relative' }}>
+              <button 
+                onClick={() => setShowSubModal(false)} 
+                style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 32, height: 32, color: 'white', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                ✕
+              </button>
               <div style={{ fontSize: 40, marginBottom: 10 }}>👑</div>
               <h2 style={{ margin: 0, fontSize: 24, fontWeight: 'bold' }}>PrimeTrade PRO</h2>
               <p style={{ margin: '5px 0 0 0', opacity: 0.9, fontSize: 14 }}>
                 {profileData?.is_admin ? 'У вас статус Админа' : profileData?.subscription_ends_at ? `Активна до ${new Date(profileData.subscription_ends_at).toLocaleDateString('ru-RU')}` : 'Оформите подписку для доступа ко всем функциям'}
               </p>
             </div>
+
             <div style={{ padding: 20 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
                 {['1', '6', '12'].map(p => {
@@ -1874,29 +1883,32 @@ function App() {
                   );
                 })}
               </div>
+
+              {/* БЛОК ВЫБОРА СПОСОБА ОПЛАТЫ */}
               <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8, color: 'var(--text-muted)' }}>Способ оплаты:</div>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-            <div 
-              onClick={() => { setSelectedPaymentMethod(2); haptic(); }} 
-              style={{ flex: 1, padding: 12, borderRadius: 12, border: `2px solid ${selectedPaymentMethod === 2 ? 'var(--accent)' : 'var(--border)'}`, textAlign: 'center', cursor: 'pointer', backgroundColor: selectedPaymentMethod === 2 ? 'rgba(36, 129, 204, 0.1)' : 'var(--bg-color)' }}
-            >
-              <div style={{ fontSize: 24 }}>💳</div>
-              <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 4 }}>СБП</div>
-            </div>
-            <div 
-              onClick={() => { setSelectedPaymentMethod(13); haptic(); }} 
-              style={{ flex: 1, padding: 12, borderRadius: 12, border: `2px solid ${selectedPaymentMethod === 13 ? '#f7931a' : 'var(--border)'}`, textAlign: 'center', cursor: 'pointer', backgroundColor: selectedPaymentMethod === 13 ? 'rgba(247, 147, 26, 0.1)' : 'var(--bg-color)' }}
-            >
-              <div style={{ fontSize: 24 }}>₿</div>
-              <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 4 }}>Крипта</div>
-            </div>
-          </div>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                <div 
+                  onClick={() => { setSelectedPaymentMethod(2); haptic(); }} 
+                  style={{ flex: 1, padding: 12, borderRadius: 12, border: `2px solid ${selectedPaymentMethod === 2 ? 'var(--accent)' : 'var(--border)'}`, textAlign: 'center', cursor: 'pointer', backgroundColor: selectedPaymentMethod === 2 ? 'rgba(36, 129, 204, 0.1)' : 'var(--bg-color)' }}
+                >
+                  <div style={{ fontSize: 24 }}>💳</div>
+                  <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 4 }}>СБП</div>
+                </div>
+                <div 
+                  onClick={() => { setSelectedPaymentMethod(13); haptic(); }} 
+                  style={{ flex: 1, padding: 12, borderRadius: 12, border: `2px solid ${selectedPaymentMethod === 13 ? '#f7931a' : 'var(--border)'}`, textAlign: 'center', cursor: 'pointer', backgroundColor: selectedPaymentMethod === 13 ? 'rgba(247, 147, 26, 0.1)' : 'var(--bg-color)' }}
+                >
+                  <div style={{ fontSize: 24 }}>₿</div>
+                  <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 4 }}>Крипта</div>
+                </div>
+              </div>
+
               <button className="btn-primary" disabled={isProcessingPayment} onClick={async () => {
                 haptic('heavy'); setIsProcessingPayment(true);
                 try {
                   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
                   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-                  const response = await fetch(`${supabaseUrl}/functions/v1/create-platega-subscription`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}`, 'apikey': supabaseKey }, body: JSON.stringify({ telegram_id: user?.id, plan_id: selectedPlan, payment_method: selectedPaymentMethod  }) });
+                  const response = await fetch(`${supabaseUrl}/functions/v1/create-platega-subscription`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}`, 'apikey': supabaseKey }, body: JSON.stringify({ telegram_id: user?.id, plan_id: selectedPlan, payment_method: selectedPaymentMethod }) });
                   if (!response.ok) { const t = await response.text(); throw new Error(`HTTP ${response.status}: ${t}`); }
                   const data = await response.json();
                   if (data?.redirect) {
@@ -1904,7 +1916,10 @@ function App() {
                     else { const a = document.createElement('a'); a.href = data.redirect; a.target = '_blank'; a.click(); }
                   } else alert('Сервер не вернул ссылку');
                 } catch (err) { alert('Ошибка: ' + err.message); } finally { setIsProcessingPayment(false); }
-              }} style={{ padding: '16px', fontSize: 16, opacity: isProcessingPayment ? 0.7 : 1 }}>{isProcessingPayment ? 'Создание...' : (selectedPaymentMethod === 13 ? 'Оплатить криптовалютой' : 'Оплатить через СБП')}</button>
+              }} style={{ padding: '16px', fontSize: 16, opacity: isProcessingPayment ? 0.7 : 1 }}>
+                {isProcessingPayment ? 'Создание...' : (selectedPaymentMethod === 13 ? 'Оплатить криптовалютой' : 'Оплатить через СБП')}
+              </button>
+              
               <button className="btn-cancel" onClick={() => setShowSubModal(false)} style={{ width: '100%', marginTop: 10 }}>Закрыть</button>
             </div>
           </div>

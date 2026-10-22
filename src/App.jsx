@@ -789,7 +789,6 @@ function App() {
     </div>
   )
 
-  // --- ФИНАНСОВАЯ СТАТИСТИКА ДЛЯ ДОП. РАСХОДОВ ---
   const getFinancialStats = () => {
     const now = new Date();
     let thisMonthTotal = 0;
@@ -799,12 +798,10 @@ function App() {
       const amount = Number(exp.amount) || 0;
       const date = new Date(exp.created_at || Date.now());
       
-      // Считаем за этот месяц
       if (date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) {
         thisMonthTotal += amount;
       }
       
-      // Считаем по категориям
       if (!categoryTotals[exp.category]) categoryTotals[exp.category] = 0;
       categoryTotals[exp.category] += amount;
     });
@@ -821,21 +818,21 @@ function App() {
 
     return (
       <div>
-        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Статистика</h2>
+        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
 
         <div className="card neon-card-blue" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 'bold' }}>Бюджет</div>
-            <button onClick={() => { setTempBudget(budget); setShowBudgetModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', textShadow: '0 0 10px var(--accent)' }}>Изменить ✏️</button>
+            <button onClick={() => { setTempBudget(budget); setShowBudgetModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>Изменить ✏️</button>
           </div>
           {budget > 0 ? (
             <>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)', fontVariantNumeric: 'tabular-nums', textShadow: freeCash >= 0 ? '0 0 15px rgba(52,199,89,0.5)' : '0 0 15px rgba(255,59,48,0.5)' }}>{formatMoney(freeCash)}</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(freeCash)}</div>
                 <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>свободно</div>
               </div>
               <div style={{ width: '100%', height: 8, backgroundColor: 'var(--bg-color)', borderRadius: 4, marginTop: 12, overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(Math.max(percentInvested, 0), 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4, boxShadow: '0 0 10px currentColor' }}></div>
+                <div style={{ width: `${Math.min(Math.max(percentInvested, 0), 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4 }}></div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
                 <span>В товаре: {formatMoney(totalInvestedInStock)}</span>
@@ -852,7 +849,7 @@ function App() {
 
         <div className="main-profit-card" style={{ boxShadow: '0 0 30px rgba(10, 186, 181, 0.3)' }}>
           <h3>Реализованная прибыль</h3>
-          <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38, textShadow: '0 0 20px rgba(255,255,255,0.4)' }}>{formatMoney(realizedProfit)}</div>
+          <div className="main-profit-value" style={{ fontSize: realizedProfit > 999999 ? 28 : 38 }}>{formatMoney(realizedProfit)}</div>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>
             <div className="stat-row"><span>Выручка с продаж:</span> <span>{formatMoney(totalRevenue)}</span></div>
             <div className="stat-row"><span>Средняя прибыль (с 1 шт):</span> <span>{formatMoney(avgProfit)}</span></div>
@@ -910,7 +907,7 @@ function App() {
                     <div style={{ fontWeight: 'bold', fontSize: 14 }}>{m.name}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Продано: {m.count} шт.</div>
                   </div>
-                  <div style={{ fontWeight: 'bold', color: 'var(--success)', fontVariantNumeric: 'tabular-nums', textShadow: '0 0 10px rgba(52,199,89,0.3)' }}>+{formatMoney(m.avg)}</div>
+                  <div style={{ fontWeight: 'bold', color: 'var(--success)', fontVariantNumeric: 'tabular-nums' }}>+{formatMoney(m.avg)}</div>
                 </div>
               ))}
             </div>
@@ -1055,7 +1052,7 @@ function App() {
           </div>
           <div className="stat-row" style={{ fontSize: 16, fontWeight: 'bold', marginTop: 5 }}>
             <span>Планируемая прибыль:</span>
-            <span style={{ color: plannedProfit >= 0 ? 'var(--success)' : 'var(--danger)', textShadow: plannedProfit >= 0 ? '0 0 10px rgba(52,199,89,0.4)' : '0 0 10px rgba(255,59,48,0.4)' }}>{formatMoney(plannedProfit)}</span>
+            <span style={{ color: plannedProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatMoney(plannedProfit)}</span>
           </div>
           <div className="stat-row" style={{ fontSize: 18, fontWeight: 'bold', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
             <span>Бюджет после сделок:</span> <span style={{ color: isEnoughMoney ? 'var(--success)' : 'var(--danger)' }}>{formatMoney(newFreeCash)}</span>
@@ -1072,7 +1069,7 @@ function App() {
     
     return (
       <div>
-        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Покупка</h2>
+        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Покупка</h2>
         <div className="card">
           <h3 style={{ fontSize: 16, marginTop: 0 }}>Добавить устройство</h3>
           <form onSubmit={addDeal}>
@@ -1171,7 +1168,7 @@ function App() {
     if (totalItems === 0) {
       return (
         <div>
-          <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Склад</h2>
+          <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Склад</h2>
           <div style={{ textAlign: 'center', marginTop: 60, color: 'var(--text-muted)' }}>
             <div style={{ fontSize: 60, marginBottom: 15 }}>📦</div>
             <h3 style={{ margin: 0, fontSize: 20, color: 'var(--text-main)' }}>Склад пуст</h3>
@@ -1183,14 +1180,23 @@ function App() {
 
     return (
       <div>
-        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Склад</h2>
+        <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Склад</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
           {CATEGORIES.map(cat => {
             const items = inStockDeals.filter(d => d.category === cat.id);
             const totalQty = items.reduce((s, d) => s + (d.quantity || 0), 0);
             return (
-              <div key={cat.id} onClick={() => { setSelectedCategory(cat.id); haptic(); }} className="neon-tile" style={{ borderColor: totalQty > 0 ? cat.color : 'var(--border)', background: totalQty > 0 ? `linear-gradient(135deg, var(--card-bg), ${cat.color}10)` : 'var(--card-bg)' }}>
-                <div style={{ fontSize: 42, marginBottom: 8, filter: totalQty > 0 ? `drop-shadow(0 0 10px ${cat.color}80)` : 'none' }}>{cat.icon}</div>
+              <div 
+                key={cat.id} 
+                onClick={() => { setSelectedCategory(cat.id); haptic(); }} 
+                className="neon-tile" 
+                style={{ 
+                  borderColor: cat.color, 
+                  background: 'var(--card-bg)', 
+                  '--glow-color': `${cat.color}60` 
+                }}
+              >
+                <div style={{ fontSize: 42, marginBottom: 8, filter: `drop-shadow(0 0 10px ${cat.color}80)` }}>{cat.icon}</div>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>{cat.name}</div>
                 <div style={{ fontSize: 13, color: totalQty > 0 ? cat.color : 'var(--text-muted)', fontWeight: 'bold' }}>{totalQty > 0 ? `${totalQty} шт.` : 'пусто'}</div>
               </div>
@@ -1209,10 +1215,12 @@ function App() {
 
     return (
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
-          <button onClick={() => { setSelectedCategory(null); setSearchQuery(''); setFilterModels([]); haptic(); }} style={{ background: 'none', border: 'none', fontSize: 24, padding: '0 10px 0 0', cursor: 'pointer', color: 'var(--accent)' }}>←</button>
-          <h2 style={{ fontSize: 28, fontWeight: 700, margin: 0, flex: 1, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>{cat?.icon} {cat?.name}</h2>
-          <button onClick={() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); }} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', boxShadow: `0 0 15px ${cat?.color}60` }}>+ Добавить</button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <button onClick={() => { setSelectedCategory(null); setSearchQuery(''); setFilterModels([]); haptic(); }} style={{ background: 'var(--bg-color)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 16px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer', color: 'var(--text-main)' }}>
+            ← На склад
+          </button>
+          <h2 style={{ fontSize: 24, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>{cat?.icon} {cat?.name}</h2>
+          <button onClick={() => { setAddForm({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' }); setAddFormPhotos([]); setShowAddModal(true); haptic('medium'); }} style={{ background: cat?.color, color: 'white', border: 'none', borderRadius: 12, padding: '10px 16px', fontWeight: 'bold', fontSize: 14, cursor: 'pointer', boxShadow: `0 2px 10px ${cat?.color}60` }}>+ Добавить</button>
         </div>
 
         {!emptyCat && (
@@ -1271,6 +1279,12 @@ function App() {
             )
           })
         )}
+
+        <div style={{ marginTop: 20, marginBottom: 40 }}>
+          <button onClick={() => { setSelectedCategory(null); setSearchQuery(''); setFilterModels([]); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'var(--bg-color)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text-main)', fontWeight: 'bold', fontSize: 16, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+            ← Вернуться на склад
+          </button>
+        </div>
       </div>
     );
   };
@@ -1278,7 +1292,7 @@ function App() {
   // =============== СДЕЛКИ ===============
   const renderDeals = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Сделки</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Сделки</h2>
 
       {soldDeals.length === 0 ? (
         <div style={{ textAlign: 'center', marginTop: 60, color: 'var(--text-muted)' }}>
@@ -1329,12 +1343,12 @@ function App() {
                 </div>
                 
                 {deal.expenses && deal.expenses.length > 0 && (
-                  <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6, textAlign: 'center', fontWeight: 'bold', boxShadow: '0 0 10px rgba(255,59,48,0.1)' }}>
+                  <div style={{ fontSize: 13, color: 'var(--danger)', marginTop: 6, backgroundColor: 'rgba(255, 59, 48, 0.05)', padding: '6px 8px', borderRadius: 6, textAlign: 'center', fontWeight: 'bold' }}>
                     {deal.expenses.map(e => `${e.category}: ${formatMoney(e.amount)}`).join(' • ')}
                   </div>
                 )}
                 
-                <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10, fontVariantNumeric: 'tabular-nums', textAlign: 'center', textShadow: margin >= 0 ? '0 0 10px rgba(52,199,89,0.4)' : '0 0 10px rgba(255,59,48,0.4)' }}>
+                <div style={{ fontWeight: 700, color: margin >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16, marginTop: 10, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
                   Чистая прибыль: {formatMoney(margin)}
                 </div>
               </div>
@@ -1348,13 +1362,12 @@ function App() {
   // =============== ДОП РАСХОДЫ ===============
   const renderFinance = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Доп. расходы</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Доп. расходы</h2>
       
-      {/* ФИНАНСОВАЯ СВОДКА */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
         <div className="card" style={{ flex: 1, margin: 0, padding: 15, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Потрачено за месяц</div>
-          <div style={{ fontSize: 20, fontWeight: 'bold', color: 'var(--danger)', textShadow: '0 0 10px rgba(255,59,48,0.2)' }}>-{formatMoney(finStats.thisMonthTotal)}</div>
+          <div style={{ fontSize: 20, fontWeight: 'bold', color: 'var(--danger)' }}>-{formatMoney(finStats.thisMonthTotal)}</div>
         </div>
         <div className="card" style={{ flex: 1, margin: 0, padding: 15, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Больше всего уходит на</div>
@@ -1366,7 +1379,6 @@ function App() {
         <form onSubmit={addGeneralExpense}>
           <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={genExpAmount} onChange={(e) => setGenExpAmount(e.target.value.replace(/[^\d]/g, ''))} />
           
-          {/* ИСПРАВЛЕННЫЙ СЕЛЕКТ (цвет текста и фона) */}
           <select 
             className="input-field" 
             value={genExpCategory} 
@@ -1377,7 +1389,7 @@ function App() {
           </select>
           
           {genExpCategory === 'Свой вариант' && <input className="input-field" type="text" placeholder="Название расхода" value={customGenExpCategory} onChange={(e) => setCustomGenExpCategory(e.target.value)} />}
-          <button className="btn-primary" type="submit" style={{ backgroundColor: 'var(--danger)', marginTop: 10, boxShadow: '0 0 15px rgba(255,59,48,0.3)' }}>Добавить</button>
+          <button className="btn-primary" type="submit" style={{ backgroundColor: 'var(--danger)', marginTop: 10 }}>Добавить</button>
         </form>
       </div>
 
@@ -1396,7 +1408,7 @@ function App() {
   // =============== КОНТАКТЫ ===============
   const renderContacts = () => (
     <div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50, textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Контакты</h2>
+      <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Контакты</h2>
       <div className="card">
         <form onSubmit={addContact}>
           <input className="input-field" type="text" placeholder="Имя" value={contactName} onChange={(e) => setContactName(e.target.value)} />
@@ -1414,7 +1426,7 @@ function App() {
               <button className="icon-btn" onClick={() => deleteContact(c.id)}>🗑️</button>
             </div>
           </div>
-          {c.phone && <button onClick={() => handlePhoneCall(c.phone)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontSize: 15, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, cursor: 'pointer', textDecoration: 'underline', textShadow: '0 0 10px rgba(0,122,255,0.3)' }}>📞 {c.phone}</button>}
+          {c.phone && <button onClick={() => handlePhoneCall(c.phone)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontSize: 15, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, cursor: 'pointer', textDecoration: 'underline' }}>📞 {c.phone}</button>}
           {c.note && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>📝 {c.note}</div>}
           <div style={{ color: '#aaa', fontSize: 11, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>Добавлен: {new Date(c.created_at || Date.now()).toLocaleDateString('ru-RU')}</div>
         </div>
@@ -1507,13 +1519,12 @@ function App() {
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.4.0 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.4.1 • Сделано для перекупов</div>
     </div>
   )
 
   return (
     <div className="app-container">
-      {/* CSS ДЛЯ НЕОНОВЫХ ЭФФЕКТОВ */}
       <style>
         {`
           @keyframes pulse-neon {
@@ -1717,7 +1728,7 @@ function App() {
       )}
 
       {showLeaderboardModal && (
-        <div className="modal-overlay"><div className="modal-content"><h3>🏆 Топ перекупов</h3>{leaderboard.map((lb, idx) => (<div key={lb.user_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', gap: 10 }}><span style={{ fontSize: 18 }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}</span><span style={{ fontWeight: 600 }}>{lb.user_name} {lb.user_id === user?.id ? '(Вы)' : ''}</span></div><span style={{ fontWeight: 'bold', color: 'var(--success)', textShadow: '0 0 10px rgba(52,199,89,0.3)' }}>{formatMoney(lb.gross_profit)}</span></div>))}<div className="modal-actions"><button className="btn-cancel" onClick={() => setShowLeaderboardModal(false)}>Закрыть</button></div></div></div>
+        <div className="modal-overlay"><div className="modal-content"><h3>🏆 Топ перекупов</h3>{leaderboard.map((lb, idx) => (<div key={lb.user_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', gap: 10 }}><span style={{ fontSize: 18 }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}</span><span style={{ fontWeight: 600 }}>{lb.user_name} {lb.user_id === user?.id ? '(Вы)' : ''}</span></div><span style={{ fontWeight: 'bold', color: 'var(--success)' }}>{formatMoney(lb.gross_profit)}</span></div>))}<div className="modal-actions"><button className="btn-cancel" onClick={() => setShowLeaderboardModal(false)}>Закрыть</button></div></div></div>
       )}
 
       {showSubModal && (
@@ -1879,12 +1890,12 @@ function App() {
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-                <button className="btn-primary" style={{ flex: 1, padding: '16px', backgroundColor: 'var(--accent)', boxShadow: '0 0 15px rgba(0,122,255,0.3)' }} onClick={() => { setAdText(generateAdText(viewingDeal)); setShowAdModal(true); }}>📢 Пост в чат</button>
+                <button className="btn-primary" style={{ flex: 1, padding: '16px', backgroundColor: 'var(--accent)' }} onClick={() => { setAdText(generateAdText(viewingDeal)); setShowAdModal(true); }}>📢 Пост в чат</button>
               </div>
 
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="btn-cancel" style={{ flex: 1, padding: '16px', backgroundColor: '#fff3cd', color: '#b28900' }} onClick={() => { setViewingDeal(null); setExpenseDeal(viewingDeal); setExpenseAmount(''); }}>+ Расход</button>
-                <button className="btn-success" style={{ flex: 1, padding: '16px', boxShadow: '0 0 15px rgba(52,199,89,0.3)' }} onClick={() => { setViewingDeal(null); setSellingDeal(viewingDeal); setSellPrice(''); setSellWarranty('0'); setSellQuantity('1'); }}>Продать</button>
+                <button className="btn-success" style={{ flex: 1, padding: '16px' }} onClick={() => { setViewingDeal(null); setSellingDeal(viewingDeal); setSellPrice(''); setSellWarranty('0'); setSellQuantity('1'); }}>Продать</button>
               </div>
             </div>
           </div>

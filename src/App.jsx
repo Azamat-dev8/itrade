@@ -163,6 +163,10 @@ function App() {
       applyTheme()
       tg.onEvent('themeChanged', applyTheme)
       return () => tg.offEvent('themeChanged', applyTheme)
+    } else {
+      // Страховка для локальной разработки или если скрипт ТГ заблокирован
+      console.warn("Telegram WebApp не найден. Включаем режим заглушки.");
+      setUser({ id: 123456789, first_name: 'Тест', username: 'test_user' });
     }
   }, [])
 
@@ -175,6 +179,9 @@ function App() {
       if (cachedContacts) setContacts(JSON.parse(cachedContacts));
 
       fetchData();
+    } else {
+      // Если по какой-то причине юзера нет, выключаем загрузку
+      setIsInitialLoading(false);
     }
   }, [user])
 
@@ -1536,7 +1543,7 @@ function App() {
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.5.1 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.5.2 • Сделано для перекупов</div>
     </div>
   )
 

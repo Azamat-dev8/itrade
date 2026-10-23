@@ -21,7 +21,7 @@ const CATEGORIES = [
   { id: 'Аксессуары', name: 'Аксессуары', icon: '🔌', color: '#ff2d55' },
 ];
 
-const MY_CHANNEL_URL = "https://t.me/primesufa"
+const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут"
 
 const detectCategory = (model) => {
   if (!model) return 'Аксессуары';
@@ -67,10 +67,11 @@ function App() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [csvData, setCsvData] = useState('')
   const [showScanner, setShowScanner] = useState(false)
+  const [scannerMode, setScannerMode] = useState('purchase') // 'purchase' или 'edit'
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showSubModal, setShowSubModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState('12')
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(2); // 2 = СБП, 13 = Крипта
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(2) // 2 = СБП, 13 = Крипта
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false)
   const [showGuideModal, setShowGuideModal] = useState(false)
@@ -136,11 +137,16 @@ function App() {
   const [buyerId, setBuyerId] = useState('')
   const [sellWarranty, setSellWarranty] = useState('0')
 
+  // СОСТОЯНИЯ ДЛЯ РЕДАКТИРОВАНИЯ
   const [editingDeal, setEditingDeal] = useState(null)
   const [editModel, setEditModel] = useState('')
   const [editBuyPrice, setEditBuyPrice] = useState('')
   const [editLocation, setEditLocation] = useState('')
   const [editDescription, setEditDescription] = useState('')
+  const [editImei, setEditImei] = useState('')
+  const [editSellerId, setEditSellerId] = useState('')
+  const [editPhotos, setEditPhotos] = useState([])
+  const [uploadingEditPhoto, setUploadingEditPhoto] = useState(false)
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState({ model: '', description: '', buy_price: '', quantity: '1', location: '', is_accounted: true, imei: '' })
@@ -150,7 +156,7 @@ function App() {
   const [showAdModal, setShowAdModal] = useState(false)
   const [adText, setAdText] = useState('')
 
-    useEffect(() => {
+  useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (tg) {
       tg.ready(); tg.expand(); setUser(tg.initDataUnsafe?.user || null)
@@ -163,23 +169,19 @@ function App() {
       applyTheme()
       tg.onEvent('themeChanged', applyTheme)
 
-      // --- ЛОВИМ ПАРАМЕТР ОПЛАТЫ ИЗ БОТА ---
       const urlParams = new URLSearchParams(window.location.search);
       const startapp = urlParams.get('startapp') || tg.initDataUnsafe?.start_param;
       
       if (startapp && startapp.startsWith('pay_')) {
-        const planId = startapp.replace('pay_', ''); // Получаем "1", "6" или "12"
+        const planId = startapp.replace('pay_', '');
         if (['1', '6', '12'].includes(planId)) {
           setSelectedPlan(planId);
-          // Небольшая задержка, чтобы приложение успело прогрузиться перед открытием модалки
           setTimeout(() => setShowSubModal(true), 500); 
         }
       }
-      // -------------------------------------
 
       return () => tg.offEvent('themeChanged', applyTheme)
     } else {
-      console.warn("Telegram WebApp не найден. Включаем режим заглушки.");
       setUser({ id: 123456789, first_name: 'Тест', username: 'test_user' });
     }
   }, [])
@@ -194,7 +196,6 @@ function App() {
 
       fetchData();
     } else {
-      // Если по какой-то причине юзера нет, выключаем загрузку
       setIsInitialLoading(false);
     }
   }, [user])
@@ -260,19 +261,11 @@ function App() {
       if (debtsData) setDebts(debtsData);
       if (lbData) setLeaderboard(lbData);
 
-            if (profileInfo) {
-        // Если у пользователя нет даты подписки (новый или старый), даем триал на 7 дней
+      if (profileInfo) {
         if (!profileInfo.subscription_ends_at) {
           const trialEndsAt = new Date();
           trialEndsAt.setDate(trialEndsAt.getDate() + 7);
-          
-          const { data: updatedProfile } = await supabase
-            .from('user_profiles')
-            .update({ subscription_ends_at: trialEndsAt.toISOString() })
-            .eq('telegram_id', user.id)
-            .select()
-            .single();
-            
+          const { data: updatedProfile } = await supabase.from('user_profiles').update({ subscription_ends_at: trialEndsAt.toISOString() }).eq('telegram_id', user.id).select().single();
           if (updatedProfile) {
             setProfileData(updatedProfile);
             setDisplayName(updatedProfile.display_name || user.first_name || 'Аноним');
@@ -287,18 +280,9 @@ function App() {
           setBudget(Number(profileInfo.resale_budget) || 0);
         }
       } else {
-        // Создаем новый профиль с триалом на 7 дней
         const trialEndsAt = new Date();
         trialEndsAt.setDate(trialEndsAt.getDate() + 7);
-
-        const newProf = { 
-          telegram_id: user.id, 
-          user_name: user.first_name || 'Аноним', 
-          display_name: user.first_name || 'Аноним', 
-          show_in_leaderboard: false, 
-          resale_budget: 0,
-          subscription_ends_at: trialEndsAt.toISOString() // <--- ВЫДАЕМ ТРИАЛ
-        }
+        const newProf = { telegram_id: user.id, user_name: user.first_name || 'Аноним', display_name: user.first_name || 'Аноним', show_in_leaderboard: false, resale_budget: 0, subscription_ends_at: trialEndsAt.toISOString() }
         const { data: createdProf } = await supabase.from('user_profiles').insert([newProf]).select().single();
         setProfileData(createdProf || newProf);
         setDisplayName(newProf.display_name);
@@ -548,6 +532,29 @@ function App() {
     setUploadingAddPhoto(false);
   }
 
+  const handleEditPhotoUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    if (editPhotos.length + files.length > 3) {
+      alert('Максимум 3 фото');
+      return;
+    }
+    setUploadingEditPhoto(true);
+    const newUrls = [];
+    for (const file of files) {
+      try {
+        const compressedBlob = await compressImage(file);
+        const fileName = `${user.id}-${Date.now()}-${Math.random()}.jpg`;
+        const { error } = await supabase.storage.from('deal-photos').upload(fileName, compressedBlob, { contentType: 'image/jpeg' });
+        if (error) throw error;
+        const { data: { publicUrl } } = supabase.storage.from('deal-photos').getPublicUrl(fileName);
+        newUrls.push(publicUrl);
+      } catch (err) { alert('Ошибка загрузки: ' + err.message); }
+    }
+    setEditPhotos(prev => [...prev, ...newUrls]);
+    setUploadingEditPhoto(false);
+  }
+
   const addDeal = async (e) => {
     e.preventDefault()
     if (!model || !buyPrice || !user) return alert('Заполните модель и цену')
@@ -683,7 +690,21 @@ function App() {
   const confirmExpense = async () => { if (!expenseAmount || !user) return; await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount: Number(expenseAmount), category: expenseCategory, user_id: user.id }]); setExpenseDeal(null); fetchData(); }
   const saveEditContact = async () => { if (!editContactName) return; await supabase.from('contacts').update({ name: editContactName, phone: editContactPhone, note: editContactNote }).eq('id', editingContact.id); setEditingContact(null); fetchData(); }
   const deleteContact = async (id) => { if (!window.confirm('Удалить контакт?')) return; await supabase.from('contacts').delete().eq('id', id); fetchData(); }
-  const saveEdit = async () => { if (!editModel || !editBuyPrice) return; await supabase.from('deals').update({ model: editModel, buy_price: Number(editBuyPrice), location: editLocation, description: editDescription || null }).eq('id', editingDeal.id); setEditingDeal(null); fetchData(); }
+  
+  const saveEdit = async () => { 
+    if (!editModel || !editBuyPrice) return; 
+    await supabase.from('deals').update({ 
+      model: editModel, 
+      buy_price: Number(editBuyPrice), 
+      location: editLocation, 
+      description: editDescription || null,
+      imei: editImei || null,
+      seller_id: editSellerId ? Number(editSellerId) : null,
+      photos: editPhotos.length > 0 ? editPhotos : null
+    }).eq('id', editingDeal.id); 
+    setEditingDeal(null); 
+    fetchData(); 
+  }
 
   const handleModelSelect = (modelName) => {
     haptic();
@@ -863,14 +884,8 @@ function App() {
   };
   const finStats = getFinancialStats();
 
-   const isPro = profileData?.is_admin || (profileData?.subscription_ends_at && new Date(profileData.subscription_ends_at) > new Date());
-  
-  // НОВАЯ ПЕРЕМЕННАЯ: Доступ к чату (только для админов или реально плативших)
-  const hasChatAccess = profileData?.is_admin || (
-    profileData?.subscription_ends_at && 
-    new Date(profileData.subscription_ends_at) > new Date() && 
-    profileData?.platega_plan !== null
-  );
+  const isPro = profileData?.is_admin || (profileData?.subscription_ends_at && new Date(profileData.subscription_ends_at) > new Date());
+
   const requirePro = (action) => {
     if (!isPro) {
       haptic('error');
@@ -1193,7 +1208,7 @@ function App() {
                 <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={imei} onChange={(e) => setImei(e.target.value)} style={{ marginBottom: 10, paddingRight: 35 }} />
                 {imei && <button type="button" onClick={() => { setImei(''); haptic(); }} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
               </div>
-              <button type="button" onClick={() => setShowScanner(true)} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12, boxShadow: '0 0 10px rgba(255,149,0,0.4)' }}>📷</button>
+              <button type="button" onClick={() => { setScannerMode('purchase'); setShowScanner(true); }} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12, boxShadow: '0 0 10px rgba(255,149,0,0.4)' }}>📷</button>
             </div>
 
             <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
@@ -1322,7 +1337,18 @@ function App() {
                     {isDeadStock && <span style={{ marginLeft: 8, fontSize: 16 }} title="Залежавшийся товар!">⚠️</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 5 }}>
-                    <button className="icon-btn" onClick={(e) => { e.stopPropagation(); setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || ''); setEditLocation(deal.location || ''); setEditDescription(deal.description || ''); haptic(); }}>✏️</button>
+                    <button className="icon-btn" onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setEditingDeal(deal); 
+                      setEditModel(deal.model || ''); 
+                      setEditBuyPrice(deal.buy_price || ''); 
+                      setEditLocation(deal.location || ''); 
+                      setEditDescription(deal.description || ''); 
+                      setEditImei(deal.imei || '');
+                      setEditSellerId(deal.seller_id || '');
+                      setEditPhotos(deal.photos || []);
+                      haptic(); 
+                    }}>✏️</button>
                     <button className="icon-btn" onClick={(e) => { e.stopPropagation(); deleteDeal(deal.id); }}>🗑️</button>
                   </div>
                 </div>
@@ -1395,7 +1421,16 @@ function App() {
                 <div className="card-header">
                   <div style={{ fontWeight: 700, fontSize: 17 }}>{deal.model || 'Без названия'}</div>
                   <div>
-                    <button className="icon-btn" onClick={() => { setEditingDeal(deal); setEditModel(deal.model || ''); setEditBuyPrice(deal.buy_price || ''); setEditLocation(deal.location || ''); setEditDescription(deal.description || ''); }}>✏️</button>
+                    <button className="icon-btn" onClick={() => { 
+                      setEditingDeal(deal); 
+                      setEditModel(deal.model || ''); 
+                      setEditBuyPrice(deal.buy_price || ''); 
+                      setEditLocation(deal.location || ''); 
+                      setEditDescription(deal.description || ''); 
+                      setEditImei(deal.imei || '');
+                      setEditSellerId(deal.seller_id || '');
+                      setEditPhotos(deal.photos || []);
+                    }}>✏️</button>
                     <button className="icon-btn" onClick={() => deleteDeal(deal.id)}>🗑️</button>
                   </div>
                 </div>
@@ -1593,7 +1628,7 @@ function App() {
         <div onClick={() => openExternalLink('https://t.me/primestore8')} style={{ padding: '12px 0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}><span>💬 Служба поддержки</span><span style={{ color: 'var(--accent)' }}>@primestore8</span></div>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.5.2 • Сделано для перекупов</div>
+      <div style={{ textAlign: 'center', marginTop: 20, color: '#aaa', fontSize: 12 }}>PrimeTrade v1.5.3 • Сделано для перекупов</div>
     </div>
   )
 
@@ -1654,48 +1689,7 @@ function App() {
           
           <button onClick={() => { setActiveTab('calculator'); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(0,122,255,0.2)' }}>🧮 Калькулятор</button>
 
-          <button onClick={async () => {
-  haptic();
-  setIsMenuOpen(false);
-  
-  // Если нет PRO — показываем окно оплаты
-   if (!hasChatAccess) {
-    setShowSubModal(true);
-    return;
-  }
-  
-  // Если PRO есть — запрашиваем свежую ссылку
-  try {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    
-    const response = await fetch(`${supabaseUrl}/functions/v1/get-invite-link`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Authorization': `Bearer ${supabaseKey}`, 
-        'apikey': supabaseKey 
-      },
-      body: JSON.stringify({ telegram_id: user?.id })
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Ошибка: ${errText}`);
-    }
-    
-    const data = await response.json();
-    if (data?.link) {
-      openExternalLink(data.link);
-    } else {
-      alert('Сервер не вернул ссылку');
-    }
-  } catch (err) {
-    alert('Не удалось получить доступ к чату: ' + err.message);
-  }
-}} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(52,199,89,0.2)' }}>
-  🤝 Закрытый чат {!isPro && '🔒'}
-</button>
+          <button onClick={() => { openExternalLink("https://t.me/ваш_закрытый_чат"); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(52,199,89,0.2)' }}>🤝 Закрытый чат</button>
           
           {profileData?.show_in_leaderboard && <button onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🏆 Рейтинг перекупов</button>}
           <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>
@@ -1743,7 +1737,7 @@ function App() {
 
       {showAddModal && selectedCategory && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
-          <div className="modal-content">
+          <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
             <h3>+ Добавить в {selectedCategory}</h3>
             {selectedCategory !== 'Аксессуары' && DEVICE_CATALOG[selectedCategory] ? (
               <div className="input-field" onClick={() => { setPickerMode('addManual'); setModelCategory(selectedCategory); setShowModelPicker(true); haptic(); }} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1846,25 +1840,17 @@ function App() {
         <div className="modal-overlay"><div className="modal-content"><h3>🏆 Топ перекупов</h3>{leaderboard.map((lb, idx) => (<div key={lb.user_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', gap: 10 }}><span style={{ fontSize: 18 }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}</span><span style={{ fontWeight: 600 }}>{lb.user_name} {lb.user_id === user?.id ? '(Вы)' : ''}</span></div><span style={{ fontWeight: 'bold', color: 'var(--success)' }}>{formatMoney(lb.gross_profit)}</span></div>))}<div className="modal-actions"><button className="btn-cancel" onClick={() => setShowLeaderboardModal(false)}>Закрыть</button></div></div></div>
       )}
 
-            {showSubModal && (
+      {showSubModal && (
         <div className="modal-overlay" style={{ zIndex: 2000 }}>
           <div className="modal-content" style={{ padding: 0, overflowY: 'auto', borderRadius: 24, boxShadow: '0 0 30px rgba(36,129,204,0.4)', maxHeight: '90vh' }}>
-            
-            {/* Шапка с градиентом и кнопкой закрытия */}
             <div style={{ background: 'linear-gradient(135deg, #2481cc, #1a5c94)', padding: '30px 20px', textAlign: 'center', color: 'white', position: 'relative' }}>
-              <button 
-                onClick={() => setShowSubModal(false)} 
-                style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 32, height: 32, color: 'white', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowSubModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 32, height: 32, color: 'white', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
               <div style={{ fontSize: 40, marginBottom: 10 }}>👑</div>
               <h2 style={{ margin: 0, fontSize: 24, fontWeight: 'bold' }}>PrimeTrade PRO</h2>
               <p style={{ margin: '5px 0 0 0', opacity: 0.9, fontSize: 14 }}>
                 {profileData?.is_admin ? 'У вас статус Админа' : profileData?.subscription_ends_at ? `Активна до ${new Date(profileData.subscription_ends_at).toLocaleDateString('ru-RU')}` : 'Оформите подписку для доступа ко всем функциям'}
               </p>
             </div>
-
             <div style={{ padding: 20 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
                 {['1', '6', '12'].map(p => {
@@ -1883,8 +1869,6 @@ function App() {
                   );
                 })}
               </div>
-
-              {/* БЛОК ВЫБОРА СПОСОБА ОПЛАТЫ */}
               <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8, color: 'var(--text-muted)' }}>Способ оплаты:</div>
               <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
                 <div 
@@ -1902,7 +1886,6 @@ function App() {
                   <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 4 }}>Крипта</div>
                 </div>
               </div>
-
               <button className="btn-primary" disabled={isProcessingPayment} onClick={async () => {
                 haptic('heavy'); setIsProcessingPayment(true);
                 try {
@@ -1919,18 +1902,16 @@ function App() {
               }} style={{ padding: '16px', fontSize: 16, opacity: isProcessingPayment ? 0.7 : 1 }}>
                 {isProcessingPayment ? 'Создание...' : (selectedPaymentMethod === 13 ? 'Оплатить криптовалютой' : 'Оплатить через СБП')}
               </button>
-              
               <button className="btn-cancel" onClick={() => setShowSubModal(false)} style={{ width: '100%', marginTop: 10 }}>Закрыть</button>
             </div>
           </div>
         </div>
       )}
 
-            {showGuideModal && (
-        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={() => setShowGuideModal(false)}>
+      {showGuideModal && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }}>
           <div className="modal-content" style={{ maxHeight: '92vh', overflowY: 'auto', padding: 0 }} onClick={(e) => e.stopPropagation()}>
             
-            {/* Шапка с градиентом */}
             <div style={{ background: 'linear-gradient(135deg, #2481cc, #1a5c94)', padding: '24px 20px 20px', position: 'sticky', top: 0, zIndex: 10, color: 'white', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
               <div style={{ fontSize: 44, marginBottom: 6 }}>📚</div>
               <h2 style={{ margin: 0, fontSize: 22, fontWeight: 'bold' }}>Полный гайд</h2>
@@ -1975,14 +1956,72 @@ function App() {
         </div>
       )}
 
-      {editingDeal && (
+      {expenseDeal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h3>Редактировать</h3>
+            <h3>Расход: {expenseDeal.model}</h3>
+            <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value.replace(/[^\d]/g, ''))} autoFocus />
+            <select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}>
+              <option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option>
+            </select>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button>
+              <button className="btn-confirm" onClick={confirmExpense} disabled={isActionLoading}>{isActionLoading ? 'Добавление...' : 'Добавить'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingDeal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3>Редактировать: {editingDeal.model}</h3>
+
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Модель</label>
             <input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)} />
+
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Цена закупа (₽)</label>
             <input className="input-field" type="text" inputMode="numeric" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value.replace(/[^\d]/g, ''))} />
+
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>IMEI</label>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input className="input-field" type="text" placeholder="IMEI" value={editImei} onChange={(e) => setEditImei(e.target.value)} style={{ marginBottom: 0, paddingRight: 35 }} />
+                {editImei && <button type="button" onClick={() => setEditImei('')} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
+              </div>
+              <button type="button" onClick={() => { setScannerMode('edit'); setShowScanner(true); }} style={{ padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12, boxShadow: '0 0 10px rgba(255,149,0,0.4)' }}>📷</button>
+            </div>
+
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Кто продал</label>
+            <select className="input-field" value={editSellerId} onChange={(e) => setEditSellerId(e.target.value)}>
+              <option value="">Не указан</option>
+              {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
+            </select>
+
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Место хранения</label>
             <input className="input-field" type="text" placeholder="Место хранения" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
+
+            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Описание</label>
             <textarea className="input-field" placeholder="Описание" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} style={{ minHeight: 60, resize: 'vertical' }} />
+
+            <div style={{ marginBottom: 15, marginTop: 5 }}>
+              <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото устройства (до 3 шт):</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {editPhotos.map((url, idx) => (
+                  <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
+                    <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button onClick={() => setEditPhotos(prev => prev.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}>✕</button>
+                  </div>
+                ))}
+                {editPhotos.length < 3 && (
+                  <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)', boxShadow: '0 0 10px rgba(0,122,255,0.1)' }}>
+                    {uploadingEditPhoto ? '...' : '+'}
+                    <input type="file" accept="image/*" multiple onChange={handleEditPhotoUpload} style={{ display: 'none' }} disabled={uploadingEditPhoto} />
+                  </label>
+                )}
+              </div>
+            </div>
+
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button>
               <button className="btn-confirm" onClick={saveEdit} disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Сохранить'}</button>
@@ -2020,7 +2059,11 @@ function App() {
         </div>
       )}
 
-      {showScanner && <Scanner key={Date.now()} onScan={(text) => { setImei(text); setShowScanner(false); }} onClose={() => setShowScanner(false)} />}
+      {showScanner && <Scanner key={Date.now()} onScan={(text) => { 
+        if (scannerMode === 'edit') { setEditImei(text); } 
+        else { setImei(text); }
+        setShowScanner(false); 
+      }} onClose={() => setShowScanner(false)} />}
 
       {viewingDeal && (
         <div className="modal-overlay" style={{ zIndex: 4000 }}>
@@ -2028,7 +2071,17 @@ function App() {
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--card-bg)' }}>
               <h3 style={{ margin: 0, fontSize: 20 }}>{viewingDeal.model}</h3>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button className="icon-btn" onClick={() => { setViewingDeal(null); setEditingDeal(viewingDeal); setEditModel(viewingDeal.model || ''); setEditBuyPrice(viewingDeal.buy_price || ''); setEditLocation(viewingDeal.location || ''); setEditDescription(viewingDeal.description || ''); }}>✏️</button>
+                <button className="icon-btn" onClick={() => { 
+                  setViewingDeal(null); 
+                  setEditingDeal(viewingDeal); 
+                  setEditModel(viewingDeal.model || ''); 
+                  setEditBuyPrice(viewingDeal.buy_price || ''); 
+                  setEditLocation(viewingDeal.location || ''); 
+                  setEditDescription(viewingDeal.description || ''); 
+                  setEditImei(viewingDeal.imei || '');
+                  setEditSellerId(viewingDeal.seller_id || '');
+                  setEditPhotos(viewingDeal.photos || []);
+                }}>✏️</button>
                 <button className="icon-btn" onClick={() => { setViewingDeal(null); deleteDeal(viewingDeal.id); }}>🗑️</button>
                 <button className="icon-btn" onClick={() => setViewingDeal(null)} style={{ fontSize: 24 }}>✕</button>
               </div>

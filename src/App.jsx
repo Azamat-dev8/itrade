@@ -3,7 +3,10 @@ import { supabase } from './supabaseClient'
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
 import Scanner from './Scanner'
 import './App.css'
-
+  const [showAiModal, setShowAiModal] = useState(false)
+  const [aiText, setAiText] = useState('')
+  const [isAiLoading, setIsAiLoading] = useState(false)
+  const [aiTargetDeal, setAiTargetDeal] = useState(null)
 const DEVICE_CATALOG = {
   'iPhone': ["iPhone 7", "iPhone 7 Plus", "iPhone 8", "iPhone 8 Plus", "iPhone X", "iPhone XR", "iPhone XS", "iPhone XS Max", "iPhone 11", "iPhone 11 Pro", "iPhone 11 Pro Max", "iPhone SE (2020)", "iPhone 12 mini", "iPhone 12", "iPhone 12 Pro", "iPhone 12 Pro Max", "iPhone 13 mini", "iPhone 13", "iPhone 13 Pro", "iPhone 13 Pro Max", "iPhone SE (2022)", "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro", "iPhone 14 Pro Max", "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max", "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max", "iPhone 17", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 18", "iPhone 18 Pro", "iPhone 18 Pro Max", "iPhone Duo"],
   'iPad': ["iPad 9", "iPad 10", "iPad Air 4", "iPad Air 5", "iPad Air 6", "iPad Pro 11 (2021)", "iPad Pro 12.9 (2021)", "iPad Pro 11 (2022)", "iPad Pro 12.9 (2022)", "iPad Pro M4"],
@@ -725,7 +728,41 @@ function App() {
       setAddForm(prev => ({ ...prev, model: modelName })); setShowModelPicker(false); setModelSearch('');
     } else { setFilterModels(prev => prev.includes(modelName) ? prev.filter(m => m !== modelName) : [...prev, modelName]); }
   }
+  const handleGenerateAi = async (deal, platform) => {
+    haptic('medium');
+    setAiTargetDeal(deal);
+    setShowAiModal(true);
+    setIsAiLoading(true);
+    setAiText('');
 
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/groq-ai`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+          'apikey': supabaseKey
+        },
+        body: JSON.stringify({ deal, platform })
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err);
+      }
+
+      const data = await response.json();
+      setAiText(data.text);
+    } catch (err) {
+      alert('Ошибка ИИ: ' + err.message);
+      setShowAiModal(false);
+    } finally {
+      setIsAiLoading(false);
+    }
+  }
   const generateAdText = (deal) => {
     let text = `🔥 В продаже: ${deal.model}\n`;
     if (deal.storage_gb) text += `📦 Память: ${deal.storage_gb >= 1024 ? deal.storage_gb/1024 + ' TB' : deal.storage_gb + ' GB'}\n`;
@@ -2121,7 +2158,64 @@ function App() {
               <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                 <button className="btn-primary" style={{ flex: 1, padding: '16px', backgroundColor: 'var(--accent)' }} onClick={() => { setAdText(generateAdText(viewingDeal)); setShowAdModal(true); }}>📢 Пост в чат</button>
               </div>
+  <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                <button 
+                  className="btn-primary" 
+                  style={{ flex: 1, padding: '16px', backgroundColor: '#8e44ad', boxShadow: '0 0 15px rgba(142, 68, 173, 0.3)' }} 
+                  onClick={() => handleGenerateAi(viewingDeal, 'chat')}
+                >
+                  ✨ AI для чата
+                </button>
+                <button 
+                  className="btn-primary" 
+                  style={{ flex: 1, padding: '16px', backgroundColor: '#2980b9', boxShadow: '0 0 15px rgba(41, 128, 185, 0.3)' }} 
+                  onClick={() => handleGenerateAi(viewingDeal, 'avito')}
+                >
+                  ✨ AI для Авито
+                </button>
+                      {showAiModal && (
+        <div className="modal-overlay" style={{ zIndex: 6000 }}>
+          <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ textAlign: 'center', marginBottom: 15 }}>
+              <div style={{ fontSize: 36, marginBottom: 5 }}>✨</div>
+              <h3 style={{ margin: 0 }}>Генерация через ИИ</h3>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 5 }}>Модель: {aiTargetDeal?.model}</p>
+            </div>
 
+            {isAiLoading ? (
+              <div style={{ padding: 40, textAlign: 'center' }}>
+                <div className="skeleton" style={{ width: 40, height: 40, borderRadius: '50%', margin: '0 auto 15px auto' }}></div>
+                <div style={{ fontWeight: 'bold', color: 'var(--accent)' }}>Нейросеть думает...</div>
+              </div>
+            ) : (
+              <textarea 
+                value={aiText} 
+                readOnly 
+                style={{ flex: 1, minHeight: 200, padding: 15, borderRadius: 12, border: '1px solid var(--border)', fontSize: 14, fontFamily: 'inherit', marginBottom: 15, backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }} 
+              />
+            )}
+
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowAiModal(false)}>Закрыть</button>
+              {!isAiLoading && (
+                <button 
+                  className="btn-confirm" 
+                  style={{ backgroundColor: 'var(--success)' }} 
+                  onClick={() => {
+                    navigator.clipboard.writeText(aiText).then(() => {
+                      alert('✅ Текст скопирован!');
+                      haptic('success');
+                    });
+                  }}
+                >
+                  Копировать
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+              </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="btn-cancel" style={{ flex: 1, padding: '16px', backgroundColor: '#fff3cd', color: '#b28900' }} onClick={() => { setViewingDeal(null); setExpenseDeal(viewingDeal); setExpenseAmount(''); }}>+ Расход</button>
                 <button className="btn-success" style={{ flex: 1, padding: '16px' }} onClick={() => { setViewingDeal(null); setSellingDeal(viewingDeal); setSellPrice(''); setSellWarranty('0'); setSellQuantity('1'); }}>Продать</button>

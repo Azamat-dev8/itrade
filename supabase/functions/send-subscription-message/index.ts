@@ -1,46 +1,72 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
+// supabase/functions/send-subscription-message/index.ts
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-// Setup type definitions for built-in Supabase Runtime APIs
-import "@supabase/functions-js/edge-runtime.d.ts";
-import { withSupabase } from "@supabase/server";
+serve(async (req: Request) => {
+  // CORS заголовки, чтобы приложение могло вызвать функцию
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
 
-console.log("Hello from Functions!");
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
 
-// This endpoint uses 'publishable' | 'secret' access, apiKey is required.
-// Use publishable for Client-facing, key-validated endpoints
-// Use secret for Server-to-server, internal calls
-export default {
-  fetch: withSupabase({ auth: ["publishable", "secret"] }, async (req, ctx) => {
-    // Called by another service with a secret key
-    // ctx.supabaseAdmin bypasses RLS — use for privileged operations
-    /*
-    if (ctx.authMode === "secret") {
-      const { user_id } = await req.json();
-      const { data } = await ctx.supabaseAdmin.auth.admin.getUserById(user_id);
-
-      return Response.json({
-        email: data?.user?.email,
-      });
+  try {
+    const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")
+    
+    if (!BOT_TOKEN) {
+      throw new Error("TELEGRAM_BOT_TOKEN не настроен в секретах Supabase")
     }
-    */
 
-    const { name } = await req.json();
+    const { chat_id } = await req.json()
 
-    return Response.json({
-      message: `Hello ${name}!`,
-    });
-  }),
-};
+    if (!chat_id) {
+      return new Response(JSON.stringify({ error: "chat_id is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
 
-/* To invoke locally:
+    const replyMarkup = {
+      inline_keyboard: [
+        [
+          { text: "📅 1 месяц — 390 ₽", web_app: { url: "https://itrade-kappa.vercel.app/" } },
+        ],
+        [
+          { text: "🔥 6 месяцев — 1990 ₽", web_app: { url: "https://itrade-kappa.vercel.app/" } },
+        ],
+        [
+          { text: "🏆 12 месяцев — 3590 ₽ (выгодно)", web_app: { url: "https://itrade-kappa.vercel.app/" } },
+        ],
+      ],
+    }
 
-  1. Run `supabase start` (see: https://supabase.com/docs/reference/cli/supabase-start)
-  2. Make an HTTP request:
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`
 
-  curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/send-subscription-message' \
-    --header 'apiKey: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH' \
-    --data '{"name":"Functions"}'
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chat_id,
+        text: "💎 *Выберите тариф PrimeTrade PRO:*\n\n" +
+              "• 1 месяц — 390 ₽\n" +
+              "• 6 месяцев — 1990 ₽\n" +
+              "• 12 месяцев — 3590 ₽ (выгодно)\n\n" +
+              "Нажмите на кнопку, чтобы открыть приложение и оформить подписку.",
+        parse_mode: "Markdown",
+        reply_markup: replyMarkup,
+      }),
+    })
 
-*/
+    const result = await response.json()
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    })
+
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    })
+  }
+})

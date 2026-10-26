@@ -1243,7 +1243,7 @@ function App() {
                 <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={imei} onChange={(e) => setImei(e.target.value)} style={{ marginBottom: 10, paddingRight: 35 }} />
                 {imei && <button type="button" onClick={() => { setImei(''); haptic(); }} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
               </div>
-              <button type="button" onClick={() => { setScannerMode('purchase'); setShowScanner(true); }} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12, boxShadow: '0 0 10px rgba(255,149,0,0.4)' }}>📷</button>
+             <button type="button" onClick={() => handleOpenScanner('purchase')} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12, boxShadow: '0 0 10px rgba(255,149,0,0.4)' }}>📷</button>
             </div>
 
             <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
@@ -2161,7 +2161,7 @@ function App() {
                 <input className="input-field" type="text" placeholder="IMEI" value={editImei} onChange={(e) => setEditImei(e.target.value)} style={{ marginBottom: 0, paddingRight: 35 }} />
                 {editImei && <button type="button" onClick={() => setEditImei('')} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
               </div>
-              <button type="button" onClick={() => { setScannerMode('edit'); setShowScanner(true); }} style={{ padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12, boxShadow: '0 0 10px rgba(255,149,0,0.4)' }}>📷</button>
+             <button type="button" onClick={() => handleOpenScanner('edit')} style={{ padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12, boxShadow: '0 0 10px rgba(255,149,0,0.4)' }}>📷</button>
             </div>
 
             <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Кто продал</label>
@@ -2231,11 +2231,22 @@ function App() {
         </div>
       )}
 
-      {showScanner && <Scanner key={Date.now()} onScan={(text) => { 
-        if (scannerMode === 'edit') { setEditImei(text); } 
-        else { setImei(text); }
-        setShowScanner(false); 
-      }} onClose={() => setShowScanner(false)} />}
+            {showScanner && (
+        <Scanner 
+          key={Date.now()} 
+          onScan={(text) => { 
+            const cleanText = text.replace(/\D/g, '');
+            if (scannerMode === 'edit') { 
+              setEditImei(cleanText); 
+            } else { 
+              setImei(cleanText); 
+              checkImeiAuto(cleanText);
+            }
+            setShowScanner(false); 
+          }} 
+          onClose={() => setShowScanner(false)} 
+        />
+      )}
 
       {viewingDeal && (
         <div className="modal-overlay" style={{ zIndex: 4000 }}>

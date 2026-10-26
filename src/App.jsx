@@ -188,9 +188,10 @@ function App() {
   };
 
   // 2. Главная функция открытия сканера
-  const handleOpenScanner = (mode = 'purchase') => {
+   const handleOpenScanner = (mode = 'purchase') => {
     setScannerMode(mode);
-    haptic('medium');
+    if (typeof haptic === 'function') haptic('medium');
+    setShowScanner(true);
 
     const tg = window.Telegram?.WebApp;
 

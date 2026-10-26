@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList, PieChart, Pie, Legend } from 'recharts'
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
 import Scanner from './Scanner'
 import './App.css'
 
@@ -136,7 +136,9 @@ function App() {
   const [sellQuantity, setSellQuantity] = useState('1')
   const [buyerId, setBuyerId] = useState('')
   const [sellWarranty, setSellWarranty] = useState('0')
-
+  const [isTradeIn, setIsTradeIn] = useState(false)
+  const [tradeInModel, setTradeInModel] = useState('')
+  const [tradeInPrice, setTradeInPrice] = useState('')
   // СОСТОЯНИЯ ДЛЯ РЕДАКТИРОВАНИЯ
   const [editingDeal, setEditingDeal] = useState(null)
   const [editModel, setEditModel] = useState('')
@@ -635,15 +637,23 @@ function App() {
     }
   };
 
-  const confirmSell = async () => {
+    const confirmSell = async () => {
     if (!sellPrice) return alert('Введите цену')
     const qtyToSell = Number(sellQuantity) || 1;
     if (qtyToSell > sellingDeal.quantity) return alert(`В наличии только ${sellingDeal.quantity} шт.`);
+    
+    // Проверка для Trade-in
+    if (isTradeIn && (!tradeInModel || !tradeInPrice)) {
+      return alert('Заполните модель и цену оценки Trade-in устройства');
+    }
+
     setIsActionLoading(true);
     try {
       const newQuantity = sellingDeal.quantity - qtyToSell;
       const newSoldQuantity = (sellingDeal.sold_quantity || 0) + qtyToSell;
       const newStatus = newQuantity === 0 ? 'sold' : 'in_stock';
+      
+      // 1. Обновляем статус текущего устройства (Продажа)
       const { error } = await supabase.from('deals').update({
         quantity: newQuantity,
         sold_quantity: newSoldQuantity,
@@ -655,9 +665,31 @@ function App() {
       }).eq('id', sellingDeal.id);
       
       if (error) throw new Error(error.message);
+
+      // 2. Если включен Trade-in, автоматом кидаем новое устройство на склад
+      if (isTradeIn) {
+        const { error: tradeInError } = await supabase.from('deals').insert([{
+          model: tradeInModel,
+          buy_price: Number(tradeInPrice),
+          status: 'in_stock',
+          category: detectCategory(tradeInModel), // Автоматически определит категорию
+          quantity: 1,
+          sold_quantity: 0,
+          is_accounted: true,
+          user_id: user.id,
+          user_name: displayName || 'Аноним',
+          seller_id: buyerId ? Number(buyerId) : null, // Покупатель стал продавцом
+          description: `🔄 Принято по Trade-in при продаже ${sellingDeal.model}`
+        }]);
+        if (tradeInError) throw new Error("Ошибка Trade-in: " + tradeInError.message);
+      }
       
-      setSellingDeal(null); 
+      setSellingDeal(null);
+      setIsTradeIn(false);
+      setTradeInModel('');
+      setTradeInPrice('');
       await fetchData();
+      haptic('success');
     } catch (err) {
       alert('Ошибка при продаже: ' + err.message);
     } finally {
@@ -809,23 +841,7 @@ function App() {
     return acc;
   }, {});
   const chartData = Object.entries(monthlyProfits).map(([name, profit]) => ({ name, profit })).reverse();
-  // --- РАСЧЕТ ДЛЯ КРУГОВОЙ ДИАГРАММЫ ---
-  const categoryProfits = accountedDeals.filter(d => d.sold_quantity > 0).reduce((acc, deal) => {
-    const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
-    const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
-    const profit = deal.sold_quantity * ((Number(deal.sell_price) || 0) - Number(deal.buy_price) - perUnitExp);
-    
-    if (profit > 0) { // Считаем только плюсовые сделки
-      const cat = deal.category || 'Другое';
-      if (!acc[cat]) acc[cat] = 0;
-      acc[cat] += profit;
-    }
-    return acc;
-  }, {});
 
-  const pieData = Object.entries(categoryProfits)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value); // Сортируем от большего к меньшему
   const filterDealsByQuery = (list) => {
     return list.filter(deal => {
       const matchesModel = filterModels.length > 0 ? filterModels.includes(deal.model) : true;
@@ -1037,51 +1053,11 @@ function App() {
                     {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} style={{ filter: `drop-shadow(0 0 5px ${entry.profit >= 0 ? 'rgba(52,199,89,0.5)' : 'rgba(255,59,48,0.5)'})` }} />)}
                     <LabelList dataKey="profit" position="center" fill="#ffffff" style={{ fontWeight: 'bold', fontSize: 13, textShadow: '0 1px 2px rgba(0,0,0,0.4)' }} formatter={(value) => { if (hideAmounts) return '***'; if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'; if (value >= 1000) return (value / 1000).toFixed(0) + 'k'; return value; }} />
                   </Bar>
-                                </BarChart>
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         )}
-
-        {/* НОВЫЙ ГРАФИК: Распределение прибыли */}
-        {showChart && pieData.length > 0 && (
-          <div className="card" style={{ marginBottom: 40 }}>
-            <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 5 }}>Прибыль по категориям</h3>
-            <div style={{ width: '100%', height: 220 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {pieData.map((entry, index) => {
-                      const catObj = CATEGORIES.find(c => c.id === entry.name);
-                      const color = catObj ? catObj.color : '#8884d8';
-                      return <Cell key={`cell-${index}`} fill={color} style={{ filter: `drop-shadow(0 0 5px ${color}80)` }} />;
-                    })}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} 
-                    formatter={(value) => [formatMoney(value), 'Прибыль']} 
-                  />
-                  <Legend 
-                    verticalAlign="bottom" 
-                    height={36}
-                    iconType="circle"
-                    formatter={(value, entry) => <span style={{ color: 'var(--text-main)', fontSize: 13, fontWeight: 500 }}>{value}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
       </div>
     )
   }
@@ -1867,26 +1843,68 @@ function App() {
         </div>
       )}
 
-      {sellingDeal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
+           {sellingDeal && (
+        <div className="modal-overlay" style={{ zIndex: 4000 }}>
+          <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
             <h3>Продажа: {sellingDeal.model}</h3>
-            <div style={{ backgroundColor: 'var(--bg-color)', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 }}>В наличии: <b>{sellingDeal.quantity} шт.</b></div>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Сколько продать</label>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="1" value={sellQuantity} onChange={(e) => setSellQuantity(e.target.value.replace(/[^\d]/g, ''))} />
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Цена продажи за 1 шт (₽)</label>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="Цена (₽)" value={sellPrice} onChange={(e) => setSellPrice(e.target.value.replace(/[^\d]/g, ''))} />
+            <div style={{ backgroundColor: 'var(--bg-color)', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
+              В наличии: <b>{sellingDeal.quantity} шт.</b>
+            </div>
+            
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Цена продажи (за 1 шт)</label>
+                <input className="input-field" type="text" inputMode="numeric" placeholder="Цена (₽)" value={sellPrice} onChange={(e) => setSellPrice(e.target.value.replace(/[^\d]/g, ''))} />
+              </div>
+              <div style={{ width: 80 }}>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Кол-во</label>
+                <input className="input-field" type="text" inputMode="numeric" placeholder="1" value={sellQuantity} onChange={(e) => setSellQuantity(e.target.value.replace(/[^\d]/g, ''))} />
+              </div>
+            </div>
+
             <select className="input-field" value={buyerId} onChange={(e) => setBuyerId(e.target.value)}>
               <option value="">Кто купил?</option>
               {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
             </select>
+            
             <label style={{ fontSize: 12, color: '#888', marginTop: 5, display: 'block' }}>Гарантия</label>
             <select className="input-field" value={sellWarranty} onChange={(e) => setSellWarranty(e.target.value)}>
               <option value="0">Без гарантии</option><option value="1">1 месяц</option><option value="3">3 месяца</option><option value="6">6 месяцев</option><option value="12">1 год</option>
             </select>
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setSellingDeal(null)}>Отмена</button>
-              <button className="btn-confirm" onClick={confirmSell} disabled={isActionLoading}>{isActionLoading ? 'Продажа...' : 'Продать'}</button>
+
+            {/* КРАСИВЫЙ БЛОК TRADE-IN */}
+            <div style={{ marginTop: 15, padding: 12, backgroundColor: isTradeIn ? 'rgba(175, 82, 222, 0.1)' : 'var(--bg-color)', border: `1px solid ${isTradeIn ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 12, transition: 'all 0.3s' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 20 }}>🔄</span>
+                  <span style={{ fontWeight: 'bold', fontSize: 14, color: isTradeIn ? 'var(--accent)' : 'var(--text-main)' }}>Принять в Trade-in</span>
+                </div>
+                <button onClick={() => { setIsTradeIn(!isTradeIn); haptic(); }} style={{ padding: '6px 12px', borderRadius: 20, background: isTradeIn ? 'var(--accent)' : '#e5e5ea', color: isTradeIn ? '#fff' : '#000', border: 'none', fontWeight: 'bold' }}>{isTradeIn ? 'ДА' : 'НЕТ'}</button>
+              </div>
+
+              {isTradeIn && (
+                <div style={{ marginTop: 15, animation: 'fadeIn 0.3s ease-out' }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Какое устройство принимаем?</label>
+                  <input className="input-field" type="text" placeholder="Например: iPhone 11 128gb" value={tradeInModel} onChange={(e) => setTradeInModel(e.target.value)} />
+                  
+                  <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>В какую сумму оцениваем? (₽)</label>
+                  <input className="input-field" type="text" inputMode="numeric" placeholder="Цена оценки (₽)" value={tradeInPrice} onChange={(e) => setTradeInPrice(e.target.value.replace(/[^\d]/g, ''))} />
+                  
+                  {sellPrice && tradeInPrice && (
+                    <div style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(52, 199, 89, 0.15)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--success)' }}>К доплате от клиента:</span>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>
+                        {formatMoney((Number(sellPrice) * (Number(sellQuantity) || 1)) - Number(tradeInPrice))}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: 20 }}>
+              <button className="btn-cancel" onClick={() => { setSellingDeal(null); setIsTradeIn(false); setTradeInModel(''); setTradeInPrice(''); }}>Отмена</button>
+              <button className="btn-confirm" style={{ backgroundColor: 'var(--success)' }} onClick={confirmSell} disabled={isActionLoading}>{isActionLoading ? 'Продажа...' : 'Продать'}</button>
             </div>
           </div>
         </div>

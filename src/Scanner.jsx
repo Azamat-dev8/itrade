@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/browser';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 
 export default function Scanner({ onScan, onClose }) {
   const videoRef = useRef(null);
@@ -13,41 +13,32 @@ export default function Scanner({ onScan, onClose }) {
   const [hasTorch, setHasTorch] = useState(false);
 
   useEffect(() => {
-    // Настраиваем подсказки для ZXing: ищем ТОЛЬКО штрихкоды (Code 128 / Code 39 / EAN), а не QR
-    const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.ITF
-    ]);
-
-    const codeReader = new BrowserMultiFormatReader(hints);
+    // Используем стандартный ридер, он поддерживает всё, но мы ускорим его через настройки камеры
+    const codeReader = new BrowserMultiFormatReader();
     let localStream = null;
 
     const startScanner = async () => {
       try {
-        // Запрашиваем ВЫСОКОЕ разрешение, чтобы тонкие линии IMEI не размывались
+        // Запрашиваем Full HD разрешение, чтобы тонкие линии IMEI были четкими
         localStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: 'environment' },
-            width: { ideal: 1920, min: 1280 },
-            height: { ideal: 1080, min: 720 },
-            advanced: [{ focusMode: 'continuous' }]
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           }
         });
 
         const track = localStream.getVideoTracks()[0];
         videoTrackRef.current = track;
 
-        // Включаем непрерывный автофокус если поддержано железом
-        if (track.applyConstraints) {
-          track.applyConstraints({
+        // Включаем автофокус, если железо позволяет
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+        if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+          await track.applyConstraints({
             advanced: [{ focusMode: 'continuous' }]
           }).catch(() => {});
         }
-
-        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+        
         if (capabilities.torch) setHasTorch(true);
 
         controlsRef.current = await codeReader.decodeFromStream(
@@ -56,32 +47,27 @@ export default function Scanner({ onScan, onClose }) {
           (result) => {
             if (result && !isScannedRef.current) {
               const text = result.getText();
-              const cleanText = text.replace(/\D/g, ''); // Оставляем только цифры
+              const cleanText = text.replace(/\D/g, ''); // Только цифры
 
-              // Если нашли 15 цифр (IMEI)
               if (cleanText.length === 15) {
                 isScannedRef.current = true; 
                 
-                // Вибрация успеха
                 if (window.Telegram?.WebApp?.HapticFeedback) {
                   window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 }
 
-                // Выключаем фонарик перед закрытием
-                if (track.getCapabilities()?.torch) {
-                  track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+                if (videoTrackRef.current?.getCapabilities()?.torch) {
+                  videoTrackRef.current.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
                 }
 
                 onScan(cleanText);
-              } else if (cleanText.length > 10) {
-                setScanStatus('Найден штрихкод, но это не IMEI...');
               }
             }
           }
         );
       } catch (err) {
         console.error("Camera error:", err);
-        setError('Не удалось открыть камеру в высоком разрешении. Разрешите доступ к камере.');
+        setError('Ошибка камеры. Разрешите доступ в настройках.');
       }
     };
 
@@ -91,10 +77,6 @@ export default function Scanner({ onScan, onClose }) {
       isScannedRef.current = true;
       if (controlsRef.current) try { controlsRef.current.stop(); } catch (e) {}
       if (localStream) localStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
-      if (videoRef.current && videoRef.current.srcObject) {
-         videoRef.current.srcObject.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
-         videoRef.current.srcObject = null;
-      }
     };
   }, [onScan]);
 
@@ -110,42 +92,38 @@ export default function Scanner({ onScan, onClose }) {
 
   return (
     <div className="modal-overlay" style={{ zIndex: 9999 }}>
-      <div className="modal-content" style={{ padding: 15, textAlign: 'center', backgroundColor: 'var(--card-bg)' }}>
-        <h3 style={{ color: 'var(--text-main)', marginTop: 5, marginBottom: 5 }}>Сканер IMEI</h3>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 15, minHeight: 18 }}>
-          {scanStatus}
-        </p>
+      <div className="modal-content" style={{ padding: 15, textAlign: 'center', backgroundColor: 'var(--card-bg)', borderRadius: 24 }}>
+        <h3 style={{ color: 'var(--text-main)', margin: '10px 0' }}>Сканер IMEI</h3>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 15 }}>{scanStatus}</p>
         
-        {error && <p style={{ color: 'var(--danger)', fontSize: 12, marginBottom: 10 }}>{error}</p>}
+        {error && <p style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</p>}
         
-        {/* Окно видоискателя с узким горизонтальным прицелом */}
-        <div style={{ position: 'relative', width: '100%', height: 260, backgroundColor: 'black', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ position: 'relative', width: '100%', height: 280, backgroundColor: 'black', borderRadius: 16, overflow: 'hidden' }}>
           <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} playsInline muted />
           
-          {/* Горизонтальный прицел под длинный штрихкод IMEI */}
+          {/* Рамка прицела */}
           <div style={{
             position: 'absolute',
             top: '50%',
-            left: '5%',
-            right: '5%',
-            height: '70px',
+            left: '10%',
+            right: '10%',
+            height: '60px',
             transform: 'translateY(-50%)',
             border: '2px solid #34c759',
             borderRadius: '12px',
-            boxShadow: '0 0 0 2000px rgba(0, 0, 0, 0.55)',
+            boxShadow: '0 0 0 2000px rgba(0, 0, 0, 0.5)',
             display: 'flex',
             alignItems: 'center',
-            justify: 'center'
+            justifyContent: 'center'
           }}>
-            {/* Лазерная красная линия по центру */}
-            <div style={{ width: '90%', height: '2px', backgroundColor: '#ff3b30', opacity: 0.8, boxShadow: '0 0 8px #ff3b30' }}></div>
+            <div style={{ width: '100%', height: '1px', backgroundColor: '#ff3b30', opacity: 0.7, boxShadow: '0 0 8px #ff3b30' }}></div>
           </div>
         </div>
         
-        <div style={{ display: 'flex', gap: 10, marginTop: 15 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           {hasTorch && (
-            <button onClick={toggleTorch} style={{ flex: 1, padding: '14px', backgroundColor: isTorchOn ? 'var(--warning)' : 'var(--bg-color)', color: isTorchOn ? 'white' : 'var(--text-main)', border: '1px solid var(--border)', borderRadius: 12, fontWeight: 'bold', fontSize: 15 }}>
-              {isTorchOn ? '🔦 Фонарик ВКЛ' : '🔦 Фонарик'}
+            <button onClick={toggleTorch} style={{ flex: 1, padding: '14px', backgroundColor: isTorchOn ? 'var(--warning)' : 'var(--bg-color)', color: isTorchOn ? 'white' : 'var(--text-main)', border: '1px solid var(--border)', borderRadius: 12, fontWeight: 'bold' }}>
+              {isTorchOn ? '🔦 Выкл' : '🔦 Фонарик'}
             </button>
           )}
           <button className="btn-cancel" style={{ flex: 1, padding: '14px' }} onClick={onClose}>Отмена</button>

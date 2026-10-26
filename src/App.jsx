@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList, PieChart, Pie, Legend } from 'recharts'
 import Scanner from './Scanner'
 import './App.css'
 
@@ -809,7 +809,23 @@ function App() {
     return acc;
   }, {});
   const chartData = Object.entries(monthlyProfits).map(([name, profit]) => ({ name, profit })).reverse();
+  // --- РАСЧЕТ ДЛЯ КРУГОВОЙ ДИАГРАММЫ ---
+  const categoryProfits = accountedDeals.filter(d => d.sold_quantity > 0).reduce((acc, deal) => {
+    const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
+    const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
+    const profit = deal.sold_quantity * ((Number(deal.sell_price) || 0) - Number(deal.buy_price) - perUnitExp);
+    
+    if (profit > 0) { // Считаем только плюсовые сделки
+      const cat = deal.category || 'Другое';
+      if (!acc[cat]) acc[cat] = 0;
+      acc[cat] += profit;
+    }
+    return acc;
+  }, {});
 
+  const pieData = Object.entries(categoryProfits)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value); // Сортируем от большего к меньшему
   const filterDealsByQuery = (list) => {
     return list.filter(deal => {
       const matchesModel = filterModels.length > 0 ? filterModels.includes(deal.model) : true;
@@ -1021,11 +1037,51 @@ function App() {
                     {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} style={{ filter: `drop-shadow(0 0 5px ${entry.profit >= 0 ? 'rgba(52,199,89,0.5)' : 'rgba(255,59,48,0.5)'})` }} />)}
                     <LabelList dataKey="profit" position="center" fill="#ffffff" style={{ fontWeight: 'bold', fontSize: 13, textShadow: '0 1px 2px rgba(0,0,0,0.4)' }} formatter={(value) => { if (hideAmounts) return '***'; if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'; if (value >= 1000) return (value / 1000).toFixed(0) + 'k'; return value; }} />
                   </Bar>
-                </BarChart>
+                                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         )}
+
+        {/* НОВЫЙ ГРАФИК: Распределение прибыли */}
+        {showChart && pieData.length > 0 && (
+          <div className="card" style={{ marginBottom: 40 }}>
+            <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 5 }}>Прибыль по категориям</h3>
+            <div style={{ width: '100%', height: 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {pieData.map((entry, index) => {
+                      const catObj = CATEGORIES.find(c => c.id === entry.name);
+                      const color = catObj ? catObj.color : '#8884d8';
+                      return <Cell key={`cell-${index}`} fill={color} style={{ filter: `drop-shadow(0 0 5px ${color}80)` }} />;
+                    })}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} 
+                    formatter={(value) => [formatMoney(value), 'Прибыль']} 
+                  />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36}
+                    iconType="circle"
+                    formatter={(value, entry) => <span style={{ color: 'var(--text-main)', fontSize: 13, fontWeight: 500 }}>{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
       </div>
     )
   }

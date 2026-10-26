@@ -21,7 +21,7 @@ const CATEGORIES = [
   { id: 'Аксессуары', name: 'Аксессуары', icon: '🔌', color: '#ff2d55' },
 ];
 
-const MY_CHANNEL_URL = "https://t.me/ваш_канал_тут"
+const MY_CHANNEL_URL = "https://t.me/primesufa"
 
 const detectCategory = (model) => {
   if (!model) return 'Аксессуары';

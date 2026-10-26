@@ -160,7 +160,60 @@ function App() {
 
   const [showAdModal, setShowAdModal] = useState(false)
   const [adText, setAdText] = useState('')
+  // --- ШАГ 1: ФУНКЦИИ ДЛЯ РАБОТЫ СКАНЕРА (ВСТАВЛЯТЬ СЮДА) ---
 
+  // 1. Функция автопроверки IMEI в базе Supabase
+  const checkImeiAuto = async (imeiCode) => {
+    if (!imeiCode || imeiCode.length < 14) return;
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/imei-check`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey 
+        },
+        body: JSON.stringify({ imei: imeiCode })
+      });
+      const data = await res.json();
+      if (data && data.model) {
+        setModel(data.model); // Автоматически ставим модель в поле
+        haptic('success');
+      }
+    } catch (err) {
+      console.error("Ошибка IMEI чекера:", err);
+    }
+  };
+
+  // 2. Главная функция открытия сканера
+  const handleOpenScanner = (mode = 'purchase') => {
+    setScannerMode(mode);
+    haptic('medium');
+
+    const tg = window.Telegram?.WebApp;
+
+    // Если мы в Телеграме, используем их супер-быструю камеру
+    if (tg && tg.showScanQrPopup) {
+      tg.showScanQrPopup({ text: "Наведите на штрихкод или IMEI" }, (text) => {
+        const cleanText = text.replace(/\D/g, '').trim(); // оставляем только цифры
+        if (mode === 'edit') {
+          setEditImei(cleanText);
+        } else {
+          setImei(cleanText);
+          checkImeiAuto(cleanText); // запускаем проверку модели
+        }
+        tg.closeScanQrPopup(); // закрываем камеру
+        return true;
+      });
+    } else {
+      // Если на ПК или в обычном браузере — открываем старый сканер Scanner.jsx
+      setShowScanner(true);
+    }
+  };
+
+  // --- КОНЕЦ НОВЫХ ФУНКЦИЙ ---
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (tg) {
@@ -1243,7 +1296,13 @@ function App() {
                 <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={imei} onChange={(e) => setImei(e.target.value)} style={{ marginBottom: 10, paddingRight: 35 }} />
                 {imei && <button type="button" onClick={() => { setImei(''); haptic(); }} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
               </div>
-             <button type="button" onClick={() => handleOpenScanner('purchase')} style={{ marginBottom: 10, padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12, boxShadow: '0 0 10px rgba(255,149,0,0.4)' }}>📷</button>
+             <button 
+  type="button" 
+  onClick={() => handleOpenScanner('purchase')} 
+  className="scanner-btn"
+>
+  📷
+</button>
             </div>
 
             <select className="input-field" value={sellerId} onChange={(e) => setSellerId(e.target.value)}>
@@ -2161,7 +2220,13 @@ function App() {
                 <input className="input-field" type="text" placeholder="IMEI" value={editImei} onChange={(e) => setEditImei(e.target.value)} style={{ marginBottom: 0, paddingRight: 35 }} />
                 {editImei && <button type="button" onClick={() => setEditImei('')} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
               </div>
-             <button type="button" onClick={() => handleOpenScanner('edit')} style={{ padding: '14px', backgroundColor: 'var(--warning)', color: 'white', border: 'none', borderRadius: 12, boxShadow: '0 0 10px rgba(255,149,0,0.4)' }}>📷</button>
+             <button 
+  type="button" 
+  onClick={() => handleOpenScanner('purchase')} 
+  className="scanner-btn"
+>
+  📷
+</button>
             </div>
 
             <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Кто продал</label>

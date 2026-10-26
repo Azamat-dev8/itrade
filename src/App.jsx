@@ -163,35 +163,71 @@ function App() {
   // --- ШАГ 1: ФУНКЦИИ ДЛЯ РАБОТЫ СКАНЕРА (ВСТАВЛЯТЬ СЮДА) ---
 
   // 1. Функция автопроверки IMEI в базе Supabase
+    // --- АВТООПРЕДЕЛЕНИЕ МОДЕЛИ ПО IMEI (МГНОВЕННО) ---
   const checkImeiAuto = async (imeiCode) => {
-    if (!imeiCode || imeiCode.length < 14) return;
+    if (!imeiCode || imeiCode.length < 8) return;
+    const tac = imeiCode.substring(0, 8);
+
+    // Расширенная база TAC-кодов айфонов (все регионы: США, Европа, Азия, Dual SIM)
+    const localTacMap = {
+      // iPhone 11
+      "35282009": "iPhone 11", "35282109": "iPhone 11", "35651510": "iPhone 11",
+      "35282209": "iPhone 11 Pro", "35651610": "iPhone 11 Pro",
+      "35282309": "iPhone 11 Pro Max", "35651710": "iPhone 11 Pro Max",
+      // iPhone 12
+      "35304910": "iPhone 12 mini", "35305010": "iPhone 12",
+      "35305110": "iPhone 12 Pro", "35305210": "iPhone 12 Pro Max",
+      // iPhone 13
+      "35613831": "iPhone 13 mini", "35613931": "iPhone 13", "35298911": "iPhone 13",
+      "35614031": "iPhone 13 Pro", "35301411": "iPhone 13 Pro",
+      "35614131": "iPhone 13 Pro Max", "35301511": "iPhone 13 Pro Max",
+      // iPhone 14
+      "35035759": "iPhone 14", "35674311": "iPhone 14",
+      "35035859": "iPhone 14 Plus",
+      "35035959": "iPhone 14 Pro", "35674511": "iPhone 14 Pro",
+      "35036059": "iPhone 14 Pro Max", "35674611": "iPhone 14 Pro Max",
+      // iPhone 15
+      "35489182": "iPhone 15", "35105021": "iPhone 15", "35158284": "iPhone 15",
+      "35489282": "iPhone 15 Plus",
+      "35489382": "iPhone 15 Pro", "35105221": "iPhone 15 Pro", "35158584": "iPhone 15 Pro", "35759325": "iPhone 15 Pro",
+      "35489482": "iPhone 15 Pro Max", "35105321": "iPhone 15 Pro Max", "35158684": "iPhone 15 Pro Max",
+      // iPhone 16
+      "35832145": "iPhone 16", "35832245": "iPhone 16 Plus",
+      "35832345": "iPhone 16 Pro", "35832445": "iPhone 16 Pro Max",
+    };
+
+    // 1. Проверяем в локальной базе
+    if (localTacMap[tac]) {
+      setModel(localTacMap[tac]);
+      if (typeof haptic === 'function') haptic('success');
+      return;
+    }
+
+    // 2. Если в локальной базе TAC пока нет, запрашиваем Supabase Edge Function
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
       const res = await fetch(`${supabaseUrl}/functions/v1/imei-check`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'apikey': supabaseKey 
-        },
+        headers: { 'Content-Type': 'application/json', 'apikey': supabaseKey },
         body: JSON.stringify({ imei: imeiCode })
       });
       const data = await res.json();
-      if (data && data.model) {
-        setModel(data.model); // Автоматически ставим модель в поле
-        haptic('success');
+      if (data?.model) {
+        setModel(data.model);
+        if (typeof haptic === 'function') haptic('success');
       }
-    } catch (err) {
-      console.error("Ошибка IMEI чекера:", err);
+    } catch (e) {
+      console.error("IMEI check error:", e);
     }
   };
 
-  // 2. Главная функция открытия сканера
-   const handleOpenScanner = (mode = 'purchase') => {
+  // --- ОТКРЫТИЕ ТОЛЬКО НАШЕГО КАСТОМНОГО СКАНЕРА ---
+  const handleOpenScanner = (mode = 'purchase') => {
     setScannerMode(mode);
     if (typeof haptic === 'function') haptic('medium');
-    setShowScanner(true);
+    setShowScanner(true); // Всегда открываем наш HD-сканер с красной лазерной рамкой!
+  
 
     const tg = window.Telegram?.WebApp;
 

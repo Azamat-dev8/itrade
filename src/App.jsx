@@ -224,30 +224,17 @@ function App() {
 
   // --- ОТКРЫТИЕ ТОЛЬКО НАШЕГО КАСТОМНОГО СКАНЕРА ---
   const handleOpenScanner = (mode = 'purchase') => {
+    // 1. Устанавливаем режим (покупка или редактирование)
     setScannerMode(mode);
-    if (typeof haptic === 'function') haptic('medium');
-    setShowScanner(true); // Всегда открываем наш HD-сканер с красной лазерной рамкой!
-  
-
-    const tg = window.Telegram?.WebApp;
-
-    // Если мы в Телеграме, используем их супер-быструю камеру
-    if (tg && tg.showScanQrPopup) {
-      tg.showScanQrPopup({ text: "Наведите на штрихкод или IMEI" }, (text) => {
-        const cleanText = text.replace(/\D/g, '').trim(); // оставляем только цифры
-        if (mode === 'edit') {
-          setEditImei(cleanText);
-        } else {
-          setImei(cleanText);
-          checkImeiAuto(cleanText); // запускаем проверку модели
-        }
-        tg.closeScanQrPopup(); // закрываем камеру
-        return true;
-      });
-    } else {
-      // Если на ПК или в обычном браузере — открываем старый сканер Scanner.jsx
-      setShowScanner(true);
+    
+    // 2. Даем вибрацию
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
     }
+
+    // 3. ПРИНУДИТЕЛЬНО открываем только наш Scanner.jsx
+    // Убираем отсюда любые проверки на tg.showScanQrPopup!
+    setShowScanner(true);
   };
 
   // --- КОНЕЦ НОВЫХ ФУНКЦИЙ ---

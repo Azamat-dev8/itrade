@@ -1,72 +1,59 @@
-// supabase/functions/send-subscription-message/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-serve(async (req: Request) => {
-  // CORS заголовки, чтобы приложение могло вызвать функцию
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  }
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
+// База TAC (первые 8 цифр IMEI) для моментального определения без внешних API
+const TAC_MAP: Record<string, string> = {
+  "35301411": "iPhone 13 Pro",
+  "35301511": "iPhone 13 Pro Max",
+  "35298911": "iPhone 13",
+  "35674311": "iPhone 14",
+  "35674511": "iPhone 14 Pro",
+  "35674611": "iPhone 14 Pro Max",
+  "35105221": "iPhone 15 Pro",
+  "35105321": "iPhone 15 Pro Max",
+  "35105021": "iPhone 15",
+  "35282009": "iPhone 11",
+  "35282209": "iPhone 11 Pro",
+  "35305010": "iPhone 12",
+  "35305110": "iPhone 12 Pro",
+};
+
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")
-    
-    if (!BOT_TOKEN) {
-      throw new Error("TELEGRAM_BOT_TOKEN не настроен в секретах Supabase")
-    }
+    const { imei } = await req.json();
+    const cleanImei = String(imei || '').replace(/\D/g, '');
 
-    const { chat_id } = await req.json()
-
-    if (!chat_id) {
-      return new Response(JSON.stringify({ error: "chat_id is required" }), {
+    if (!cleanImei || cleanImei.length < 14) {
+      return new Response(JSON.stringify({ error: "IMEI слишком короткий" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      })
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
-    const replyMarkup = {
-      inline_keyboard: [
-        [
-          { text: "📅 1 месяц — 390 ₽", web_app: { url: "https://itrade-kappa.vercel.app/" } },
-        ],
-        [
-          { text: "🔥 6 месяцев — 1990 ₽", web_app: { url: "https://itrade-kappa.vercel.app/" } },
-        ],
-        [
-          { text: "🏆 12 месяцев — 3590 ₽ (выгодно)", web_app: { url: "https://itrade-kappa.vercel.app/" } },
-        ],
-      ],
-    }
+    const tac = cleanImei.substring(0, 8);
+    const foundModel = TAC_MAP[tac] || null;
 
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chat_id,
-        text: "💎 *Выберите тариф PrimeTrade PRO:*\n\n" +
-              "• 1 месяц — 390 ₽\n" +
-              "• 6 месяцев — 1990 ₽\n" +
-              "• 12 месяцев — 3590 ₽ (выгодно)\n\n" +
-              "Нажмите на кнопку, чтобы открыть приложение и оформить подписку.",
-        parse_mode: "Markdown",
-        reply_markup: replyMarkup,
+    return new Response(
+      JSON.stringify({
+        success: true,
+        imei: cleanImei,
+        model: foundModel
       }),
-    })
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
 
-    const result = await response.json()
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : "Ошибка" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
-})
+});

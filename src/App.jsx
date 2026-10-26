@@ -139,6 +139,9 @@ function App() {
   const [isTradeIn, setIsTradeIn] = useState(false)
   const [tradeInModel, setTradeInModel] = useState('')
   const [tradeInPrice, setTradeInPrice] = useState('')
+    const [touchStartX, setTouchStartX] = useState(null)
+  const [swipedDealId, setSwipedDealId] = useState(null)
+  
   // СОСТОЯНИЯ ДЛЯ РЕДАКТИРОВАНИЯ
   const [editingDeal, setEditingDeal] = useState(null)
   const [editModel, setEditModel] = useState('')
@@ -1358,17 +1361,54 @@ function App() {
             <p style={{ fontSize: 14, marginTop: 8 }}>Нажмите «+ Добавить», чтобы добавить товар.</p>
           </div>
         ) : (
-          items.map((deal) => {
+                    items.map((deal) => {
             const daysOnStock = getDaysOnStock(deal);
             const isDeadStock = daysOnStock >= 21;
+            const isSwiped = swipedDealId === deal.id; // Проверяем, свайпнули ли эту карточку
+
             return (
-              <div key={deal.id} className="card neon-card-blue" onClick={() => { setViewingDeal(deal); haptic(); }} style={{ borderLeft: `4px solid ${isDeadStock ? 'var(--danger)' : cat?.color || 'var(--warning)'}`, cursor: 'pointer' }}>
-                <div className="card-header">
-                  <div style={{ fontWeight: 700, fontSize: 17 }}>
-                    {deal.model || 'Без названия'}
-                    {isDeadStock && <span style={{ marginLeft: 8, fontSize: 16 }} title="Залежавшийся товар!">⚠️</span>}
-                  </div>
-                  <div style={{ display: 'flex', gap: 5 }}>
+              <div key={deal.id} style={{ position: 'relative', marginBottom: 16, borderRadius: 18, overflow: 'hidden' }}>
+                
+                {/* 1. ЗАДНИЙ ФОН С КНОПКАМИ (открывается при свайпе влево) */}
+                <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 140, display: 'flex' }}>
+                  <button onClick={() => { setSwipedDealId(null); deleteDeal(deal.id); }} style={{ flex: 1, border: 'none', backgroundColor: 'var(--danger)', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: 'bold', cursor: 'pointer' }}>
+                    <span style={{ fontSize: 20 }}>🗑️</span> Удалить
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); setSwipedDealId(null); setSellingDeal(deal); setSellPrice(''); setSellWarranty('0'); setSellQuantity('1'); }} style={{ flex: 1, border: 'none', backgroundColor: 'var(--success)', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: 'bold', cursor: 'pointer' }}>
+                    <span style={{ fontSize: 20 }}>💰</span> Продать
+                  </button>
+                </div>
+
+                {/* 2. ПЕРЕДНЯЯ КАРТОЧКА (Сдвигается влево) */}
+                <div 
+                  className="card neon-card-blue" 
+                  onClick={() => { if(isSwiped) setSwipedDealId(null); else { setViewingDeal(deal); haptic(); } }} 
+                  onTouchStart={(e) => setTouchStartX(e.touches[0].clientX)}
+                  onTouchMove={(e) => {
+                    if (touchStartX === null) return;
+                    const diff = touchStartX - e.touches[0].clientX;
+                    if (diff > 45) setSwipedDealId(deal.id); // Свайпнули влево
+                    else if (diff < -45) setSwipedDealId(null); // Свайпнули вправо
+                  }}
+                  onTouchEnd={() => setTouchStartX(null)}
+                  style={{ 
+                    borderLeft: `4px solid ${isDeadStock ? 'var(--danger)' : cat?.color || 'var(--warning)'}`, 
+                    cursor: 'pointer',
+                    marginBottom: 0, // Убрали отступ, он теперь у родителя
+                    transform: isSwiped ? 'translateX(-140px)' : 'translateX(0)', // Сама анимация сдвига
+                    transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                    backgroundColor: 'var(--card-bg)',
+                    position: 'relative',
+                    zIndex: 2,
+                    boxShadow: isSwiped ? '-5px 0 15px rgba(0,0,0,0.3)' : 'none'
+                  }}
+                >
+                  <div className="card-header">
+                    <div style={{ fontWeight: 700, fontSize: 17 }}>
+                      {deal.model || 'Без названия'}
+                      {isDeadStock && <span style={{ marginLeft: 8, fontSize: 16 }} title="Залежавшийся товар!">⚠️</span>}
+                    </div>
+                    {/* Кнопка удаления исчезла отсюда (она теперь в свайпе) */}
                     <button className="icon-btn" onClick={(e) => { 
                       e.stopPropagation(); 
                       setEditingDeal(deal); 
@@ -1381,29 +1421,33 @@ function App() {
                       setEditPhotos(deal.photos || []);
                       haptic(); 
                     }}>✏️</button>
-                    <button className="icon-btn" onClick={(e) => { e.stopPropagation(); deleteDeal(deal.id); }}>🗑️</button>
                   </div>
-                </div>
-                {renderSpecs(deal)}
+                  
+                  {renderSpecs(deal)}
 
-                {deal.photos && deal.photos.length > 0 && (
-                  <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10 }}>
-                    {deal.photos.map((url, idx) => (
-                      <img key={idx} src={url} onClick={(e) => { e.stopPropagation(); setViewingPhoto(url); haptic(); }} style={{ height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
-                    ))}
+                  {deal.photos && deal.photos.length > 0 && (
+                    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10 }}>
+                      {deal.photos.map((url, idx) => (
+                        <img key={idx} src={url} onClick={(e) => { e.stopPropagation(); setViewingPhoto(url); haptic(); }} style={{ height: 60, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
+                      ))}
+                    </div>
+                  )}
+
+                  {deal.description && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>📝 {deal.description}</div>}
+                  {deal.seller && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>👤 Продавец: {deal.seller.name}</div>}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                    <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500 }}>
+                      Закуп: {formatMoney(deal.buy_price)} {getDealExpensesSum(deal) > 0 && <span style={{ color: 'var(--danger)', marginLeft: 4 }}>+{formatMoney(getDealExpensesSum(deal))}</span>}
+                    </div>
+                    {/* Маленькая подсказка для пользователя */}
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.7 }}>👈 Смахни</div>
                   </div>
-                )}
 
-                {deal.description && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>📝 {deal.description}</div>}
-                {deal.seller && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>👤 Продавец: {deal.seller.name}</div>}
-
-                <div style={{ fontSize: 15, color: 'var(--text-main)', fontWeight: 500, marginTop: 10, marginBottom: 14 }}>
-                  Закуп: {formatMoney(deal.buy_price)}/шт {getDealExpensesSum(deal) > 0 && <span style={{ color: 'var(--danger)', marginLeft: 8 }}>+ Расходы: {formatMoney(getDealExpensesSum(deal))}</span>}
-                </div>
-
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button className="btn-cancel" style={{ padding: '12px' }} onClick={(e) => { e.stopPropagation(); setExpenseDeal(deal); setExpenseAmount(''); }}>+ Расход</button>
-                  <button className="btn-success" style={{ flex: 1, padding: '12px' }} onClick={(e) => { e.stopPropagation(); setSellingDeal(deal); setSellPrice(''); setSellWarranty('0'); setSellQuantity('1'); }}>Продать</button>
+                  {/* Оставили только добавление расхода, чтобы не загромождать */}
+                  <div style={{ marginTop: 12 }}>
+                    <button className="btn-cancel" style={{ width: '100%', padding: '10px' }} onClick={(e) => { e.stopPropagation(); setExpenseDeal(deal); setExpenseAmount(''); }}>+ Доп. расход</button>
+                  </div>
                 </div>
               </div>
             )

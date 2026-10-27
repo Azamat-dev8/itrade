@@ -1,3 +1,4 @@
+//aaaaaa
 import React, { useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { X } from 'lucide-react';

@@ -38,6 +38,7 @@ body, html {
 .card {
   background-color: var(--card-bg);
   padding: 16px;
+    animation: fadeInUp 0.3s ease-out;
   border-radius: 16px;
   margin-bottom: 16px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.04);
@@ -61,6 +62,10 @@ body, html {
   padding: 24px 20px;
   margin-bottom: 16px;
   box-shadow: 0 8px 24px rgba(10, 186, 181, 0.3);
+  transition: box-shadow 0.3s ease;
+}
+.main-profit-card:hover {
+  box-shadow: 0 0 40px rgba(10, 186, 181, 0.5); /* Усиливаем свечение при наведении/касании */
 }
 
 .debt-card {
@@ -188,3 +193,23 @@ body.dark-theme .pricing-card.best-value { background: rgba(255, 149, 0, 0.1); }
 .pro-features { list-style: none; padding: 0; margin: 15px 0; display: flex; flex-direction: column; gap: 10px; }
 .pro-features li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text-main); }
 .pro-features li span { font-size: 16px; }
+/* Плавное появление контента */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Эффект нажатия для кнопок */
+button {
+  transition: transform 0.1s ease, opacity 0.2s ease;
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+/* Улучшенный скроллбар (для тех, кто смотрит с компьютера) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(150, 150, 150, 0.3); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(150, 150, 150, 0.6); }

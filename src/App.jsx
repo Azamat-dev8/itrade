@@ -160,6 +160,7 @@ function App() {
 
   const [showAdModal, setShowAdModal] = useState(false)
   const [adText, setAdText] = useState('')
+  
   // --- ШАГ 1: ФУНКЦИИ ДЛЯ РАБОТЫ СКАНЕРА (ВСТАВЛЯТЬ СЮДА) ---
 
   // 1. Функция автопроверки IMEI в базе Supabase
@@ -1015,32 +1016,59 @@ function App() {
       <div>
         <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
 
-        <div className="card neon-card-blue" style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 'bold' }}>Бюджет</div>
-            <button onClick={() => { setTempBudget(budget); setShowBudgetModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>Изменить ✏️</button>
-          </div>
-          {budget > 0 ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(freeCash)}</div>
-                <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>свободно</div>
-              </div>
-              <div style={{ width: '100%', height: 8, backgroundColor: 'var(--bg-color)', borderRadius: 4, marginTop: 12, overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(Math.max(percentInvested, 0), 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4 }}></div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-                <span>В товаре: {formatMoney(totalInvestedInStock)}</span>
-                <span>Всего: {formatMoney(budget + realizedProfit)}</span>
-              </div>
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '10px 0' }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>Бюджет не задан</div>
-              <button className="btn-primary" style={{ padding: '10px', fontSize: 14 }} onClick={() => { setTempBudget(''); setShowBudgetModal(true); haptic(); }}>Указать бюджет</button>
-            </div>
-          )}
+           <div className="bg-white px-5 pt-4 pb-6 rounded-b-[32px] shadow-sm mb-6">
+           <div className="flex justify-between items-center mb-5">
+          <h1 className="text-xl font-black tracking-tight uppercase italic">
+            Smart<span className="text-blue-600">Stock</span>
+          </h1>
+          <button 
+            onClick={() => setShowScanner(true)}
+            className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+          >
+            📸
+          </button>
         </div>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="bg-blue-600 p-4 rounded-2xl text-white shadow-lg shadow-blue-200">
+            <p className="text-[10px] opacity-80 uppercase font-bold mb-1">Свободная касса</p>
+            <p className="text-2xl font-black tracking-tight">
+              {financials.freeCash.toLocaleString()} ₽
+            </p>
+          </div>
+
+          <div className="bg-white border-2 border-gray-100 p-4 rounded-2xl shadow-sm">
+            <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Чистая прибыль</p>
+            <p className="text-2xl font-black tracking-tight text-green-600">
+              {financials.netProfit >= 0 ? `+${financials.netProfit.toLocaleString()}` : financials.netProfit.toLocaleString()} ₽
+            </p>
+          </div>
+        </div>
+
+        {/* 3 Детализирующих блока в один ряд */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+            <p className="text-[9px] text-gray-400 uppercase font-bold">Весь капитал</p>
+            <p className="text-xs font-black text-gray-700 mt-0.5">
+              {financials.totalCapital.toLocaleString()} ₽
+            </p>
+          </div>
+
+          <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+            <p className="text-[9px] text-gray-400 uppercase font-bold">В товаре</p>
+            <p className="text-xs font-black text-gray-700 mt-0.5">
+              {financials.totalInvestedInStock.toLocaleString()} ₽
+            </p>
+          </div>
+
+          <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+            <p className="text-[9px] text-gray-400 uppercase font-bold">Общ. расходы</p>
+            <p className="text-xs font-black text-red-500 mt-0.5">
+              {financials.generalExpenses.toLocaleString()} ₽
+            </p>
+          </div>
+        </div>
+
+      </div>
 
         <div className="main-profit-card" style={{ boxShadow: '0 0 30px rgba(10, 186, 181, 0.3)' }}>
           <h3>Реализованная прибыль</h3>

@@ -566,7 +566,25 @@ function App() {
       reader.onerror = reject;
     });
   };
+  // Функция для удаления файлов из Supabase Storage
+  const deletePhotosFromStorage = async (photoUrls) => {
+    if (!photoUrls || photoUrls.length === 0) return;
+    try {
+      // Извлекаем имя файла из полного URL (нам нужна только последняя часть ссылки)
+      const filePaths = photoUrls.map(url => {
+        const parts = url.split('/');
+        return parts[parts.length - 1];
+      }).filter(Boolean); // Убираем пустые значения, если вдруг попались
 
+      if (filePaths.length > 0) {
+        const { error } = await supabase.storage.from('deal-photos').remove(filePaths);
+        if (error) console.error("Ошибка при удалении фото из Storage:", error);
+        else console.log("🗑️ Фото успешно удалены из облака:", filePaths);
+      }
+    } catch (err) {
+      console.error("Ошибка удаления:", err);
+    }
+  };
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -797,14 +815,39 @@ function App() {
     setIsActionLoading(false);
   }
 
-  const deleteDeal = async (id) => { if (!window.confirm('Удалить устройство?')) return; await supabase.from('deals').delete().eq('id', id); fetchData(); }
+    const deleteDeal = async (id) => { 
+    if (!window.confirm('Удалить устройство?')) return; 
+    
+    // 1. Находим сделку, чтобы взять её фото
+    const dealToDelete = deals.find(d => d.id === id);
+    
+    // 2. Если у сделки были фото — удаляем их из облака
+    if (dealToDelete && dealToDelete.photos && dealToDelete.photos.length > 0) {
+      await deletePhotosFromStorage(dealToDelete.photos);
+    }
+    
+    // 3. Удаляем саму сделку из базы
+    await supabase.from('deals').delete().eq('id', id); 
+    fetchData(); 
+  }
   const deleteExpense = async (id) => { if (!window.confirm('Удалить расход?')) return; await supabase.from('expenses').delete().eq('id', id); fetchData(); }
   const confirmExpense = async () => { if (!expenseAmount || !user) return; await supabase.from('expenses').insert([{ deal_id: expenseDeal.id, amount: Number(expenseAmount), category: expenseCategory, user_id: user.id }]); setExpenseDeal(null); fetchData(); }
   const saveEditContact = async () => { if (!editContactName) return; await supabase.from('contacts').update({ name: editContactName, phone: editContactPhone, note: editContactNote }).eq('id', editingContact.id); setEditingContact(null); fetchData(); }
   const deleteContact = async (id) => { if (!window.confirm('Удалить контакт?')) return; await supabase.from('contacts').delete().eq('id', id); fetchData(); }
   
-  const saveEdit = async () => { 
+    const saveEdit = async () => { 
     if (!editModel || !editBuyPrice) return; 
+    
+    // 1. Находим фото, которые были удалены (были в старой сделке, но нет в новой)
+    const oldPhotos = editingDeal.photos || [];
+    const removedPhotos = oldPhotos.filter(url => !editPhotos.includes(url));
+    
+    // 2. Если такие фото есть — удаляем их из облака
+    if (removedPhotos.length > 0) {
+      await deletePhotosFromStorage(removedPhotos);
+    }
+
+    // 3. Сохраняем изменения в БД
     await supabase.from('deals').update({ 
       model: editModel, 
       buy_price: Number(editBuyPrice), 
@@ -814,6 +857,7 @@ function App() {
       seller_id: editSellerId ? Number(editSellerId) : null,
       photos: editPhotos.length > 0 ? editPhotos : null
     }).eq('id', editingDeal.id); 
+    
     setEditingDeal(null); 
     fetchData(); 
   }
@@ -1360,10 +1404,20 @@ function App() {
             <div style={{ marginBottom: 15, marginTop: 5 }}>
               <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото устройства (до 3 шт):</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {dealPhotos.map((url, idx) => (
+                                {dealPhotos.map((url, idx) => (
                   <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
                     <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button type="button" onClick={() => setDealPhotos(prev => prev.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}>✕</button>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const urlToRemove = dealPhotos[idx];
+                        setDealPhotos(prev => prev.filter((_, i) => i !== idx));
+                        deletePhotosFromStorage([urlToRemove]);
+                      }} 
+                      style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
                 {dealPhotos.length < 3 && (
@@ -1999,10 +2053,19 @@ function App() {
             <div style={{ marginBottom: 15, marginTop: 5 }}>
               <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото устройства (до 3 шт):</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {addFormPhotos.map((url, idx) => (
+                                {addFormPhotos.map((url, idx) => (
                   <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
                     <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button onClick={() => setAddFormPhotos(prev => prev.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}>✕</button>
+                    <button 
+                      onClick={() => {
+                        const urlToRemove = addFormPhotos[idx];
+                        setAddFormPhotos(prev => prev.filter((_, i) => i !== idx));
+                        deletePhotosFromStorage([urlToRemove]);
+                      }} 
+                      style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
                 {addFormPhotos.length < 3 && (
@@ -2291,10 +2354,19 @@ function App() {
             <div style={{ marginBottom: 15, marginTop: 5 }}>
               <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото устройства (до 3 шт):</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {editPhotos.map((url, idx) => (
+                                {editPhotos.map((url, idx) => (
                   <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
                     <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button onClick={() => setEditPhotos(prev => prev.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}>✕</button>
+                    <button 
+                      onClick={() => {
+                        const urlToRemove = editPhotos[idx];
+                        setEditPhotos(prev => prev.filter((_, i) => i !== idx));
+                        deletePhotosFromStorage([urlToRemove]);
+                      }} 
+                      style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
                 {editPhotos.length < 3 && (

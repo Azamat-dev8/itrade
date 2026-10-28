@@ -880,8 +880,16 @@ function App() {
 
   const realizedProfit = totalRevenue - totalBuySold - totalExpSold;
 
-  const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+    const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+  
+  // Свободные средства (наличка на руках)
   const freeCash = budget + realizedProfit - totalGenExp - totalInvestedInStock;
+  
+  // Общий капитал (наличка + товар на складе)
+  const totalCapital = freeCash + totalInvestedInStock;
+  
+  // Процент денег, замороженных в товаре (от общего капитала)
+  const percentInvested = totalCapital > 0 ? (totalInvestedInStock / totalCapital) * 100 : 0;
 
   const totalUnitsSold = accountedDeals.reduce((sum, deal) => sum + (deal.sold_quantity || 0), 0);
   const avgProfit = totalUnitsSold > 0 ? realizedProfit / totalUnitsSold : 0;
@@ -1015,29 +1023,44 @@ function App() {
       <div>
         <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Статистика</h2>
 
-        <div className="card neon-card-blue" style={{ marginBottom: 16 }}>
+                <div className="card neon-card-blue" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 'bold' }}>Бюджет</div>
+            <div style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 'bold' }}>Финансы</div>
             <button onClick={() => { setTempBudget(budget); setShowBudgetModal(true); haptic(); }} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 'bold', fontSize: 14, cursor: 'pointer' }}>Изменить ✏️</button>
           </div>
+          
           {budget > 0 ? (
             <>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(freeCash)}</div>
-                <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>свободно</div>
+              {/* Главная цифра - Свободные средства */}
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>Свободные средства:</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 15 }}>
+                <div style={{ fontSize: 32, fontWeight: 800, color: freeCash >= 0 ? 'var(--success)' : 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>{formatMoney(freeCash)}</div>
               </div>
-              <div style={{ width: '100%', height: 8, backgroundColor: 'var(--bg-color)', borderRadius: 4, marginTop: 12, overflow: 'hidden' }}>
+
+              {/* Полоска заполненности (сколько денег в товаре) */}
+              <div style={{ width: '100%', height: 8, backgroundColor: 'var(--bg-color)', borderRadius: 4, marginBottom: 8, overflow: 'hidden' }}>
                 <div style={{ width: `${Math.min(Math.max(percentInvested, 0), 100)}%`, height: '100%', backgroundColor: percentInvested > 80 ? 'var(--danger)' : 'var(--warning)', borderRadius: 4 }}></div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-                <span>В товаре: {formatMoney(totalInvestedInStock)}</span>
-                <span>Всего: {formatMoney(budget + realizedProfit)}</span>
+
+              {/* Четкая расшифровка доходов и расходов */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>В товаре (заморожено):</span>
+                  <span style={{ fontWeight: 'bold', color: 'var(--warning)' }}>{formatMoney(totalInvestedInStock)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
+                  <span style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>Общий капитал:</span>
+                  <span style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{formatMoney(totalCapital)}</span>
+                </div>
+                <div style={{ fontSize: 11, fontStyle: 'italic', marginTop: 4, textAlign: 'center', opacity: 0.7 }}>
+                  (Начальный бюджет + Прибыль - Расходы)
+                </div>
               </div>
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '10px 0' }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>Бюджет не задан</div>
-              <button className="btn-primary" style={{ padding: '10px', fontSize: 14 }} onClick={() => { setTempBudget(''); setShowBudgetModal(true); haptic(); }}>Указать бюджет</button>
+              <button className="btn-primary" style={{ padding: '10px', fontSize: 14 }} onClick={() => { setTempBudget(''); setShowBudgetModal(true); haptic(); }}>Указать начальный бюджет</button>
             </div>
           )}
         </div>
@@ -1902,7 +1925,7 @@ function App() {
           
           <button onClick={() => { setActiveTab('calculator'); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(0,122,255,0.2)' }}>🧮 Калькулятор</button>
 
-          <button onClick={() => { openExternalLink("https://t.me/ваш_закрытый_чат"); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(52,199,89,0.2)' }}>🤝 Закрытый чат</button>
+          <button onClick={() => { openExternalLink("https://t.me/https://t.me/+SYcUDjFavnsyNGVi"); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(52,199,89,0.2)' }}>🤝 Закрытый чат</button>
           
           {profileData?.show_in_leaderboard && <button onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🏆 Рейтинг перекупов</button>}
           <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>

@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from './supabaseClient'
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
 import Scanner from './Scanner'
 import './App.css'
+import ExpenseModal from './components/ExpenseModal';
+import BudgetModal from './components/BudgetModal';
+import DebtModal from './components/DebtModal';
+import SellModal from './components/SellModal';
+
 
 const DEVICE_CATALOG = {
   'iPhone': ["iPhone 7", "iPhone 7 Plus", "iPhone 8", "iPhone 8 Plus", "iPhone X", "iPhone XR", "iPhone XS", "iPhone XS Max", "iPhone 11", "iPhone 11 Pro", "iPhone 11 Pro Max", "iPhone SE (2020)", "iPhone 12 mini", "iPhone 12", "iPhone 12 Pro", "iPhone 12 Pro Max", "iPhone 13 mini", "iPhone 13", "iPhone 13 Pro", "iPhone 13 Pro Max", "iPhone SE (2022)", "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro", "iPhone 14 Pro Max", "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max", "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max", "iPhone 17", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 18", "iPhone 18 Pro", "iPhone 18 Pro Max", "iPhone Duo"],
@@ -901,88 +906,104 @@ function App() {
 
   const getDealExpensesSum = (deal) => (deal.expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-  const inStockDeals = deals.filter(d => (d.quantity || 0) > 0)
-  const soldDeals = deals.filter(d => (d.sold_quantity || 0) > 0)
+    // ==========================================
+  // ОПТИМИЗИРОВАННЫЕ ФИНАНСОВЫЕ РАСЧЕТЫ
+  // ==========================================
+  const {
+    inStockDeals, soldDeals, accountedDeals,
+    totalInvestedInStock, totalRevenue, totalBuySold, totalExpSold,
+    realizedProfit, totalGenExp, freeCash, totalCapital, percentInvested,
+    totalUnitsSold, avgProfit, inStockExpenses, marginPercent,
+    totalTheyOwe, totalIOwe, topModels, chartData
+  } = useMemo(() => {
+    const inStock = deals.filter(d => (d.quantity || 0) > 0);
+    const sold = deals.filter(d => (d.sold_quantity || 0) > 0);
+    const accounted = deals.filter(d => d.is_accounted !== false);
 
-  const accountedDeals = deals.filter(d => d.is_accounted !== false)
+    const invested = inStock.filter(d => d.is_accounted !== false).reduce((sum, deal) => {
+      const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
+      const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
+      return sum + (deal.quantity * Number(deal.buy_price)) + (deal.quantity * perUnitExp);
+    }, 0);
 
-  const totalInvestedInStock = inStockDeals.filter(d => d.is_accounted !== false).reduce((sum, deal) => {
-    const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
-    const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
-    return sum + (deal.quantity * Number(deal.buy_price)) + (deal.quantity * perUnitExp);
-  }, 0)
+    const revenue = accounted.reduce((sum, deal) => sum + (deal.sold_quantity || 0) * (Number(deal.sell_price) || 0), 0);
+    const buySold = accounted.reduce((sum, deal) => sum + (deal.sold_quantity || 0) * Number(deal.buy_price), 0);
+    const expSold = accounted.reduce((sum, deal) => {
+      const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
+      const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
+      return sum + (deal.sold_quantity || 0) * perUnitExp;
+    }, 0);
 
-  const totalRevenue = accountedDeals.reduce((sum, deal) => sum + (deal.sold_quantity || 0) * (Number(deal.sell_price) || 0), 0)
+    const profit = revenue - buySold - expSold;
+    const genExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+    
+    const freeCashVal = budget + profit - genExp - invested;
+    const totalCapitalVal = freeCashVal + invested;
+    const percentInv = totalCapitalVal > 0 ? (invested / totalCapitalVal) * 100 : 0;
 
-  const totalBuySold = accountedDeals.reduce((sum, deal) => sum + (deal.sold_quantity || 0) * Number(deal.buy_price), 0)
+    const unitsSold = accounted.reduce((sum, deal) => sum + (deal.sold_quantity || 0), 0);
+    const avg = unitsSold > 0 ? profit / unitsSold : 0;
+    
+    const stockExp = inStock.filter(d => d.is_accounted !== false).reduce((sum, deal) => {
+      const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
+      const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
+      return sum + (deal.quantity * perUnitExp);
+    }, 0);
+    
+    const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
 
-  const totalExpSold = accountedDeals.reduce((sum, deal) => {
-    const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
-    const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
-    return sum + (deal.sold_quantity || 0) * perUnitExp;
-  }, 0)
+    const theyOwe = debts.filter(d => d.type === 'they_owe').reduce((sum, d) => sum + Number(d.amount), 0);
+    const iOwe = debts.filter(d => d.type === 'i_owe').reduce((sum, d) => sum + Number(d.amount), 0);
 
-  const realizedProfit = totalRevenue - totalBuySold - totalExpSold;
+    const modelStats = accounted.filter(d => d.sold_quantity > 0).reduce((acc, deal) => {
+      if (!acc[deal.model]) acc[deal.model] = { count: 0, profit: 0 };
+      const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
+      const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
+      acc[deal.model].count += deal.sold_quantity;
+      acc[deal.model].profit += deal.sold_quantity * ((Number(deal.sell_price) || 0) - Number(deal.buy_price) - perUnitExp);
+      return acc;
+    }, {});
+    
+    const top = Object.entries(modelStats)
+      .map(([name, stats]) => ({ name, avg: stats.profit / stats.count, count: stats.count }))
+      .sort((a, b) => b.avg - a.avg)
+      .slice(0, 3);
 
-    const totalGenExp = generalExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
-  
-  // Свободные средства (наличка на руках)
-  const freeCash = budget + realizedProfit - totalGenExp - totalInvestedInStock;
-  
-  // Общий капитал (наличка + товар на складе)
-  const totalCapital = freeCash + totalInvestedInStock;
-  
-  // Процент денег, замороженных в товаре (от общего капитала)
-  const percentInvested = totalCapital > 0 ? (totalInvestedInStock / totalCapital) * 100 : 0;
+    const monthlyProfits = accounted.filter(d => d.sold_quantity > 0).reduce((acc, deal) => {
+      const date = new Date(deal.sold_at || deal.created_at || Date.now());
+      const monthYear = date.toLocaleString('ru-RU', { month: 'short', year: '2-digit' });
+      const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
+      const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
+      const p = deal.sold_quantity * ((Number(deal.sell_price) || 0) - Number(deal.buy_price) - perUnitExp);
+      if (!acc[monthYear]) acc[monthYear] = 0;
+      acc[monthYear] += p;
+      return acc;
+    }, {});
+    
+    const chart = Object.entries(monthlyProfits).map(([name, profit]) => ({ name, profit })).reverse();
 
-  const totalUnitsSold = accountedDeals.reduce((sum, deal) => sum + (deal.sold_quantity || 0), 0);
-  const avgProfit = totalUnitsSold > 0 ? realizedProfit / totalUnitsSold : 0;
+    return {
+      inStockDeals: inStock, soldDeals: sold, accountedDeals: accounted,
+      totalInvestedInStock: invested, totalRevenue: revenue, totalBuySold: buySold, totalExpSold: expSold,
+      realizedProfit: profit, totalGenExp: genExp, freeCash: freeCashVal, totalCapital: totalCapitalVal, percentInvested: percentInv,
+      totalUnitsSold: unitsSold, avgProfit: avg, inStockExpenses: stockExp, marginPercent: margin,
+      totalTheyOwe: theyOwe, totalIOwe: iOwe, topModels: top, chartData: chart
+    };
+  }, [deals, generalExpenses, debts, budget]); 
 
-  const inStockExpenses = inStockDeals.filter(d => d.is_accounted !== false).reduce((sum, deal) => {
-    const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
-    const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
-    return sum + (deal.quantity * perUnitExp);
-  }, 0)
-
-  const marginPercent = totalRevenue > 0 ? (realizedProfit / totalRevenue) * 100 : 0;
-
-  const totalTheyOwe = debts.filter(d => d.type === 'they_owe').reduce((sum, d) => sum + Number(d.amount), 0);
-  const totalIOwe = debts.filter(d => d.type === 'i_owe').reduce((sum, d) => sum + Number(d.amount), 0);
-
-  const modelStats = accountedDeals.filter(d => d.sold_quantity > 0).reduce((acc, deal) => {
-    if (!acc[deal.model]) acc[deal.model] = { count: 0, profit: 0 };
-    const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
-    const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
-    acc[deal.model].count += deal.sold_quantity;
-    acc[deal.model].profit += deal.sold_quantity * ((Number(deal.sell_price) || 0) - Number(deal.buy_price) - perUnitExp);
-    return acc;
-  }, {});
-  const topModels = Object.entries(modelStats)
-    .map(([name, stats]) => ({ name, avg: stats.profit / stats.count, count: stats.count }))
-    .sort((a, b) => b.avg - a.avg)
-    .slice(0, 3);
-
-  const monthlyProfits = accountedDeals.filter(d => d.sold_quantity > 0).reduce((acc, deal) => {
-    const date = new Date(deal.sold_at || deal.created_at || Date.now());
-    const monthYear = date.toLocaleString('ru-RU', { month: 'short', year: '2-digit' });
-    const initQty = (deal.quantity || 0) + (deal.sold_quantity || 0);
-    const perUnitExp = initQty > 0 ? getDealExpensesSum(deal) / initQty : 0;
-    const profit = deal.sold_quantity * ((Number(deal.sell_price) || 0) - Number(deal.buy_price) - perUnitExp);
-    if (!acc[monthYear]) acc[monthYear] = 0;
-    acc[monthYear] += profit;
-    return acc;
-  }, {});
-  const chartData = Object.entries(monthlyProfits).map(([name, profit]) => ({ name, profit })).reverse();
-
-  const filterDealsByQuery = (list) => {
-    return list.filter(deal => {
-      const matchesModel = filterModels.length > 0 ? filterModels.includes(deal.model) : true;
-      const matchesSearch = searchQuery ? (String(deal.model || '').toLowerCase().includes(searchQuery.toLowerCase()) || (deal.imei && String(deal.imei).includes(searchQuery))) : true;
-      return matchesModel && matchesSearch;
-    })
-  }
-  const filteredStock = filterDealsByQuery(inStockDeals);
-  const filteredSold = filterDealsByQuery(soldDeals);
+    const { filteredStock, filteredSold } = useMemo(() => {
+    const filterFn = (list) => {
+      return list.filter(deal => {
+        const matchesModel = filterModels.length > 0 ? filterModels.includes(deal.model) : true;
+        const matchesSearch = searchQuery ? (String(deal.model || '').toLowerCase().includes(searchQuery.toLowerCase()) || (deal.imei && String(deal.imei).includes(searchQuery))) : true;
+        return matchesModel && matchesSearch;
+      });
+    };
+    return {
+      filteredStock: filterFn(inStockDeals),
+      filteredSold: filterFn(soldDeals)
+    };
+  }, [inStockDeals, soldDeals, searchQuery, filterModels]);
 
   const getDaysOnStock = (deal) => {
     const start = new Date(deal.created_at || Date.now());
@@ -1989,41 +2010,26 @@ function App() {
         </div>
       </div>
 
-      {showBudgetModal && (
-        <div className="modal-overlay" style={{ zIndex: 3000 }}>
-          <div className="modal-content">
-            <h3>Изменить бюджет</h3>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="Бюджет (₽)" value={tempBudget} onChange={(e) => setTempBudget(e.target.value.replace(/[^\d]/g, ''))} autoFocus />
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowBudgetModal(false)}>Отмена</button>
-              <button className="btn-confirm" style={{ backgroundColor: 'var(--success)' }} onClick={saveBudget}>Сохранить</button>
-            </div>
-          </div>
-        </div>
-      )}
+            <BudgetModal 
+        isOpen={showBudgetModal}
+        tempBudget={tempBudget}
+        setTempBudget={setTempBudget}
+        onClose={() => setShowBudgetModal(false)}
+        onSave={saveBudget}
+      />
 
-      {showDebtModal && (
-        <div className="modal-overlay" style={{ zIndex: 3000 }}>
-          <div className="modal-content">
-            <h3>Добавить долг</h3>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Контакт</label>
-            <select className="input-field" value={debtContactId} onChange={(e) => setDebtContactId(e.target.value)}>
-              <option value="">Выберите контакт...</option>
-              {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Сумма (₽)</label>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="0" value={debtAmount} onChange={(e) => setDebtAmount(e.target.value.replace(/[^\d]/g, ''))} />
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Тип</label>
-            <select className="input-field" value={debtType} onChange={(e) => setDebtType(e.target.value)}>
-              <option value="they_owe">Мне должны</option><option value="i_owe">Я должен</option>
-            </select>
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowDebtModal(false)}>Отмена</button>
-              <button className="btn-confirm" style={{ backgroundColor: 'var(--warning)' }} onClick={saveDebt}>Сохранить</button>
-            </div>
-          </div>
-        </div>
-      )}
+            <DebtModal 
+        isOpen={showDebtModal}
+        contacts={contacts}
+        debtContactId={debtContactId}
+        setDebtContactId={setDebtContactId}
+        debtAmount={debtAmount}
+        setDebtAmount={setDebtAmount}
+        debtType={debtType}
+        setDebtType={setDebtType}
+        onClose={() => setShowDebtModal(false)}
+        onSave={saveDebt}
+      />
 
       {showAddModal && selectedCategory && (
         <div className="modal-overlay" style={{ zIndex: 3000 }}>
@@ -2110,73 +2116,29 @@ function App() {
         </div>
       )}
 
-           {sellingDeal && (
-        <div className="modal-overlay" style={{ zIndex: 4000 }}>
-          <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>Продажа: {sellingDeal.model}</h3>
-            <div style={{ backgroundColor: 'var(--bg-color)', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
-              В наличии: <b>{sellingDeal.quantity} шт.</b>
-            </div>
-            
-            <div style={{ display: 'flex', gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Цена продажи (за 1 шт)</label>
-                <input className="input-field" type="text" inputMode="numeric" placeholder="Цена (₽)" value={sellPrice} onChange={(e) => setSellPrice(e.target.value.replace(/[^\d]/g, ''))} />
-              </div>
-              <div style={{ width: 80 }}>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Кол-во</label>
-                <input className="input-field" type="text" inputMode="numeric" placeholder="1" value={sellQuantity} onChange={(e) => setSellQuantity(e.target.value.replace(/[^\d]/g, ''))} />
-              </div>
-            </div>
-
-            <select className="input-field" value={buyerId} onChange={(e) => setBuyerId(e.target.value)}>
-              <option value="">Кто купил?</option>
-              {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
-            </select>
-            
-            <label style={{ fontSize: 12, color: '#888', marginTop: 5, display: 'block' }}>Гарантия</label>
-            <select className="input-field" value={sellWarranty} onChange={(e) => setSellWarranty(e.target.value)}>
-              <option value="0">Без гарантии</option><option value="1">1 месяц</option><option value="3">3 месяца</option><option value="6">6 месяцев</option><option value="12">1 год</option>
-            </select>
-
-            {/* КРАСИВЫЙ БЛОК TRADE-IN */}
-            <div style={{ marginTop: 15, padding: 12, backgroundColor: isTradeIn ? 'rgba(175, 82, 222, 0.1)' : 'var(--bg-color)', border: `1px solid ${isTradeIn ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 12, transition: 'all 0.3s' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 20 }}>🔄</span>
-                  <span style={{ fontWeight: 'bold', fontSize: 14, color: isTradeIn ? 'var(--accent)' : 'var(--text-main)' }}>Принять в Trade-in</span>
-                </div>
-                <button onClick={() => { setIsTradeIn(!isTradeIn); haptic(); }} style={{ padding: '6px 12px', borderRadius: 20, background: isTradeIn ? 'var(--accent)' : '#e5e5ea', color: isTradeIn ? '#fff' : '#000', border: 'none', fontWeight: 'bold' }}>{isTradeIn ? 'ДА' : 'НЕТ'}</button>
-              </div>
-
-              {isTradeIn && (
-                <div style={{ marginTop: 15, animation: 'fadeIn 0.3s ease-out' }}>
-                  <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Какое устройство принимаем?</label>
-                  <input className="input-field" type="text" placeholder="Например: iPhone 11 128gb" value={tradeInModel} onChange={(e) => setTradeInModel(e.target.value)} />
-                  
-                  <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>В какую сумму оцениваем? (₽)</label>
-                  <input className="input-field" type="text" inputMode="numeric" placeholder="Цена оценки (₽)" value={tradeInPrice} onChange={(e) => setTradeInPrice(e.target.value.replace(/[^\d]/g, ''))} />
-                  
-                  {sellPrice && tradeInPrice && (
-                    <div style={{ marginTop: 10, padding: 12, backgroundColor: 'rgba(52, 199, 89, 0.15)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--success)' }}>К доплате от клиента:</span>
-                      <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>
-                        {formatMoney((Number(sellPrice) * (Number(sellQuantity) || 1)) - Number(tradeInPrice))}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: 20 }}>
-              <button className="btn-cancel" onClick={() => { setSellingDeal(null); setIsTradeIn(false); setTradeInModel(''); setTradeInPrice(''); }}>Отмена</button>
-              <button className="btn-confirm" style={{ backgroundColor: 'var(--success)' }} onClick={confirmSell} disabled={isActionLoading}>{isActionLoading ? 'Продажа...' : 'Продать'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
+                 <SellModal 
+        sellingDeal={sellingDeal}
+        sellPrice={sellPrice}
+        setSellPrice={setSellPrice}
+        sellQuantity={sellQuantity}
+        setSellQuantity={setSellQuantity}
+        buyerId={buyerId}
+        setBuyerId={setBuyerId}
+        sellWarranty={sellWarranty}
+        setSellWarranty={setSellWarranty}
+        isTradeIn={isTradeIn}
+        setIsTradeIn={setIsTradeIn}
+        tradeInModel={tradeInModel}
+        setTradeInModel={setTradeInModel}
+        tradeInPrice={tradeInPrice}
+        setTradeInPrice={setTradeInPrice}
+        contacts={contacts}
+        onClose={() => { setSellingDeal(null); setIsTradeIn(false); setTradeInModel(''); setTradeInPrice(''); }}
+        onConfirm={confirmSell}
+        isActionLoading={isActionLoading}
+        formatMoney={formatMoney}
+        haptic={haptic}
+      />
       {showLeaderboardModal && (
         <div className="modal-overlay"><div className="modal-content"><h3>🏆 Топ перекупов</h3>{leaderboard.map((lb, idx) => (<div key={lb.user_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}><div style={{ display: 'flex', gap: 10 }}><span style={{ fontSize: 18 }}>{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}</span><span style={{ fontWeight: 600 }}>{lb.user_name} {lb.user_id === user?.id ? '(Вы)' : ''}</span></div><span style={{ fontWeight: 'bold', color: 'var(--success)' }}>{formatMoney(lb.gross_profit)}</span></div>))}<div className="modal-actions"><button className="btn-cancel" onClick={() => setShowLeaderboardModal(false)}>Закрыть</button></div></div></div>
       )}
@@ -2297,21 +2259,16 @@ function App() {
         </div>
       )}
 
-      {expenseDeal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3>Расход: {expenseDeal.model}</h3>
-            <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value.replace(/[^\d]/g, ''))} autoFocus />
-            <select className="input-field" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}>
-              <option value="Ремонт">Ремонт</option><option value="Запчасти">Запчасти</option><option value="Такси">Такси</option><option value="Реклама/Авито">Реклама/Авито</option><option value="Бензин">Бензин</option>
-            </select>
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setExpenseDeal(null)}>Отмена</button>
-              <button className="btn-confirm" onClick={confirmExpense} disabled={isActionLoading}>{isActionLoading ? 'Добавление...' : 'Добавить'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+            <ExpenseModal 
+        expenseDeal={expenseDeal}
+        expenseAmount={expenseAmount}
+        setExpenseAmount={setExpenseAmount}
+        expenseCategory={expenseCategory}
+        setExpenseCategory={setExpenseCategory}
+        onClose={() => setExpenseDeal(null)}
+        onConfirm={confirmExpense}
+        isActionLoading={isActionLoading}
+      />
 
       {editingDeal && (
         <div className="modal-overlay">

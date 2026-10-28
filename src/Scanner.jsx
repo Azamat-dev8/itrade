@@ -7,6 +7,14 @@ export default function Scanner({ onScan, onClose }) {
   const controlsRef = useRef(null);
   const isScannedRef = useRef(false); 
   
+  // ДОБАВЛЯЕМ ЭТО:
+  const onScanRef = useRef(onScan);
+
+  // ДОБАВЛЯЕМ ЭТО: Обновляем ссылку, если функция изменилась
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+  
   const [error, setError] = useState('');
   const [scanStatus, setScanStatus] = useState('Поместите штрихкод IMEI в рамку');
   const [isTorchOn, setIsTorchOn] = useState(false);
@@ -49,7 +57,7 @@ export default function Scanner({ onScan, onClose }) {
               const text = result.getText();
               const cleanText = text.replace(/\D/g, ''); // Только цифры
 
-              if (cleanText.length === 15) {
+                            if (cleanText.length === 15) {
                 isScannedRef.current = true; 
                 
                 if (window.Telegram?.WebApp?.HapticFeedback) {
@@ -60,7 +68,7 @@ export default function Scanner({ onScan, onClose }) {
                   videoTrackRef.current.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
                 }
 
-                onScan(cleanText);
+                onScanRef.current(cleanText); // ИЗМЕНЕНО ТУТ
               }
             }
           }
@@ -78,7 +86,7 @@ export default function Scanner({ onScan, onClose }) {
       if (controlsRef.current) try { controlsRef.current.stop(); } catch (e) {}
       if (localStream) localStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
     };
-  }, [onScan]);
+   }, []); 
 
   const toggleTorch = async () => {
     if (videoTrackRef.current && hasTorch) {

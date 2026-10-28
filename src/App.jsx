@@ -7,7 +7,9 @@ import ExpenseModal from './components/ExpenseModal';
 import BudgetModal from './components/BudgetModal';
 import DebtModal from './components/DebtModal';
 import SellModal from './components/SellModal';
-
+import EditDealModal from './components/EditDealModal';
+import ModelPickerModal from './components/ModelPickerModal';
+import AddDealModal from './components/AddDealModal';
 
 const DEVICE_CATALOG = {
   'iPhone': ["iPhone 7", "iPhone 7 Plus", "iPhone 8", "iPhone 8 Plus", "iPhone X", "iPhone XR", "iPhone XS", "iPhone XS Max", "iPhone 11", "iPhone 11 Pro", "iPhone 11 Pro Max", "iPhone SE (2020)", "iPhone 12 mini", "iPhone 12", "iPhone 12 Pro", "iPhone 12 Pro Max", "iPhone 13 mini", "iPhone 13", "iPhone 13 Pro", "iPhone 13 Pro Max", "iPhone SE (2022)", "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro", "iPhone 14 Pro Max", "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max", "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max", "iPhone 17", "iPhone 17 Pro", "iPhone 17 Pro Max", "iPhone 18", "iPhone 18 Pro", "iPhone 18 Pro Max", "iPhone Duo"],
@@ -2031,91 +2033,37 @@ function App() {
         onSave={saveDebt}
       />
 
-      {showAddModal && selectedCategory && (
-        <div className="modal-overlay" style={{ zIndex: 3000 }}>
-          <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>+ Добавить в {selectedCategory}</h3>
-            {selectedCategory !== 'Аксессуары' && DEVICE_CATALOG[selectedCategory] ? (
-              <div className="input-field" onClick={() => { setPickerMode('addManual'); setModelCategory(selectedCategory); setShowModelPicker(true); haptic(); }} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: addForm.model ? 'var(--text-main)' : 'var(--text-muted)' }}>{addForm.model || 'Выберите модель...'}</span>
-                <span style={{ opacity: 0.5 }}>▼</span>
-              </div>
-            ) : (
-              <input className="input-field" type="text" placeholder="Название (например, Стекло iPhone 15)" value={addForm.model} onChange={(e) => setAddForm({ ...addForm, model: e.target.value })} />
-            )}
-            
-            <div style={{ display: 'flex', gap: 10 }}>
-              <input className="input-field" type="text" inputMode="numeric" placeholder="Цена закупа (за 1 шт)" value={addForm.buy_price} onChange={(e) => setAddForm({ ...addForm, buy_price: e.target.value.replace(/[^\d]/g, '') })} style={{ flex: 1 }} />
-              <input className="input-field" type="text" inputMode="numeric" placeholder="Кол-во" value={addForm.quantity} onChange={(e) => setAddForm({ ...addForm, quantity: e.target.value.replace(/[^\d]/g, '') })} style={{ width: 90 }} />
-            </div>
-            
-            <textarea className="input-field" placeholder="Описание (необязательно)" value={addForm.description} onChange={(e) => setAddForm({ ...addForm, description: e.target.value })} style={{ minHeight: 60, resize: 'vertical' }} />
-            
-            <input className="input-field" type="text" placeholder="Место хранения (необязательно)" value={addForm.location} onChange={(e) => setAddForm({ ...addForm, location: e.target.value })} />
-            {(selectedCategory === 'iPhone' || selectedCategory === 'iPad' || selectedCategory === 'MacBook' || selectedCategory === 'Apple Watch') && (
-              <input className="input-field" type="text" placeholder="IMEI (необязательно)" value={addForm.imei} onChange={(e) => setAddForm({ ...addForm, imei: e.target.value })} />
-            )}
-
-            <div style={{ marginBottom: 15, marginTop: 5 }}>
-              <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото устройства (до 3 шт):</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                                {addFormPhotos.map((url, idx) => (
-                  <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
-                    <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button 
-                      onClick={() => {
-                        const urlToRemove = addFormPhotos[idx];
-                        setAddFormPhotos(prev => prev.filter((_, i) => i !== idx));
-                        deletePhotosFromStorage([urlToRemove]);
-                      }} 
-                      style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-                {addFormPhotos.length < 3 && (
-                  <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)', boxShadow: '0 0 10px rgba(0,122,255,0.1)' }}>
-                    {uploadingAddPhoto ? '...' : '+'}
-                    <input type="file" accept="image/*" multiple onChange={handleAddModalPhotoUpload} style={{ display: 'none' }} disabled={uploadingAddPhoto} />
-                  </label>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 5, marginBottom: 15 }}>
-              <label style={{ fontSize: 13, fontWeight: 'bold' }}>Учитывать в расчётах</label>
-              <button onClick={() => { setAddForm({ ...addForm, is_accounted: !addForm.is_accounted }); haptic(); }} style={{ padding: '6px 12px', borderRadius: 20, background: addForm.is_accounted ? '#34c759' : '#e5e5ea', color: addForm.is_accounted ? '#fff' : '#000', border: 'none', fontWeight: 'bold' }}>{addForm.is_accounted ? 'ДА' : 'НЕТ'}</button>
-            </div>
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowAddModal(false)}>Отмена</button>
-              <button className="btn-confirm" style={{ backgroundColor: 'var(--success)' }} onClick={addManualProduct} disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Добавить'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showModelPicker && (
-        <div className="modal-overlay" style={{ zIndex: 3000 }}>
-          <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ marginTop: 0 }}>{pickerMode === 'purchase' ? 'Выберите устройство' : pickerMode === 'addManual' ? 'Выберите модель' : 'Выберите модели'}</h3>
-            <input className="input-field" type="text" placeholder="Поиск..." value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} style={{ marginBottom: 10 }} />
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, paddingBottom: 10, marginBottom: 10, justifyContent: 'center' }}>
-              {Object.keys(DEVICE_CATALOG).map(cat => (
-                <button key={cat} onClick={() => setModelCategory(cat)} style={{ padding: '8px 14px', borderRadius: 20, border: 'none', backgroundColor: modelCategory === cat ? 'var(--accent)' : 'var(--bg-color)', color: modelCategory === cat ? '#fff' : 'var(--text-main)', fontWeight: 'bold', fontSize: 13 }}>{cat}</button>
-              ))}
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {(DEVICE_CATALOG[modelCategory] || []).filter(m => String(m).toLowerCase().includes(modelSearch.toLowerCase())).map(m => {
-                const isSelected = pickerMode !== 'purchase' && pickerMode !== 'addManual' && filterModels.includes(m);
-                return <div key={m} onClick={() => handleModelSelect(m)} style={{ padding: '12px 16px', backgroundColor: isSelected ? 'var(--accent)' : 'var(--bg-color)', color: isSelected ? 'white' : 'var(--text-main)', borderRadius: 10, cursor: 'pointer', fontWeight: 500, display: 'flex', justifyContent: 'space-between' }}>{m}{isSelected && <span>✓</span>}</div>
-              })}
-            </div>
-            <div className="modal-actions" style={{ marginTop: 15 }}><button className="btn-primary" onClick={() => setShowModelPicker(false)}>{pickerMode === 'purchase' || pickerMode === 'addManual' ? 'Отмена' : 'Готово'}</button></div>
-          </div>
-        </div>
-      )}
-
+            <AddDealModal
+        showAddModal={showAddModal}
+        selectedCategory={selectedCategory}
+        DEVICE_CATALOG={DEVICE_CATALOG}
+        addForm={addForm}
+        setAddForm={setAddForm}
+        setPickerMode={setPickerMode}
+        setModelCategory={setModelCategory}
+        setShowModelPicker={setShowModelPicker}
+        addFormPhotos={addFormPhotos}
+        setAddFormPhotos={setAddFormPhotos}
+        uploadingAddPhoto={uploadingAddPhoto}
+        handleAddModalPhotoUpload={handleAddModalPhotoUpload}
+        deletePhotosFromStorage={deletePhotosFromStorage}
+        onClose={() => setShowAddModal(false)}
+        onSave={addManualProduct}
+        isActionLoading={isActionLoading}
+        haptic={haptic}
+      />
+            <ModelPickerModal
+        showModelPicker={showModelPicker}
+        pickerMode={pickerMode}
+        setShowModelPicker={setShowModelPicker}
+        modelSearch={modelSearch}
+        setModelSearch={setModelSearch}
+        modelCategory={modelCategory}
+        setModelCategory={setModelCategory}
+        DEVICE_CATALOG={DEVICE_CATALOG}
+        filterModels={filterModels}
+        handleModelSelect={handleModelSelect}
+      />  
                  <SellModal 
         sellingDeal={sellingDeal}
         sellPrice={sellPrice}
@@ -2270,78 +2218,24 @@ function App() {
         isActionLoading={isActionLoading}
       />
 
-      {editingDeal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>Редактировать: {editingDeal.model}</h3>
-
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Модель</label>
-            <input className="input-field" type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)} />
-
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Цена закупа (₽)</label>
-            <input className="input-field" type="text" inputMode="numeric" value={editBuyPrice} onChange={(e) => setEditBuyPrice(e.target.value.replace(/[^\d]/g, ''))} />
-
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>IMEI</label>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ flex: 1, position: 'relative' }}>
-                <input className="input-field" type="text" placeholder="IMEI" value={editImei} onChange={(e) => setEditImei(e.target.value)} style={{ marginBottom: 0, paddingRight: 35 }} />
-                {editImei && <button type="button" onClick={() => setEditImei('')} style={{ position: 'absolute', right: 10, top: 14, background: 'none', border: 'none', fontSize: 18, color: '#888', cursor: 'pointer' }}>✕</button>}
-              </div>
-             <button 
-  type="button" 
-  onClick={() => handleOpenScanner('purchase')} 
-  className="scanner-btn"
->
-  📷
-</button>
-            </div>
-
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Кто продал</label>
-            <select className="input-field" value={editSellerId} onChange={(e) => setEditSellerId(e.target.value)}>
-              <option value="">Не указан</option>
-              {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
-            </select>
-
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Место хранения</label>
-            <input className="input-field" type="text" placeholder="Место хранения" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
-
-            <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Описание</label>
-            <textarea className="input-field" placeholder="Описание" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} style={{ minHeight: 60, resize: 'vertical' }} />
-
-            <div style={{ marginBottom: 15, marginTop: 5 }}>
-              <div style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 8 }}>Фото устройства (до 3 шт):</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                                {editPhotos.map((url, idx) => (
-                  <div key={idx} style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', position: 'relative', border: '1px solid var(--border)' }}>
-                    <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button 
-                      onClick={() => {
-                        const urlToRemove = editPhotos[idx];
-                        setEditPhotos(prev => prev.filter((_, i) => i !== idx));
-                        deletePhotosFromStorage([urlToRemove]);
-                      }} 
-                      style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-                {editPhotos.length < 3 && (
-                  <label style={{ width: 60, height: 60, borderRadius: 8, border: '1px dashed var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontSize: 24, cursor: 'pointer', backgroundColor: 'rgba(0,122,255,0.05)', boxShadow: '0 0 10px rgba(0,122,255,0.1)' }}>
-                    {uploadingEditPhoto ? '...' : '+'}
-                    <input type="file" accept="image/*" multiple onChange={handleEditPhotoUpload} style={{ display: 'none' }} disabled={uploadingEditPhoto} />
-                  </label>
-                )}
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setEditingDeal(null)}>Отмена</button>
-              <button className="btn-confirm" onClick={saveEdit} disabled={isActionLoading}>{isActionLoading ? 'Сохранение...' : 'Сохранить'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+            <EditDealModal
+        editingDeal={editingDeal}
+        editModel={editModel} setEditModel={setEditModel}
+        editBuyPrice={editBuyPrice} setEditBuyPrice={setEditBuyPrice}
+        editImei={editImei} setEditImei={setEditImei}
+        editSellerId={editSellerId} setEditSellerId={setEditSellerId}
+        editLocation={editLocation} setEditLocation={setEditLocation}
+        editDescription={editDescription} setEditDescription={setEditDescription}
+        editPhotos={editPhotos} setEditPhotos={setEditPhotos}
+        uploadingEditPhoto={uploadingEditPhoto}
+        handleEditPhotoUpload={handleEditPhotoUpload}
+        deletePhotosFromStorage={deletePhotosFromStorage}
+        contacts={contacts}
+        onClose={() => setEditingDeal(null)}
+        onSave={saveEdit}
+        isActionLoading={isActionLoading}
+        handleOpenScanner={handleOpenScanner}
+      />
 
       {editingContact && (
         <div className="modal-overlay">

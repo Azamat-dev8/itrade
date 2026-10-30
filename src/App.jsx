@@ -1023,19 +1023,8 @@ function App() {
       monthly[key].expense += expense;
     };
 
-    deals.forEach(d => {
-      // 1. Закупка (расход)
-      const totalQty = (d.quantity || 0) + (d.sold_quantity || 0);
-      if (d.is_accounted !== false && totalQty > 0) {
-        const buySum = totalQty * Number(d.buy_price);
-        feed.push({
-          id: `buy-${d.id}`, type: 'purchase', date: new Date(d.created_at),
-          title: `Закуп: ${d.model}`, sub: `${totalQty} шт.`, amount: -buySum
-        });
-        addToMonth(d.created_at, 0, buySum);
-      }
-      
-      // 2. Продажа (доход)
+        deals.forEach(d => {
+      // 1. Продажа (доход) и Закупка проданного (расход) - строго в день продажи
       if (d.sold_quantity > 0 && d.sold_at) {
         const sellSum = d.sold_quantity * Number(d.sell_price);
         feed.push({
@@ -1043,12 +1032,22 @@ function App() {
           title: `Продажа: ${d.model}`, sub: `${d.sold_quantity} шт.`, amount: sellSum
         });
         addToMonth(d.sold_at, sellSum, 0);
+
+        // Считаем себестоимость только проданных товаров
+        if (d.is_accounted !== false) {
+          const buySum = d.sold_quantity * Number(d.buy_price);
+          feed.push({
+            id: `buy-${d.id}`, type: 'purchase', date: new Date(d.sold_at),
+            title: `Закуп: ${d.model}`, sub: `Себестоимость ${d.sold_quantity} шт.`, amount: -buySum
+          });
+          addToMonth(d.sold_at, 0, buySum);
+        }
       }
 
-      // 3. Расходы по сделке
+      // 2. Расходы по сделке (ремонт, такси и т.д.)
       if (d.expenses && d.expenses.length > 0) {
         d.expenses.forEach(e => {
-          const expDate = new Date(e.created_at || d.created_at);
+          const expDate = new Date(e.created_at || d.created_at || Date.now());
           feed.push({
             id: `dexp-${e.id}`, type: 'expense', date: expDate,
             title: e.category, sub: d.model, amount: -Number(e.amount)
@@ -1315,11 +1314,11 @@ function App() {
                   <Tooltip 
                     cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} 
                     contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} 
-                    formatter={(value, name) => [formatMoney(value), name === 'income' ? 'Доход (Приход)' : 'Расход (Убыток)']} 
+                    formatter={(value, name) => [formatMoney(value), name === 'income' ? 'Доход (Приход)' : 'Расходы (Убыток)']} 
                   />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                  <Bar dataKey="income" name="income" fill="#34c759" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                  <Bar dataKey="expense" name="expense" fill="#ff3b30" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                  <Bar dataKey="income" name="Доход" fill="#34c759" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                  <Bar dataKey="expense" name="Расход" fill="#ff3b30" radius={[4, 4, 0, 0]} maxBarSize={30} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

@@ -1023,8 +1023,8 @@ function App() {
       monthly[key].expense += expense;
     };
 
-        deals.forEach(d => {
-      // 1. Продажа (доход) и Закупка проданного (расход) - строго в день продажи
+            deals.forEach(d => {
+      // 1. Продажа (доход). Считаем выручку.
       if (d.sold_quantity > 0 && d.sold_at) {
         const sellSum = d.sold_quantity * Number(d.sell_price);
         feed.push({
@@ -1032,19 +1032,10 @@ function App() {
           title: `Продажа: ${d.model}`, sub: `${d.sold_quantity} шт.`, amount: sellSum
         });
         addToMonth(d.sold_at, sellSum, 0);
-
-        // Считаем себестоимость только проданных товаров
-        if (d.is_accounted !== false) {
-          const buySum = d.sold_quantity * Number(d.buy_price);
-          feed.push({
-            id: `buy-${d.id}`, type: 'purchase', date: new Date(d.sold_at),
-            title: `Закуп: ${d.model}`, sub: `Себестоимость ${d.sold_quantity} шт.`, amount: -buySum
-          });
-          addToMonth(d.sold_at, 0, buySum);
-        }
       }
 
-      // 2. Расходы по сделке (ремонт, такси и т.д.)
+      // 2. Расходы по сделке (Ремонт, Запчасти и т.д. - те, что добавляем при покупке или на складе)
+      // Закупку (buy_price) мы тут НЕ считаем!
       if (d.expenses && d.expenses.length > 0) {
         d.expenses.forEach(e => {
           const expDate = new Date(e.created_at || d.created_at || Date.now());
@@ -1055,6 +1046,16 @@ function App() {
           addToMonth(expDate, 0, Number(e.amount));
         });
       }
+    });
+
+    // 3. Общие доп. расходы (Авито, Такси, Аренда)
+    generalExpenses.forEach(e => {
+      const expDate = new Date(e.created_at || Date.now());
+      feed.push({
+        id: `gexp-${e.id}`, type: 'expense', date: expDate,
+        title: e.category, sub: 'Общий расход', amount: -Number(e.amount)
+      });
+      addToMonth(expDate, 0, Number(e.amount));
     });
 
     // 4. Общие расходы
@@ -1314,7 +1315,7 @@ function App() {
                   <Tooltip 
                     cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} 
                     contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} 
-                    formatter={(value, name) => [formatMoney(value), name === 'income' ? 'Доход (Приход)' : 'Расходы (Убыток)']} 
+                    formatter={(value, name) => [formatMoney(value), name === 'income' ? 'Выручка с продаж' : 'Расходы (Ремонт, Такси и др.)']} 
                   />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
                   <Bar dataKey="income" name="Доход" fill="#34c759" radius={[4, 4, 0, 0]} maxBarSize={30} />

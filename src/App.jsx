@@ -307,9 +307,24 @@ function App() {
     haptic('medium');
   }
 
-  const openExternalLink = (url) => {
+    const openExternalLink = (url) => {
     const tg = window.Telegram?.WebApp;
-    if (tg?.openLink) tg.openLink(url); else window.open(url, '_blank');
+    if (tg) {
+      // Если ссылка ведет на Telegram (t.me), используем специальный метод
+      if (url.includes('t.me')) {
+        if (tg.openTelegramLink) {
+          tg.openTelegramLink(url);
+          return;
+        }
+      }
+      // Для всех остальных сайтов
+      if (tg.openLink) {
+        tg.openLink(url);
+        return;
+      }
+    }
+    // Запасной вариант (если открыто в обычном браузере)
+    window.open(url, '_blank');
   }
 
   const handlePhoneCall = (phone) => {
@@ -2002,7 +2017,7 @@ function App() {
           
           <button onClick={() => { setActiveTab('calculator'); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(36, 129, 204, 0.1)', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(0,122,255,0.2)' }}>🧮 Калькулятор</button>
 
-          <button onClick={() => { openExternalLink("https://t.me/https://t.me/+SYcUDjFavnsyNGVi"); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(52,199,89,0.2)' }}>🤝 Закрытый чат</button>
+          <button onClick={() => { openExternalLink("https://t.me/+MrG7RADQfbFmMTEy"); setIsMenuOpen(false); haptic(); }} style={{ width: '100%', padding: '16px', backgroundColor: 'rgba(52, 199, 89, 0.1)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 0 10px rgba(52,199,89,0.2)' }}>🤝 Закрытый чат</button>
           
           {profileData?.show_in_leaderboard && <button onClick={() => { setShowLeaderboardModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>🏆 Рейтинг перекупов</button>}
           <button onClick={() => { setShowGuideModal(true); setIsMenuOpen(false); }} style={{ width: '100%', padding: '16px', backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px' }}>📚 Как пользоваться</button>

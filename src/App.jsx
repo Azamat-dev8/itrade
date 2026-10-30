@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from './supabaseClient'
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList, ComposedChart, Legend } from 'recharts'
 import Scanner from './Scanner'
 import './App.css'
 import ExpenseModal from './components/ExpenseModal';
@@ -1007,7 +1007,75 @@ function App() {
       totalTheyOwe: theyOwe, totalIOwe: iOwe, topModels: top, chartData: chart
     };
   }, [deals, generalExpenses, debts, budget]); 
+  // ==========================================
+  // ЛЕНТА ТРАНЗАКЦИЙ И CASH FLOW
+  // ==========================================
+  const { transactionFeed, cashFlowData } = useMemo(() => {
+    const feed = [];
+    const monthly = {};
 
+    const addToMonth = (dateStr, income, expense) => {
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      const key = d.toLocaleString('ru-RU', { month: 'short', year: '2-digit' });
+      if (!monthly[key]) monthly[key] = { name: key, income: 0, expense: 0, sortDate: new Date(d.getFullYear(), d.getMonth(), 1).getTime() };
+      monthly[key].income += income;
+      monthly[key].expense += expense;
+    };
+
+    deals.forEach(d => {
+      // 1. Закупка (расход)
+      const totalQty = (d.quantity || 0) + (d.sold_quantity || 0);
+      if (d.is_accounted !== false && totalQty > 0) {
+        const buySum = totalQty * Number(d.buy_price);
+        feed.push({
+          id: `buy-${d.id}`, type: 'purchase', date: new Date(d.created_at),
+          title: `Закуп: ${d.model}`, sub: `${totalQty} шт.`, amount: -buySum
+        });
+        addToMonth(d.created_at, 0, buySum);
+      }
+      
+      // 2. Продажа (доход)
+      if (d.sold_quantity > 0 && d.sold_at) {
+        const sellSum = d.sold_quantity * Number(d.sell_price);
+        feed.push({
+          id: `sell-${d.id}`, type: 'sale', date: new Date(d.sold_at),
+          title: `Продажа: ${d.model}`, sub: `${d.sold_quantity} шт.`, amount: sellSum
+        });
+        addToMonth(d.sold_at, sellSum, 0);
+      }
+
+      // 3. Расходы по сделке
+      if (d.expenses && d.expenses.length > 0) {
+        d.expenses.forEach(e => {
+          const expDate = new Date(e.created_at || d.created_at);
+          feed.push({
+            id: `dexp-${e.id}`, type: 'expense', date: expDate,
+            title: e.category, sub: d.model, amount: -Number(e.amount)
+          });
+          addToMonth(expDate, 0, Number(e.amount));
+        });
+      }
+    });
+
+    // 4. Общие расходы
+    generalExpenses.forEach(e => {
+      const expDate = new Date(e.created_at || Date.now());
+      feed.push({
+        id: `gexp-${e.id}`, type: 'expense', date: expDate,
+        title: e.category, sub: 'Общий расход', amount: -Number(e.amount)
+      });
+      addToMonth(expDate, 0, Number(e.amount));
+    });
+
+    // Сортируем ленту от новых к старым
+    feed.sort((a, b) => b.date.getTime() - a.date.getTime());
+    
+    // Сортируем месяцы по хронологии
+    const cashFlow = Object.values(monthly).sort((a, b) => a.sortDate - b.sortDate);
+
+    return { transactionFeed: feed.slice(0, 15), cashFlowData: cashFlow }; // Берем 15 последних транзакций
+  }, [deals, generalExpenses]);
     const { filteredStock, filteredSold } = useMemo(() => {
     const filterFn = (list) => {
       return list.filter(deal => {
@@ -1226,23 +1294,58 @@ function App() {
           🗑️ {isActionLoading ? 'Очистка...' : 'Очистить статистику'}
         </button>
 
-        {showChart && chartData.length > 0 && (
-          <div className="card">
-            <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Прибыль по месяцам</h3>
-            <div style={{ width: '100%', height: 220 }}>
+                {showChart && cashFlowData.length > 0 && (
+          <div className="card" style={{ paddingBottom: 10 }}>
+            <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Движение денежных средств</h3>
+            <div style={{ width: '100%', height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
+                <ComposedChart data={cashFlowData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
-                  <Tooltip cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} formatter={(value) => [formatMoney(value), 'Прибыль']} />
-                  <Bar dataKey="profit" maxBarSize={45} radius={[6, 6, 0, 0]}>
-                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#34c759' : '#ff3b30'} style={{ filter: `drop-shadow(0 0 5px ${entry.profit >= 0 ? 'rgba(52,199,89,0.5)' : 'rgba(255,59,48,0.5)'})` }} />)}
-                    <LabelList dataKey="profit" position="center" fill="#ffffff" style={{ fontWeight: 'bold', fontSize: 13, textShadow: '0 1px 2px rgba(0,0,0,0.4)' }} formatter={(value) => { if (hideAmounts) return '***'; if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M'; if (value >= 1000) return (value / 1000).toFixed(0) + 'k'; return value; }} />
-                  </Bar>
-                </BarChart>
+                  <Tooltip 
+                    cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} 
+                    contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} 
+                    formatter={(value, name) => [formatMoney(value), name === 'income' ? 'Доход (Приход)' : 'Расход (Убыток)']} 
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                  <Bar dataKey="income" name="income" fill="#34c759" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                  <Bar dataKey="expense" name="expense" fill="#ff3b30" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
         )}
+                <div className="card" style={{ paddingBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+            <h3 style={{ fontSize: 16, margin: 0 }}>История операций</h3>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Последние 15</span>
+          </div>
+          
+          {transactionFeed.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0', fontSize: 14 }}>Пока нет операций</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {transactionFeed.map((tx, idx) => (
+                <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: idx !== transactionFeed.length - 1 ? '1px solid var(--border)' : 'none', paddingBottom: idx !== transactionFeed.length - 1 ? 12 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {/* Иконка операции */}
+                    <div style={{ width: 36, height: 36, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: tx.amount > 0 ? 'rgba(52, 199, 89, 0.15)' : 'rgba(255, 59, 48, 0.1)', color: tx.amount > 0 ? 'var(--success)' : 'var(--danger)', fontSize: 16 }}>
+                      {tx.type === 'sale' ? '💰' : tx.type === 'purchase' ? '📦' : '📉'}
+                    </div>
+                    {/* Текст */}
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{tx.title}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{tx.sub} • {tx.date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</div>
+                    </div>
+                  </div>
+                  {/* Сумма */}
+                  <div style={{ fontWeight: 700, fontSize: 15, color: tx.amount > 0 ? 'var(--success)' : 'var(--text-main)', fontVariantNumeric: 'tabular-nums' }}>
+                    {tx.amount > 0 ? '+' : ''}{formatMoney(tx.amount)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     )
   }

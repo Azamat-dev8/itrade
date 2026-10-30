@@ -1319,7 +1319,6 @@ function App() {
             <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Движение денежных средств</h3>
             <div style={{ width: '100%', height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
-                              <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={cashFlowData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
                   

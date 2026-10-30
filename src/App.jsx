@@ -1014,15 +1014,24 @@ function App() {
     const feed = [];
     const monthly = {};
 
-    const addToMonth = (dateStr, income, expense) => {
+        const addToMonth = (dateStr, income, expense) => {
       if (!dateStr) return;
       const d = new Date(dateStr);
-      const key = d.toLocaleString('ru-RU', { month: 'short', year: '2-digit' });
-      if (!monthly[key]) monthly[key] = { name: key, income: 0, expense: 0, sortDate: new Date(d.getFullYear(), d.getMonth(), 1).getTime() };
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const key = `${year}-${month}`; // Железобетонный ключ для группировки
+      
+      if (!monthly[key]) {
+         monthly[key] = { 
+            name: d.toLocaleString('ru-RU', { month: 'short', year: '2-digit' }), 
+            income: 0, 
+            expense: 0, 
+            sortDate: new Date(year, month, 1).getTime() 
+         };
+      }
       monthly[key].income += income;
       monthly[key].expense += expense;
     };
-
             deals.forEach(d => {
       // 1. Продажа (доход). Считаем выручку.
       if (d.sold_quantity > 0 && d.sold_at) {

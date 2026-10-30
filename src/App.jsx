@@ -1310,16 +1310,29 @@ function App() {
             <h3 style={{ fontSize: 16, marginTop: 0, marginBottom: 15 }}>Движение денежных средств</h3>
             <div style={{ width: '100%', height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
+                              <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={cashFlowData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#8e8e93' }} />
+                  
                   <Tooltip 
                     cursor={{ fill: isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} 
                     contentStyle={{ borderRadius: 12, border: 'none', backgroundColor: isDarkTheme ? '#1c1c1e' : '#ffffff', color: isDarkTheme ? '#fff' : '#000' }} 
-                    formatter={(value, name) => [formatMoney(value), name === 'income' ? 'Выручка с продаж' : 'Расходы (Ремонт, Такси и др.)']} 
+                    formatter={(value, name) => {
+                      // Вот тут мы четко разделяем названия
+                      if (name === 'income') return [formatMoney(value), 'Выручка (Доход)'];
+                      if (name === 'expense') return [formatMoney(value), 'Расходы (Ремонт, Такси и др.)'];
+                      return [formatMoney(value), name];
+                    }} 
                   />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                  <Bar dataKey="income" name="Доход" fill="#34c759" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                  <Bar dataKey="expense" name="Расход" fill="#ff3b30" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                  
+                  <Legend 
+                    iconType="circle" 
+                    wrapperStyle={{ fontSize: 12, paddingTop: 10 }} 
+                    formatter={(value) => value === 'income' ? 'Доход' : 'Расход'} 
+                  />
+                  
+                  <Bar dataKey="income" name="income" fill="#34c759" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                  <Bar dataKey="expense" name="expense" fill="#ff3b30" radius={[4, 4, 0, 0]} maxBarSize={30} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

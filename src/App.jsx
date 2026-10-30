@@ -1089,7 +1089,18 @@ function App() {
       filteredSold: filterFn(soldDeals)
     };
   }, [inStockDeals, soldDeals, searchQuery, filterModels]);
-
+  // Умные иконки для категорий расходов
+  const getCategoryIcon = (cat) => {
+    if (!cat) return '💸';
+    const c = cat.toLowerCase();
+    if (c.includes('авито') || c.includes('реклам')) return '📢';
+    if (c.includes('такси') || c.includes('доставк')) return '🚕';
+    if (c.includes('бензин') || c.includes('заправк')) return '⛽';
+    if (c.includes('запчаст') || c.includes('ремонт')) return '🛠️';
+    if (c.includes('аренд')) return '🏢';
+    if (c.includes('ед') || c.includes('обед')) return '🍔';
+    return '💸';
+  };
   const getDaysOnStock = (deal) => {
     const start = new Date(deal.created_at || Date.now());
     const end = (deal.quantity === 0 && deal.sold_at) ? new Date(deal.sold_at) : new Date();
@@ -1898,48 +1909,98 @@ function App() {
   )
 
   // =============== ДОП РАСХОДЫ ===============
+    // =============== ДОП РАСХОДЫ ===============
   const renderFinance = () => (
-    <div>
+    <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
       <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 20, paddingLeft: 50 }}>Доп. расходы</h2>
       
+      {/* Две карточки со статистикой */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
         <div className="card" style={{ flex: 1, margin: 0, padding: 15, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Потрачено за месяц</div>
-          <div style={{ fontSize: 20, fontWeight: 'bold', color: 'var(--danger)' }}>-{formatMoney(finStats.thisMonthTotal)}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>
+            -{formatMoney(finStats.thisMonthTotal)}
+          </div>
         </div>
         <div className="card" style={{ flex: 1, margin: 0, padding: 15, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Больше всего уходит на</div>
-          <div style={{ fontSize: 16, fontWeight: 'bold', color: 'var(--warning)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{finStats.topCategory[0]}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Топ категория</div>
+          <div style={{ fontSize: 16, fontWeight: 'bold', color: 'var(--warning)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {getCategoryIcon(finStats.topCategory[0])} {finStats.topCategory[0]}
+          </div>
         </div>
       </div>
 
-      <div className="card">
+      {/* Форма добавления */}
+      <div className="card" style={{ backgroundColor: isDarkTheme ? '#1c1c1e' : '#fff' }}>
+        <h3 style={{ fontSize: 16, marginTop: 0, color: 'var(--text-muted)' }}>Добавить расход</h3>
         <form onSubmit={addGeneralExpense}>
-          <input className="input-field" type="text" inputMode="numeric" placeholder="Сумма (₽)" value={genExpAmount} onChange={(e) => setGenExpAmount(e.target.value.replace(/[^\d]/g, ''))} />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input 
+              className="input-field" 
+              type="text" 
+              inputMode="numeric" 
+              placeholder="Сумма (₽)" 
+              value={genExpAmount} 
+              onChange={(e) => setGenExpAmount(e.target.value.replace(/[^\d]/g, ''))} 
+              style={{ flex: 1, marginBottom: 0 }} 
+            />
+            <select 
+              className="input-field" 
+              value={genExpCategory} 
+              onChange={(e) => setGenExpCategory(e.target.value)}
+              style={{ flex: 1, marginBottom: 0, color: 'var(--text-main)', backgroundColor: 'var(--bg-color)', appearance: 'auto' }}
+            >
+              <option value="Авито">Авито</option>
+              <option value="Реклама">Реклама</option>
+              <option value="Аренда">Аренда</option>
+              <option value="Такси">Такси</option>
+              <option value="Бензин">Бензин</option>
+              <option value="Еда">Еда</option>
+              <option value="Свой вариант">Свой вариант</option>
+            </select>
+          </div>
           
-          <select 
-            className="input-field" 
-            value={genExpCategory} 
-            onChange={(e) => setGenExpCategory(e.target.value)}
-            style={{ color: 'var(--text-main)', backgroundColor: 'var(--bg-color)', appearance: 'auto' }}
-          >
-            <option value="Авито">Авито</option><option value="Реклама">Реклама</option><option value="Аренда">Аренда</option><option value="Такси">Такси</option><option value="Бензин">Бензин</option><option value="Еда">Еда</option><option value="Свой вариант">Свой вариант</option>
-          </select>
+          {genExpCategory === 'Свой вариант' && (
+            <input className="input-field" type="text" placeholder="Название расхода" value={customGenExpCategory} onChange={(e) => setCustomGenExpCategory(e.target.value)} style={{ marginTop: 10 }} />
+          )}
           
-          {genExpCategory === 'Свой вариант' && <input className="input-field" type="text" placeholder="Название расхода" value={customGenExpCategory} onChange={(e) => setCustomGenExpCategory(e.target.value)} />}
-          <button className="btn-primary" type="submit" style={{ backgroundColor: 'var(--danger)', marginTop: 10 }}>Добавить</button>
+          <button className="btn-primary" type="submit" style={{ backgroundColor: 'var(--danger)', marginTop: 15, padding: '12px' }}>Добавить расход</button>
         </form>
       </div>
 
-      {generalExpenses.map(exp => (
-        <div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8, alignItems: 'center', borderLeft: '4px solid var(--danger)' }}>
-          <div style={{ fontWeight: 600 }}>{exp.category}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontWeight: 700, color: 'var(--danger)', fontVariantNumeric: 'tabular-nums' }}>-{formatMoney(exp.amount)}</div>
-            <button className="icon-btn" onClick={() => deleteExpense(exp.id)}>🗑️</button>
+      {/* Лента расходов (как банковская выписка) */}
+      <div style={{ marginTop: 24 }}>
+        <h3 style={{ fontSize: 16, marginBottom: 15, color: 'var(--text-muted)', paddingLeft: 5 }}>История расходов</h3>
+        
+        {generalExpenses.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px 0', backgroundColor: 'var(--card-bg)', borderRadius: 16 }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>🧾</div>
+            <div>Расходов пока нет</div>
           </div>
-        </div>
-      ))}
+        ) : (
+          generalExpenses.map((exp, idx) => (
+            <div key={exp.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', marginBottom: 8, alignItems: 'center', borderLeft: '4px solid var(--danger)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255, 59, 48, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                  {getCategoryIcon(exp.category)}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{exp.category}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {new Date(exp.created_at || Date.now()).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ fontWeight: 700, color: 'var(--danger)', fontVariantNumeric: 'tabular-nums', fontSize: 16 }}>
+                  -{formatMoney(exp.amount)}
+                </div>
+                <button className="icon-btn" onClick={() => deleteExpense(exp.id)} style={{ opacity: 0.5, padding: 4 }}>🗑️</button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   )
 
